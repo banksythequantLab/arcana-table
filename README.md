@@ -2,12 +2,17 @@
 
 **Play D&D with an AI co-DM — and do real push-ups for your natural 20s.**
 
-Arcana Table is a WebMCP-powered virtual tabletop. Open it in a WebMCP-enabled
-browser and your AI agent pulls up a chair as co-Dungeon-Master: it narrates,
-moves tokens, reveals the dungeon, runs combat, and rolls dice — through
-structured tools registered with `navigator.modelContext` / `document.modelContext`,
-with every call visible in the on-screen Agent Log and sensitive calls gated
-behind player approval.
+Arcana Table is a WebMCP-powered virtual tabletop with an **AI Dungeon Master
+built in**. Open the URL, type what you do, and the DM answers — narrating,
+moving tokens, revealing the dungeon, running combat, and rolling public dice
+through structured tools registered on `document.modelContext`. Every call
+shows in the on-screen Agent Log, and destructive ones wait for your ✓.
+
+**The DM has no special powers.** It discovers what it can do by calling
+`document.modelContext.getTools()` and acts by calling `executeTool()` — the
+exact surface an outside ChatGPT or Claude agent uses. So an external agent can
+take the co-DM seat too, through the same contract. The page doesn't just claim
+its tools are real; the built-in DM is the proof.
 
 And when a roll really matters, the agent can invoke **Heroic Effort**: it stakes
 a real exercise against the dice. Ten jumping jacks for +2. Fifteen squats for
@@ -24,9 +29,14 @@ Built for [The WebMCP Challenge](https://webmcp.devpost.com/) (Devpost, 2026).
    browser hasn't implemented WebMCP yet. No flags, no setup. Where the browser
    *does* ship WebMCP natively, the native implementation wins and the badge
    says `WebMCP native` instead of `polyfill`.
-2. Ask your agent something like:
-   > "You're my co-DM. Look at the board, set the scene, and run me through this dungeon. Offer me Heroic Effort challenges when rolls matter."
-3. No agent? Everything works by hand from the **🎩 DM Panel** tab.
+2. **Just start playing.** The built-in DM opens the scene. Type what you do —
+   *"I push the iron door open and listen"* — and it answers on the board.
+3. **Or bring your own agent.** In a WebMCP-capable agent browser, point your
+   agent at the page: *"You're my co-DM. Read the board, set the scene, and run
+   me through this dungeon. Offer Heroic Effort when a roll matters."* It drives
+   the identical 17 tools.
+4. **Or run it yourself.** The **🎩 DM Panel** tab does everything the tools do,
+   by hand — the game never depends on a network call.
 
 Console demo (works in any browser — same tool surface, no flag needed):
 
@@ -92,6 +102,24 @@ Design choices worth noting:
 Reps are counted by tap/spacebar (honor system, works everywhere). Challenges
 are always optional, and the agent is instructed via tool descriptions to scale
 stakes to the fiction and read `get_fitness_log` to vary muscle groups.
+
+## The built-in DM
+
+`js/dm.js` is a ~180-line agent loop, and it is deliberately unprivileged:
+
+1. `getTools()` on the live registry → translated into OpenAI function specs.
+2. Conversation + tools → `worker/` (a ~120-line Cloudflare Worker) → OpenAI.
+   The Worker holds the API key so no key ever reaches a browser; it is
+   origin-locked, size-capped, and rate-limited to 40 requests/min per IP.
+3. Tool calls come back → executed via `executeTool()` → results fed back →
+   loop, up to 6 hops, then the DM speaks.
+
+The DM is prompted to never narrate a roll it didn't actually make, to offer
+Heroic Effort only when a roll matters, to read `get_fitness_log` so it varies
+muscle groups and eases off, and to accept a denied approval without arguing.
+
+If the Worker is unconfigured or unreachable it returns a friendly message and
+the table stays fully playable from the DM panel. See `worker/README.md`.
 
 ## Run locally
 

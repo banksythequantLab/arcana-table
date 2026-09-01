@@ -13,7 +13,7 @@ const ALLOWED = [
 ];
 
 // Keep a runaway tab (or a curious stranger) from spending real money.
-const LIMITS = { bodyBytes: 96_000, messages: 60, tools: 40, maxTokens: 700, perIpPerHour: 120 };
+const LIMITS = { bodyBytes: 96_000, messages: 60, tools: 40, maxTokens: 700 };
 
 const cors = (origin) => ({
   'access-control-allow-origin': origin,
@@ -38,13 +38,17 @@ function pickOrigin(req, env) {
   return null;
 }
 
+// Cloudflare's native rate limiter — a config-only binding, no KV namespace.
+// If the binding is absent the Worker still runs, just uncapped.
 async function rateLimited(req, env) {
-  if (!env.RATE) return false;                       // KV not bound → skip
+  if (!env.RATE?.limit) return false;
   const ip = req.headers.get('CF-Connecting-IP') || 'anon';
-  const key = `rl:${ip}:${new Date().toISOString().slice(0, 13)}`;   // per hour
-  const n = parseInt((await env.RATE.get(key)) || '0', 10) + 1;
-  await env.RATE.put(key, String(n), { expirationTtl: 3900 });
-  return n > (parseInt(env.PER_IP_PER_HOUR || '', 10) || LIMITS.perIpPerHour);
+  try {
+    const { success } = await env.RATE.limit({ key: ip });
+    return !success;
+  } catch {
+    return false;                                    // never fail a turn over the limiter
+  }
 }
 
 export default {

@@ -7,7 +7,7 @@
 import { state } from './state.js';
 import { emit, onChange } from './actions.js';
 
-export const DM_ENDPOINT = 'https://arcana-dm.banksythequant.workers.dev';
+export const DM_ENDPOINT = 'https://arcana-dm.dj-b02.workers.dev';
 
 const MAX_TOOL_HOPS = 6;      // tool → result → tool … before we must speak
 const HISTORY_TURNS = 22;

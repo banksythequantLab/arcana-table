@@ -14,12 +14,25 @@ WebMCP let us fuse them: an agent that improvises the dungeon, and a mechanic
 where the dice reward real, physical effort. The agent brings the dungeon; you
 bring the muscle.
 
+The build started as a board that *exposed* tools and expected you to bring
+your own agent — and it was lifeless. You opened it and clicked buttons at
+yourself. Putting a real DM in the seat, reachable through the same tools an
+external agent would use, is what turned a protocol demo into a game.
+
 ## What it does
 
-Arcana Table is a virtual tabletop that any WebMCP-capable agent can co-run.
-Open the live URL, tell your agent "you're my co-DM," and it starts playing —
-narrating scenes, moving tokens across a cel-shaded battle map, revealing fog
-of war, spawning monsters, running initiative, and rolling dice in the open.
+Arcana Table is a virtual tabletop with an AI Dungeon Master built in. Open the
+live URL and you are playing in about four seconds: the DM sets the scene, you
+type what you do, and it answers — narrating, moving tokens across a cel-shaded
+battle map, lifting fog of war, spawning monsters, running initiative, and
+rolling dice in the open where you can see them.
+
+The DM is not privileged. It finds out what it can do by calling
+`document.modelContext.getTools()` and acts by calling `executeTool()` — the
+same public surface an outside ChatGPT or Claude agent uses, so an external
+agent can take the co-DM seat through the identical contract. That is the
+demonstration: the page doesn't assert its tool surface is real, it hands the
+seat to an agent and lets you watch.
 
 Its signature system is **Heroic Effort**: before a roll that matters, the
 agent can stake a real exercise against the dice. Ten jumping jacks for +2.
@@ -29,6 +42,12 @@ tap/spacebar ring with a timer, and the reward applies automatically to your
 next roll — publicly, in the on-screen dice tray.
 
 ## How WebMCP powers it
+
+- **The built-in DM is a WebMCP client, not a shortcut.** `js/dm.js` reads the
+  live registry with `getTools()`, translates it to function specs, and invokes
+  everything through `executeTool()`. It cannot touch game state any other way.
+  A ~120-line Cloudflare Worker holds the API key so none reaches a browser —
+  origin-locked, size-capped, 40 req/min per IP.
 
 - **17 tools** registered through `document.modelContext` / `navigator.modelContext`
   — reads (`get_board_state`, `get_character_sheet`, `get_fitness_log`, all
@@ -94,10 +113,11 @@ multiplayer parties, and AI-generated campaign art from our ComfyUI pipeline.
 play D&D. Almost none of them want to be the Dungeon Master. And nobody —
 nobody — wants to do burpees alone. Arcana Table fixes both."
 
-**0:20–0:40 — Meet the table.** Screen: the board. "This is a virtual tabletop
-that speaks WebMCP. Seventeen tools, registered right in the browser — and you
-don't need a flag or a special build, just this URL. Watch what happens when I
-tell my agent it's my co-DM." Show the agent badge + Agent Log.
+**0:20–0:40 — Meet the table.** Screen: the board, DM already speaking. "No
+setup, no flag — just this URL, and a Dungeon Master already running the game."
+Type a line, let it answer and move a token. "Seventeen tools, registered right
+in the browser. And that DM has no back door — it's calling the same
+`document.modelContext` your agent would." Point at the Agent Log lighting up.
 
 **0:40–1:50 — Live play (the core).** Agent narrates, reveals the crypt,
 spawns a dragon, starts combat (call out: "combat tools just registered —
