@@ -6,7 +6,7 @@ import { extname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const root = join(fileURLToPath(import.meta.url), '..', '..');
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml' };
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.mjs': 'text/javascript' };
 
 const server = createServer(async (req, res) => {
   const path = req.url === '/' ? '/index.html' : req.url.split('?')[0];
@@ -38,7 +38,46 @@ const check = (label, cond, extra = '') => {
   else { fail++; console.log(`  ✗ ${label} ${extra}`); }
 };
 
-console.log('— tool surface —');
+console.log('— WebMCP surface (the real document.modelContext, via polyfill) —');
+const mcInfo = await page.evaluate(() => {
+  const ctx = document.modelContext || navigator.modelContext;
+  return {
+    present: !!ctx,
+    hasRegister: typeof ctx?.registerTool === 'function',
+    hasUnregister: typeof ctx?.unregisterTool === 'function',
+    hasGetTools: typeof ctx?.getTools === 'function',
+    hasExecute: typeof ctx?.executeTool === 'function',
+    mode: window.__arcanaNativeWebMCP ? 'native' : 'polyfill',
+  };
+});
+check('document.modelContext exists', mcInfo.present, JSON.stringify(mcInfo));
+check('registerTool + getTools + executeTool available', mcInfo.hasRegister && mcInfo.hasGetTools && mcInfo.hasExecute, JSON.stringify(mcInfo));
+
+// Enumerate + execute through the real WebMCP API, not our console shim.
+const mcNames = () => page.evaluate(async () =>
+  (await (document.modelContext || navigator.modelContext).getTools()).map(t => t.name));
+const listed = await mcNames();
+check(`WebMCP registry lists 14 tools (got ${listed.length})`, listed.length === 14, listed.join(','));
+check('readOnlyHint set on the read tools', await page.evaluate(async () => {
+  const tools = await (document.modelContext || navigator.modelContext).getTools();
+  const reads = ['get_board_state', 'get_character_sheet', 'get_fitness_log'];
+  return reads.every(n => tools.find(t => t.name === n)?.annotations?.readOnlyHint === true);
+}));
+// NOTE: this polyfill takes executeTool input as a JSON string (the spec says
+// object); agents drive this themselves, our execute() sees a parsed object.
+const execViaMc = (name, args = {}) => page.evaluate(async ([n, a]) => {
+  const ctx = document.modelContext || navigator.modelContext;
+  const tool = (await ctx.getTools()).find(t => t.name === n);
+  const out = await ctx.executeTool(tool, JSON.stringify(a));
+  return typeof out === 'string' ? JSON.parse(out) : out;
+}, [name, args]);
+
+const viaMc = await execViaMc('get_board_state');
+check('executeTool("get_board_state") via WebMCP returns the board', !!viaMc?.tokens?.length, JSON.stringify(viaMc).slice(0, 140));
+const rollViaMc = await execViaMc('roll_dice', { formula: '3d6', reason: 'via WebMCP' });
+check('executeTool("roll_dice") via WebMCP rolls 3d6', rollViaMc?.rolls?.length === 3 && rollViaMc.total >= 3 && rollViaMc.total <= 18, JSON.stringify(rollViaMc));
+
+console.log('— tool surface (shim) —');
 const tools = await page.evaluate(() => window.arcana.tools());
 check(`14 base tools registered (got ${tools.length})`, tools.length === 14, tools.join(','));
 
@@ -72,6 +111,9 @@ const combat = await call('start_combat');
 check('start_combat ok', combat.ok === true, JSON.stringify(combat));
 const toolsInCombat = await page.evaluate(() => window.arcana.tools());
 check(`combat tools live (got ${toolsInCombat.length})`, toolsInCombat.length === 17);
+const mcInCombat = await mcNames();
+check(`WebMCP registry grew to 17 during combat (got ${mcInCombat.length})`, mcInCombat.length === 17, mcInCombat.join(','));
+check('advance_turn is in the live WebMCP registry', mcInCombat.includes('advance_turn'));
 check('advance_turn works in combat', (await call('advance_turn')).ok === true);
 const dmg = await call('update_hp', { tokenId: 'Snaggle', delta: -3 });
 check('damage goblin (no approval needed)', dmg.ok && dmg.hp === 4, JSON.stringify(dmg));
@@ -95,6 +137,9 @@ check('apply_condition ok', (await call('apply_condition', { tokenId: 'Snaggle',
 check('end_combat ok', (await call('end_combat')).ok === true);
 const toolsAfter = await page.evaluate(() => window.arcana.tools());
 check(`combat tools unregistered (got ${toolsAfter.length})`, toolsAfter.length === 14);
+const mcAfter = await mcNames();
+check(`WebMCP registry shrank back to 14 via AbortSignal (got ${mcAfter.length})`, mcAfter.length === 14, mcAfter.join(','));
+check('advance_turn really left the WebMCP registry', !mcAfter.includes('advance_turn'), mcAfter.join(','));
 
 console.log('— Heroic Effort —');
 const chalPromise = call('propose_challenge', { exercise: 'burpees', reps: 3, reward: 'nat20', reason: 'The dragon rears back!' });

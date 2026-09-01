@@ -27,10 +27,15 @@ function renderHeader() {
   $('#scene-title').textContent = state.scene.title;
   $('#scene-mood').textContent = state.scene.mood;
   const badge = $('#agent-badge');
-  badge.className = 'badge ' + (agentState.available ? 'on' : 'off');
-  badge.innerHTML = agentState.available
-    ? `● Agent-ready · ${agentState.registered.length} tools live`
-    : `○ No WebMCP agent — DM panel active <span class="hint" title="Open this page in a WebMCP-enabled browser (Chrome 146+ with the WebMCP flag, or ChatGPT's browser) and your AI agent can co-DM through ${agentState.registered.length} registered tools.">?</span>`;
+  const n = agentState.registered.length;
+  const MODES = {
+    native:   { cls: 'on',  html: `● WebMCP native · ${n} tools live` },
+    polyfill: { cls: 'on',  html: `● WebMCP ready · ${n} tools live <span class="hint" title="Your browser doesn't ship WebMCP yet, so this page installed the open-source polyfill — the tool surface is real and agents can use it. In a browser with native WebMCP, that implementation is used instead.">polyfill</span>` },
+    missing:  { cls: 'off', html: `○ No tool surface — DM panel active <span class="hint" title="The WebMCP polyfill failed to load. The game is still fully playable from the DM panel tab.">?</span>` },
+  };
+  const m = MODES[agentState.mode] || MODES.missing;
+  badge.className = 'badge ' + m.cls;
+  badge.innerHTML = m.html;
 
   const boosts = [];
   if (state.boosts.setRoll === 20) boosts.push('⚡ NAT 20 armed');

@@ -18,9 +18,12 @@ Built for [The WebMCP Challenge](https://webmcp.devpost.com/) (Devpost, 2026).
 
 ## Try it
 
-1. Open the live URL in a WebMCP-enabled browser:
-   - **Chrome 146+**: enable `chrome://flags/#enable-webmcp-for-testing` (or use a build with WebMCP on), or
-   - **ChatGPT's browser** with WebMCP support.
+1. **Just open the live URL — in any modern browser.** The page ships the
+   vendored [`@mcp-b/webmcp-polyfill`](https://github.com/WebMCP-org/npm-packages)
+   (MIT), so `document.modelContext` and all 17 tools are real even where the
+   browser hasn't implemented WebMCP yet. No flags, no setup. Where the browser
+   *does* ship WebMCP natively, the native implementation wins and the badge
+   says `WebMCP native` instead of `polyfill`.
 2. Ask your agent something like:
    > "You're my co-DM. Look at the board, set the scene, and run me through this dungeon. Offer me Heroic Effort challenges when rolls matter."
 3. No agent? Everything works by hand from the **🎩 DM Panel** tab.
@@ -62,16 +65,20 @@ Design choices worth noting:
 
 - **One action API, two hands on the table.** Tools and UI buttons call the same
   `actions.js` functions — the manual DM panel is proof the agent has no secret powers.
-- **Dynamic tool registration.** Combat tools exist only while combat runs
-  (`registerTool`/`unregisterTool` on state change), keeping the agent's toolset
-  matched to the game state.
+- **Dynamic tool registration, done the spec way.** Combat tools exist only
+  while combat runs. Each tool is registered with an `AbortController` —
+  `registerTool(def, { signal })` — and unregistered by `controller.abort()`,
+  which is how the WebMCP spec removes tools and fires `toolchange` so agents
+  refresh. The test suite asserts this against the live registry: `getTools()`
+  returns 14, then 17 once combat starts, then 14 again when it ends.
 - **Human-in-the-loop by construction.** Destructive calls (`remove_token`,
   PC damage via `update_hp`) suspend inside `execute()` until the player clicks
   ✓ Allow / ✗ Deny on the board. Denials return structured guidance, not errors.
 - **Public dice.** Rolls animate on-screen for both players; earned boosts are
   consumed transparently and logged.
 - **Feature detection, no hard dependency.** `document.modelContext ?? navigator.modelContext`,
-  with a `window.arcana` shim exposing the identical tool surface for consoles and tests.
+  reported honestly in the header as `native` / `polyfill` / none, with a
+  `window.arcana` shim exposing the identical tool surface for consoles and tests.
 
 ## Heroic Effort
 
@@ -100,8 +107,11 @@ npx serve .        # or: python3 -m http.server 8080
 cd test && npm install && node smoke.mjs
 ```
 
-Drives the full tool surface headlessly through the `window.arcana` shim
-(Playwright + bundled Chromium) and screenshots the board.
+38 assertions, Playwright + Chromium. Drives the full tool surface **through the
+real `document.modelContext`** — enumerating tools with `getTools()`, invoking
+them with `executeTool()`, asserting `readOnlyHint` on the read tools, and
+proving the combat toolset registers and unregisters (14 → 17 → 14) — plus the
+approval Allow *and* Deny paths and a complete burpees-to-natural-20 loop.
 
 ## Art pipeline
 

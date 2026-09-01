@@ -11,7 +11,16 @@ const mc = () => (typeof document !== 'undefined' && document.modelContext)
              || (typeof navigator !== 'undefined' && navigator.modelContext)
              || null;
 
-export const agentState = { available: false, registered: [] };
+// native → the browser ships WebMCP · polyfill → our vendored shim is providing
+// it · missing → no tool surface at all (manual DM panel still runs the game).
+export function webmcpMode() {
+  const ctx = mc();
+  if (!ctx || typeof ctx.registerTool !== 'function') return 'missing';
+  if (window.__arcanaNativeWebMCP) return 'native';
+  return (ctx.__isWebMCPPolyfill || ctx.isWebMCPPolyfill) ? 'polyfill' : 'native';
+}
+
+export const agentState = { available: false, mode: 'missing', registered: [] };
 
 // ── approval queue ───────────────────────────────────────────────────────────
 let approvalSeq = 0;
@@ -177,7 +186,9 @@ export const COMBAT_TOOLS = [
 ];
 
 // ── registration ─────────────────────────────────────────────────────────────
-const registered = new Map();   // name → true (guard double-registration)
+// Per the WebMCP spec, a tool is unregistered by aborting the AbortSignal it
+// was registered with — that fires `toolchange` so agents refresh their list.
+const registered = new Map();   // name → AbortController
 
 function wrap(def) {
   return {
@@ -211,26 +222,34 @@ async function registerSet(defs) {
   const ctx = mc();
   for (const def of defs) {
     if (registered.has(def.name)) continue;
-    registered.set(def.name, true);
-    if (ctx) { try { await ctx.registerTool(wrap(def)); } catch (e) { console.warn('registerTool failed:', def.name, e); } }
+    const controller = new AbortController();
+    registered.set(def.name, controller);
+    if (ctx) {
+      try {
+        await ctx.registerTool(wrap(def), { signal: controller.signal });
+      } catch (e) {
+        console.warn('registerTool failed:', def.name, e);
+      }
+    }
     agentState.registered.push(def.name);
   }
   emit('agent');
 }
 
 async function unregisterSet(defs) {
-  const ctx = mc();
   for (const def of defs) {
-    if (!registered.has(def.name)) continue;
+    const controller = registered.get(def.name);
+    if (!controller) continue;
     registered.delete(def.name);
-    if (ctx && typeof ctx.unregisterTool === 'function') { try { await ctx.unregisterTool(def.name); } catch (e) { /* older builds */ } }
+    try { controller.abort(); } catch (e) { /* already gone */ }
     agentState.registered = agentState.registered.filter(n => n !== def.name);
   }
   emit('agent');
 }
 
 export async function initTools() {
-  agentState.available = !!mc();
+  agentState.mode = webmcpMode();
+  agentState.available = agentState.mode !== 'missing';
   await registerSet(BASE_TOOLS);
 
   // dynamic combat toolset

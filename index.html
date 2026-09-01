@@ -10,6 +10,14 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:ital,wght@0,400;0,600;0,800;1,400&display=swap">
 <link rel="stylesheet" href="css/style.css">
+
+<!-- WebMCP polyfill (vendored, MIT). Self-initializes, so the tool surface is
+     real in every browser — judges do not need a Chrome flag to play. When the
+     browser ships WebMCP natively, the native implementation wins and the badge
+     says so. -->
+<script>window.__webMCPPolyfillOptions = { installTestingShim: true };
+  window.__arcanaNativeWebMCP = !!(document.modelContext || navigator.modelContext);</script>
+<script src="vendor/webmcp-polyfill.iife.js"></script>
 </head>
 <body>
 
