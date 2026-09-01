@@ -56,11 +56,18 @@ function renderHeader() {
 // ── the table: DM speech + game events, interleaved in time ─────────────────
 const ICONS = { narrate: '📜', roll: '🎲', action: '👣', combat: '⚔️', loot: '💰', scene: '🗺️', challenge: '💪' };
 
+const norm = s => String(s).replace(/\s+/g, ' ').trim().slice(0, 120);
+
 function renderLog() {
   const el = $('#story-log');
+  // A DM that both speaks and calls narrate would print itself twice; show once.
+  const spoken = new Set(chat.messages.filter(m => m.role === 'dm').map(m => norm(m.text)));
   const feed = [
-    ...chat.messages.map((m, i) => ({ kind: 'chat', m, t: m.t ?? (i * 1e-6) })),
-    ...state.log.slice(-60).map(l => ({ kind: 'event', l, t: l.t })),
+    ...chat.messages.filter(m => m.text && m.text.trim())
+      .map((m, i) => ({ kind: 'chat', m, t: m.t ?? (i * 1e-6) })),
+    ...state.log.slice(-60)
+      .filter(l => !(l.type === 'narrate' && spoken.has(norm(l.text))))
+      .map(l => ({ kind: 'event', l, t: l.t })),
   ].sort((a, b) => a.t - b.t);
 
   el.innerHTML = feed.map(x => {

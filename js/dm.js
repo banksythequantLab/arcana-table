@@ -28,9 +28,19 @@ VOICE
 
 THE BOARD IS REAL
 - The player SEES the board. Anything you describe must be made true with tools.
-- Move a monster? call move_token. New room? set_scene / reveal_area. Something appears? add_token.
+- If you mention a creature, it must EXIST: call add_token in the same turn you
+  introduce it. Never describe a monster, NPC or object that is not on the board.
+  "Something shifts beyond the sarcophagus" is only allowed if you just spawned it.
+- Move a monster? call move_token. New room? set_scene / reveal_area.
 - Never say "you rolled a 14" — call roll_dice and react to what it actually returns.
 - Call get_board_state when you are unsure where things are. Do not guess positions.
+- If a tool returns an error, read it and adapt. Walls are real; pick another cell.
+
+HOW YOU SPEAK
+- Your reply text is shown to the player directly. That IS your narration.
+- Therefore do NOT call the narrate tool for your own prose — it would print
+  everything twice. (narrate exists for other agents that have no voice channel.)
+- Always end a turn with actual spoken text, never with tool calls alone.
 
 HEROIC EFFORT — your signature move
 - When a roll genuinely matters (a boss, a leap over a chasm, a last stand), you may call
@@ -113,6 +123,7 @@ export async function sendToDM(playerText, { silent = false } = {}) {
     ];
     if (playerText && silent) convo.push({ role: 'user', content: playerText });
 
+    let spoke = false;
     for (let hop = 0; hop <= MAX_TOOL_HOPS; hop++) {
       const reply = await ask(convo, tools);
 
@@ -130,14 +141,27 @@ export async function sendToDM(playerText, { silent = false } = {}) {
         }
         if (reply.content?.trim()) {
           chat.messages.push({ role: 'dm', text: reply.content.trim(), t: Date.now() });
+          spoke = true;
           emit('chat');
         }
         continue;                        // let the DM react to what the tools returned
       }
 
       const text = (reply.content || '').trim();
-      if (text) chat.messages.push({ role: 'dm', text, t: Date.now() });
+      if (text) { chat.messages.push({ role: 'dm', text, t: Date.now() }); spoke = true; }
       break;
+    }
+
+    // A turn must never end in silence. If the DM spent every hop on tools,
+    // ask once more with no tools available so it has to answer in prose.
+    if (!spoke) {
+      const last = await ask([...convo, { role: 'user', content: '(Now describe what just happened, in your DM voice. Do not call any tools.)' }], []);
+      const text = (last.content || '').trim();
+      chat.messages.push({
+        role: 'dm',
+        text: text || 'The dust settles. What do you do?',
+        t: Date.now(),
+      });
     }
   } catch (e) {
     chat.error = String(e.message || e);

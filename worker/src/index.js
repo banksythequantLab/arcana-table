@@ -51,6 +51,43 @@ async function rateLimited(req, env) {
   }
 }
 
+const callOpenAI = (key, payload) =>
+  fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
+    body: JSON.stringify(payload),
+  });
+
+// Model families disagree about parameter names and which values they accept
+// (max_tokens vs max_completion_tokens, fixed temperature, …). Rather than pin
+// this Worker to one generation, read the complaint and retry once without the
+// offending parameter — so swapping MODEL never silently breaks the table.
+function healPayload(payload, message) {
+  const p = { ...payload };
+  const unsupportedParam = /Unsupported parameter: '([^']+)'/.exec(message || '');
+  const unsupportedValue = /Unsupported value: '([^']+)'/.exec(message || '');
+  const renameHint = /Use '([^']+)' instead/.exec(message || '');
+
+  if (unsupportedParam) {
+    const bad = unsupportedParam[1];
+    const value = p[bad];
+    delete p[bad];
+    if (renameHint) p[renameHint[1]] = value;        // e.g. max_tokens → max_completion_tokens
+    return p;
+  }
+  if (unsupportedValue) {
+    delete p[unsupportedValue[1]];                   // e.g. temperature must stay default
+    return p;
+  }
+  // "…set reasoning_effort to 'none'" — take the instruction literally.
+  const setHint = /set (\w+) to '([^']+)'/.exec(message || '');
+  if (setHint) { p[setHint[1]] = setHint[2]; return p; }
+  // "…are not supported for <model>" naming a parameter we sent: drop it.
+  const notSupported = /^(\w+) (?:is|are) not supported/.exec(message || '');
+  if (notSupported && notSupported[1] in p) { delete p[notSupported[1]]; return p; }
+  return null;                                       // nothing we know how to fix
+}
+
 export default {
   async fetch(req, env) {
     const origin = pickOrigin(req, env);
@@ -64,7 +101,7 @@ export default {
       return json({ error: 'The DM is not configured yet: set the OPENAI_API_KEY secret on this Worker.' }, 503, origin);
     }
     if (await rateLimited(req, env)) {
-      return json({ error: "The table is busy — too many requests from your connection this hour. Try again shortly, or keep playing from the DM panel." }, 429, origin);
+      return json({ error: "The table is busy — too many requests from your connection just now. Give it a minute, or keep playing from the DM panel." }, 429, origin);
     }
 
     const raw = await req.text();
@@ -77,29 +114,40 @@ export default {
     const tools = Array.isArray(body.tools) ? body.tools.slice(0, LIMITS.tools) : [];
     if (!messages || !messages.length) return json({ error: 'No messages supplied.' }, 400, origin);
 
-    const payload = {
+    let payload = {
       model: env.MODEL || MODEL_DEFAULT,
       messages,
-      max_tokens: Math.min(Number(body.max_tokens) || LIMITS.maxTokens, LIMITS.maxTokens),
+      max_completion_tokens: Math.min(Number(body.max_tokens) || LIMITS.maxTokens, LIMITS.maxTokens),
       temperature: 0.9,
     };
-    if (tools.length) { payload.tools = tools; payload.tool_choice = 'auto'; payload.parallel_tool_calls = false; }
+    if (tools.length) {
+      payload.tools = tools;
+      payload.tool_choice = 'auto';
+      payload.parallel_tool_calls = false;
+      // Reasoning-capable models refuse function tools on /v1/chat/completions
+      // unless reasoning is off. A DM wants fast and vivid, not deliberative.
+      payload.reasoning_effort = 'none';
+    }
 
-    let upstream;
+    let upstream, text;
     try {
-      upstream = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          authorization: `Bearer ${env.OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify(payload),
-      });
+      upstream = await callOpenAI(env.OPENAI_API_KEY, payload);
+      text = await upstream.text();
+
+      // One self-heal pass for parameter disagreements between model families.
+      for (let attempt = 0; attempt < 2 && !upstream.ok && upstream.status === 400; attempt++) {
+        let msg = '';
+        try { msg = JSON.parse(text)?.error?.message || ''; } catch { /* keep '' */ }
+        const healed = healPayload(payload, msg);
+        if (!healed) break;
+        payload = healed;
+        upstream = await callOpenAI(env.OPENAI_API_KEY, payload);
+        text = await upstream.text();
+      }
     } catch (e) {
       return json({ error: 'Could not reach the DM right now. The DM panel still runs the table.' }, 502, origin);
     }
 
-    const text = await upstream.text();
     if (!upstream.ok) {
       let detail = text.slice(0, 300);
       try { detail = JSON.parse(text)?.error?.message || detail; } catch { /* keep raw */ }
