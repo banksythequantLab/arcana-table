@@ -6,6 +6,7 @@ import { state, MAPS } from './state.js';
 import * as A from './actions.js';
 import { onChange } from './actions.js';
 import { agentState, pendingApprovals, settleApproval } from './tools.js';
+import { chat, sendToDM } from './dm.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -14,11 +15,9 @@ export function initUI() {
   bindTabs();
   bindDMPanel();
   bindChallengeModal();
+  bindSay();
   onChange(render);
   render('all');
-  if (!state.log.length) {
-    A.narrate({ text: 'Welcome to Arcana Table. Connect an agent as your co-DM — or run the table yourself from the DM panel. Torches are lit. The keep is waiting.' });
-  }
   state.tokens.filter(t => t.kind === 'pc').forEach(t => A.revealAround(t.x, t.y, 3));
 }
 
@@ -54,14 +53,49 @@ function renderHeader() {
   }
 }
 
-// ── story log ────────────────────────────────────────────────────────────────
+// ── the table: DM speech + game events, interleaved in time ─────────────────
 const ICONS = { narrate: '📜', roll: '🎲', action: '👣', combat: '⚔️', loot: '💰', scene: '🗺️', challenge: '💪' };
+
 function renderLog() {
   const el = $('#story-log');
-  el.innerHTML = state.log.slice(-80).map(l =>
-    `<div class="entry ${l.type}"><span class="ic">${ICONS[l.type] || '•'}</span><div><b>${esc(l.actor)}</b> ${esc(l.text)}</div></div>`
-  ).join('');
+  const feed = [
+    ...chat.messages.map((m, i) => ({ kind: 'chat', m, t: m.t ?? (i * 1e-6) })),
+    ...state.log.slice(-60).map(l => ({ kind: 'event', l, t: l.t })),
+  ].sort((a, b) => a.t - b.t);
+
+  el.innerHTML = feed.map(x => {
+    if (x.kind === 'event') {
+      const l = x.l;
+      return `<div class="entry ${l.type}"><span class="ic">${ICONS[l.type] || '•'}</span><div><b>${esc(l.actor)}</b> ${esc(l.text)}</div></div>`;
+    }
+    const m = x.m;
+    if (m.role === 'user') return `<div class="say you"><b>You</b> ${esc(m.text)}</div>`;
+    if (m.role === 'system') return `<div class="say sys">${esc(m.text)}</div>`;
+    return `<div class="say dm"><b>DM</b> ${esc(m.text)}</div>`;
+  }).join('')
+    + (chat.busy ? `<div class="say dm thinking"><b>DM</b> <span class="dots"><i></i><i></i><i></i></span></div>` : '')
+    + (!chat.messages.length && !chat.busy ? `<div class="say sys">The table is set. Say what you do, and the Dungeon Master will answer.</div>` : '');
   el.scrollTop = el.scrollHeight;
+}
+
+function bindSay() {
+  const form = $('#say-row'), input = $('#say');
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text || chat.busy) return;
+    input.value = '';
+    sendToDM(text);
+    document.querySelector('.tab[data-pane="pane-story"]')?.click();
+  });
+}
+
+function renderSay() {
+  const input = $('#say'), btn = $('#say-btn');
+  input.disabled = chat.busy;
+  btn.disabled = chat.busy;
+  btn.textContent = chat.busy ? '…' : '▶';
+  input.placeholder = chat.busy ? 'The DM is thinking…' : 'What do you do?';
 }
 
 // ── party panel ──────────────────────────────────────────────────────────────
@@ -88,6 +122,9 @@ function renderParty() {
 
 // ── agent log + approvals ────────────────────────────────────────────────────
 function renderAgent() {
+  $('#agent-sub').textContent = chat.error
+    ? '· built-in DM offline, DM panel still works'
+    : chat.busy ? '· built-in DM is acting' : '· built-in DM + any external agent';
   const el = $('#agent-log');
   el.innerHTML = state.agentLog.slice(-40).reverse().map(l => {
     const chip = { ok: '✓', called: '…', 'awaiting-approval': '✋', denied: '✗', error: '!' }[l.status] || '•';
@@ -210,6 +247,7 @@ function renderDM() {
 function render() {
   renderHeader();
   renderLog();
+  renderSay();
   renderParty();
   renderAgent();
   renderDice();

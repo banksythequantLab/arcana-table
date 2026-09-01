@@ -158,6 +158,40 @@ check('boost consumed after roll', fit2.unspentBoosts.setRoll === null);
 
 check('loot awarded', (await call('award_loot', { items: ['Dragonfang Dagger'], gold: 50 })).gold === 50);
 
+// ── the built-in AI DM ───────────────────────────────────────────────────────
+// Mock the brain so the loop is tested without spending a token: the "model"
+// asks for a tool call, we assert the board actually changed, then it speaks.
+console.log('— built-in DM (mocked brain, real tools) —');
+let sawTools = null, hop = 0;
+await page.route('**/arcana-dm*/**', r => r.fulfill({ status: 200, body: '{}' }));
+await page.route(/arcana-dm.*workers\.dev/, async route => {
+  const body = route.request().postDataJSON();
+  sawTools = body.tools;
+  hop++;
+  const reply = hop === 1
+    ? { content: 'The wyrm uncoils from the dark.', tool_calls: [{ id: 'c1', type: 'function', function: { name: 'add_token', arguments: JSON.stringify({ name: 'Ember Wyrm', kind: 'monster', art: 'dragon', x: 9, y: 7, hp: 40 }) } }] }
+    : { content: 'It fixes one molten eye on you. What do you do?', tool_calls: [] };
+  await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(reply) });
+});
+
+await page.fill('#say', 'I push open the iron door and step through.');
+await page.click('#say-btn');
+await page.waitForFunction(() => document.querySelectorAll('.say.dm').length >= 2, { timeout: 20000 });
+
+check('DM was offered the live WebMCP tool list', Array.isArray(sawTools) && sawTools.length >= 14, `got ${sawTools?.length}`);
+check('tool specs carry name + JSON-schema parameters',
+  sawTools.every(t => t.type === 'function' && t.function.name && t.function.parameters?.type === 'object'));
+const spawned = await call('get_board_state');
+check('DM\'s tool call actually changed the board', spawned.tokens.some(t => t.name === 'Ember Wyrm'),
+  spawned.tokens.map(t => t.name).join(','));
+const said = await page.evaluate(() => [...document.querySelectorAll('.say.dm')].map(e => e.innerText));
+check('DM spoke in the transcript', said.some(s => /wyrm/i.test(s)), said.join(' | ').slice(0, 120));
+check('player turn is shown in the transcript',
+  await page.evaluate(() => [...document.querySelectorAll('.say.you')].some(e => /iron door/i.test(e.innerText))));
+check('DM tool call appears in the Agent Log',
+  await page.evaluate(() => [...document.querySelectorAll('#agent-log code')].some(e => e.textContent === 'add_token')));
+await page.unroute(/arcana-dm.*workers\.dev/);
+
 await page.waitForSelector('#dice-overlay', { state: 'hidden', timeout: 10000 });
 await page.waitForTimeout(600);
 await page.screenshot({ path: 'screens/board.png', fullPage: false });

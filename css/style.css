@@ -81,6 +81,27 @@ main{flex:1;display:flex;min-height:0}
 .entry.loot{color:#6B4E12;font-weight:800}
 .entry.scene{font:700 15px "Baloo 2",cursive;border-top:2px dashed #B8A77E;padding-top:8px}
 
+/* the table: spoken turns */
+.say{border-radius:12px;padding:8px 11px;font-size:14.5px;line-height:1.45;border:2.5px solid var(--ink)}
+.say b{display:block;font:700 11px "Baloo 2",cursive;letter-spacing:.09em;text-transform:uppercase;opacity:.65;margin-bottom:2px}
+.say.dm{background:#FFF6E2;box-shadow:2px 2px 0 rgba(46,34,51,.2)}
+.say.you{background:#DCE8FA;margin-left:22px}
+.say.sys{background:transparent;border:2px dashed #B8A77E;color:#6B5E76;font-size:13px;font-style:italic;text-align:center}
+.say.thinking{opacity:.85}
+.dots{display:inline-flex;gap:4px;padding:3px 0}
+.dots i{width:7px;height:7px;border-radius:50%;background:var(--ink);opacity:.35;animation:blink 1.1s infinite}
+.dots i:nth-child(2){animation-delay:.18s}
+.dots i:nth-child(3){animation-delay:.36s}
+@keyframes blink{0%,60%,100%{opacity:.25;transform:translateY(0)}30%{opacity:.9;transform:translateY(-3px)}}
+
+/* say something */
+#say-row{display:flex;gap:6px;padding:10px}
+#say-row input{flex:1;border-radius:10px;padding:9px 12px;font-size:14.5px}
+#say-row input:disabled{background:#E8E1D2;color:#7A6E80}
+#say-row .btn{padding:8px 14px}
+#say-row .btn:disabled{opacity:.5;cursor:default}
+#agent-sub{font-weight:400;opacity:.7;text-transform:none;letter-spacing:0}
+
 /* party */
 .pc-card{border:2.5px solid var(--ink);border-radius:12px;background:#fff;box-shadow:3px 3px 0 rgba(46,34,51,.25);
   padding:10px;margin-bottom:10px}

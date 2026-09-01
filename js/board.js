@@ -2,7 +2,7 @@
 // Canvas grid: cel-shaded tiles, chunky outlines, fog of war, drag-to-move.
 
 import { state, GRID_W, GRID_H, currentMap, isRevealed, isWalkable, findToken } from './state.js';
-import { moveToken, onChange } from './actions.js';
+import { moveToken, onChange, emit } from './actions.js';
 import { TOKEN_ART, TILE_COLORS } from './art.js';
 
 let canvas, ctx, cell = 44, offX = 0, offY = 0;
@@ -79,6 +79,7 @@ function onUp(e) {
   if (c && (c.x !== t.x || c.y !== t.y) && isWalkable(c.x, c.y)) {
     lastPos.set(t.id, c);                       // no snap-back animation
     moveToken({ tokenId: t.id, x: c.x, y: c.y });
+    emit('player-move');                        // the DM should react to this
   }
 }
 

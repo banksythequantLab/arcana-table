@@ -1,0 +1,19 @@
+name = "arcana-dm"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+
+[vars]
+# Swap the DM's brain here without touching code.
+MODEL = "gpt-4o-mini"
+ALLOWED_ORIGINS = "https://arcana-table.pages.dev,http://localhost:8080,http://127.0.0.1:8080"
+PER_IP_PER_HOUR = "120"
+
+# Optional per-IP rate limiting. Create the namespace, paste its id below, and
+# uncomment — without it the Worker still runs, just without the hourly cap:
+#   wrangler kv namespace create RATE
+# [[kv_namespaces]]
+# binding = "RATE"
+# id = "PASTE_NAMESPACE_ID_HERE"
+
+# The API key is a secret, never a var:
+#   wrangler secret put OPENAI_API_KEY

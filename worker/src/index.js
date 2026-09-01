@@ -1,0 +1,117 @@
+// ── Arcana Table · DM brain proxy ────────────────────────────────────────────
+// A thin Cloudflare Worker that lets the page talk to OpenAI without shipping a
+// key to the browser. It holds NO game logic: the page sends the conversation
+// plus the tool list it read from document.modelContext, and the model's tool
+// calls are executed back in the page through the real WebMCP surface.
+
+const MODEL_DEFAULT = 'gpt-4o-mini';
+const ALLOWED = [
+  'https://arcana-table.pages.dev',
+  'http://localhost:8788',
+  'http://localhost:8080',
+  'http://127.0.0.1:8080',
+];
+
+// Keep a runaway tab (or a curious stranger) from spending real money.
+const LIMITS = { bodyBytes: 96_000, messages: 60, tools: 40, maxTokens: 700, perIpPerHour: 120 };
+
+const cors = (origin) => ({
+  'access-control-allow-origin': origin,
+  'access-control-allow-methods': 'POST, OPTIONS',
+  'access-control-allow-headers': 'content-type',
+  'access-control-max-age': '86400',
+  'vary': 'Origin',
+});
+
+const json = (obj, status, origin) =>
+  new Response(JSON.stringify(obj), {
+    status,
+    headers: { 'content-type': 'application/json; charset=utf-8', ...cors(origin) },
+  });
+
+function pickOrigin(req, env) {
+  const o = req.headers.get('Origin') || '';
+  const allowed = (env.ALLOWED_ORIGINS ? env.ALLOWED_ORIGINS.split(',') : ALLOWED).map(s => s.trim());
+  if (allowed.includes(o)) return o;
+  // Cloudflare Pages preview deployments: <hash>.arcana-table.pages.dev
+  if (/^https:\/\/[a-z0-9-]+\.arcana-table\.pages\.dev$/.test(o)) return o;
+  return null;
+}
+
+async function rateLimited(req, env) {
+  if (!env.RATE) return false;                       // KV not bound → skip
+  const ip = req.headers.get('CF-Connecting-IP') || 'anon';
+  const key = `rl:${ip}:${new Date().toISOString().slice(0, 13)}`;   // per hour
+  const n = parseInt((await env.RATE.get(key)) || '0', 10) + 1;
+  await env.RATE.put(key, String(n), { expirationTtl: 3900 });
+  return n > (parseInt(env.PER_IP_PER_HOUR || '', 10) || LIMITS.perIpPerHour);
+}
+
+export default {
+  async fetch(req, env) {
+    const origin = pickOrigin(req, env);
+    if (req.method === 'OPTIONS') {
+      return origin ? new Response(null, { status: 204, headers: cors(origin) })
+                    : new Response('forbidden origin', { status: 403 });
+    }
+    if (!origin) return new Response('forbidden origin', { status: 403 });
+    if (req.method !== 'POST') return json({ error: 'POST only' }, 405, origin);
+    if (!env.OPENAI_API_KEY) {
+      return json({ error: 'The DM is not configured yet: set the OPENAI_API_KEY secret on this Worker.' }, 503, origin);
+    }
+    if (await rateLimited(req, env)) {
+      return json({ error: "The table is busy — too many requests from your connection this hour. Try again shortly, or keep playing from the DM panel." }, 429, origin);
+    }
+
+    const raw = await req.text();
+    if (raw.length > LIMITS.bodyBytes) return json({ error: 'Request too large.' }, 413, origin);
+
+    let body;
+    try { body = JSON.parse(raw); } catch { return json({ error: 'Malformed JSON.' }, 400, origin); }
+
+    const messages = Array.isArray(body.messages) ? body.messages.slice(-LIMITS.messages) : null;
+    const tools = Array.isArray(body.tools) ? body.tools.slice(0, LIMITS.tools) : [];
+    if (!messages || !messages.length) return json({ error: 'No messages supplied.' }, 400, origin);
+
+    const payload = {
+      model: env.MODEL || MODEL_DEFAULT,
+      messages,
+      max_tokens: Math.min(Number(body.max_tokens) || LIMITS.maxTokens, LIMITS.maxTokens),
+      temperature: 0.9,
+    };
+    if (tools.length) { payload.tools = tools; payload.tool_choice = 'auto'; payload.parallel_tool_calls = false; }
+
+    let upstream;
+    try {
+      upstream = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${env.OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (e) {
+      return json({ error: 'Could not reach the DM right now. The DM panel still runs the table.' }, 502, origin);
+    }
+
+    const text = await upstream.text();
+    if (!upstream.ok) {
+      let detail = text.slice(0, 300);
+      try { detail = JSON.parse(text)?.error?.message || detail; } catch { /* keep raw */ }
+      return json({ error: `The DM stumbled (${upstream.status}): ${detail}` }, upstream.status, origin);
+    }
+
+    let data;
+    try { data = JSON.parse(text); } catch { return json({ error: 'Unreadable reply from the DM.' }, 502, origin); }
+
+    // Hand back only what the page needs — no key, no upstream metadata.
+    const choice = data.choices?.[0]?.message || {};
+    return json({
+      content: choice.content ?? '',
+      tool_calls: choice.tool_calls ?? [],
+      finish_reason: data.choices?.[0]?.finish_reason ?? 'stop',
+      model: data.model,
+    }, 200, origin);
+  },
+};

@@ -43,7 +43,7 @@
 
   <aside id="side">
     <nav class="tabs">
-      <button class="tab active" data-pane="pane-story">📜 Story</button>
+      <button class="tab active" data-pane="pane-story">🎲 Table</button>
       <button class="tab" data-pane="pane-party">🛡 Party</button>
       <button class="tab" data-pane="pane-dm">🎩 DM Panel</button>
     </nav>
@@ -118,8 +118,13 @@
       </div>
     </div>
 
+    <form id="say-row" autocomplete="off">
+      <input id="say" placeholder="What do you do?" aria-label="Tell the Dungeon Master what you do" maxlength="400">
+      <button id="say-btn" class="btn" type="submit" aria-label="Send">▶</button>
+    </form>
+
     <div id="agent-section">
-      <div class="agent-head">🤖 Agent log</div>
+      <div class="agent-head">🤖 Agent log <span id="agent-sub"></span></div>
       <div id="agent-log"></div>
     </div>
   </aside>
