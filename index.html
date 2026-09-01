@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arcana Table — play D&D with your AI co-DM (and your push-ups)</title>
+<meta name="description" content="A WebMCP-powered tabletop where an AI agent co-runs the game — and real exercise earns heroic dice. Do the burpees, claim the natural 20.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎲</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:ital,wght@0,400;0,600;0,800;1,400&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header id="topbar">
+  <div class="brand">🎲 <b>Arcana&nbsp;Table</b></div>
+  <div class="scene">
+    <div id="scene-title">The Sunken Keep</div>
+    <div id="scene-mood">Torchlight flickers over wet stone…</div>
+  </div>
+  <div class="status">
+    <div id="boosts" class="boosts"></div>
+    <div id="agent-badge" class="badge off">○ checking for agent…</div>
+  </div>
+</header>
+
+<div id="combat-strip" hidden></div>
+
+<main>
+  <section id="board-wrap">
+    <canvas id="board"></canvas>
+    <div id="approvals"></div>
+  </section>
+
+  <aside id="side">
+    <nav class="tabs">
+      <button class="tab active" data-pane="pane-story">📜 Story</button>
+      <button class="tab" data-pane="pane-party">🛡 Party</button>
+      <button class="tab" data-pane="pane-dm">🎩 DM Panel</button>
+    </nav>
+
+    <div id="pane-story" class="tabpane">
+      <div id="story-log"></div>
+    </div>
+
+    <div id="pane-party" class="tabpane" hidden>
+      <div id="party-panel"></div>
+      <div id="fitness-panel"></div>
+    </div>
+
+    <div id="pane-dm" class="tabpane" hidden>
+      <p class="dm-hint">Everything an agent can do, you can do by hand. No agent required.</p>
+      <div class="dm-group">
+        <label>Roll dice</label>
+        <div class="row"><input id="dm-formula" value="d20" size="6"><button id="dm-roll" class="btn">🎲 Roll</button></div>
+      </div>
+      <div class="dm-group">
+        <label>Narrate</label>
+        <div class="row"><input id="dm-text" placeholder="The door creaks open…"><button id="dm-narrate" class="btn">📜</button></div>
+      </div>
+      <div class="dm-group">
+        <label>Spawn token</label>
+        <div class="row">
+          <input id="dm-name" placeholder="Snaggle" size="8">
+          <select id="dm-art">
+            <option>goblin</option><option>skeleton</option><option>wolf</option><option>dragon</option>
+            <option>villager</option><option>chest</option><option>knight</option><option>wizard</option>
+          </select>
+          <button id="dm-spawn" class="btn">＋</button>
+        </div>
+      </div>
+      <div class="dm-group">
+        <label>Scene</label>
+        <div class="row">
+          <select id="dm-scene">
+            <option value="dungeon">The Sunken Keep</option>
+            <option value="forest">The Whispering Glade</option>
+            <option value="crypt">The Ember Crypt</option>
+          </select>
+          <button id="dm-reveal" class="btn">🔦 Reveal</button>
+        </div>
+      </div>
+      <div class="dm-group">
+        <button id="dm-combat" class="btn wide">⚔ Start combat</button>
+      </div>
+      <div class="dm-group heroic">
+        <label>💪 Heroic Effort</label>
+        <div class="row">
+          <select id="dm-exercise">
+            <option>push-ups</option><option>jumping jacks</option><option>squats</option><option>burpees</option>
+            <option>sit-ups</option><option>lunges</option><option>high knees</option><option>mountain climbers</option>
+          </select>
+          <input id="dm-reps" type="number" value="10" min="1" max="100">
+        </div>
+        <div class="row">
+          <select id="dm-reward">
+            <option value="bonus+2">+2 next roll</option>
+            <option value="bonus+5">+5 next roll</option>
+            <option value="advantage">Advantage</option>
+            <option value="set10">Set die to 10</option>
+            <option value="nat20">NATURAL 20</option>
+          </select>
+          <button id="dm-challenge" class="btn">Offer</button>
+        </div>
+      </div>
+      <div class="dm-group">
+        <label class="row check"><input type="checkbox" id="dm-auto"> Auto-approve agent actions</label>
+        <button id="dm-reset" class="btn danger wide">Reset table</button>
+      </div>
+    </div>
+
+    <div id="agent-section">
+      <div class="agent-head">🤖 Agent log</div>
+      <div id="agent-log"></div>
+    </div>
+  </aside>
+</main>
+
+<!-- dice overlay -->
+<div id="dice-overlay" class="dice-overlay" hidden>
+  <div id="die-label" class="die-label"></div>
+  <div id="die" class="die">20</div>
+  <div id="die-total" class="die-total"></div>
+  <div id="die-boosts" class="die-boosts"></div>
+</div>
+
+<!-- Heroic Effort modal -->
+<div id="challenge-modal" class="chal-backdrop" hidden>
+  <div class="chal-card">
+    <div class="chal-eyebrow">💪 HEROIC EFFORT</div>
+    <div id="chal-title" class="chal-title">10 PUSH-UPS</div>
+    <div id="chal-reward" class="chal-reward">→ Natural 20</div>
+    <p id="chal-reason" class="chal-reason"></p>
+    <div id="chal-offer-row" class="chal-row">
+      <button id="chal-accept" class="btn big">I accept! 🔥</button>
+      <button id="chal-decline" class="btn ghost">Roll fate as it lies</button>
+    </div>
+    <div id="chal-active-row" class="chal-row" hidden>
+      <button id="chal-tap" class="rep-ring" style="--pct:0%" aria-label="Count one rep">
+        <span id="chal-ring" class="ring-fill" style="--pct:0%"></span>
+        <span id="chal-count" class="ring-count">0 / 10</span>
+        <span class="ring-hint">TAP or SPACE per rep</span>
+      </button>
+      <div id="chal-time" class="chal-time">0s</div>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
