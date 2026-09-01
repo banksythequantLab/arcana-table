@@ -1,0 +1,27 @@
+{
+  "name": "arcana-table",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Play D&D with an AI co-DM and do real push-ups for your natural 20s.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "playwright test"
+  },
+  "dependencies": {
+    "@mcp-b/webmcp-polyfill": "^5.1.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "usewebmcp": "^5.1.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
+    "@vitejs/plugin-react": "^5.0.2",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.3"
+  }
+}
