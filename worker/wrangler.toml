@@ -4,7 +4,7 @@ compatibility_date = "2026-01-01"
 
 [vars]
 # Swap the DM's brain here without touching code.
-MODEL = "gpt-4o-mini"
+MODEL = "gpt-5.6-luna"
 ALLOWED_ORIGINS = "https://arcana-table.pages.dev,http://localhost:8080,http://127.0.0.1:8080"
 
 # Per-IP spend guard. A turn costs up to ~6 calls (tool hops), and a human plays

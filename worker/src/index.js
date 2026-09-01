@@ -4,7 +4,7 @@
 // plus the tool list it read from document.modelContext, and the model's tool
 // calls are executed back in the page through the real WebMCP surface.
 
-const MODEL_DEFAULT = 'gpt-4o-mini';
+const MODEL_DEFAULT = 'gpt-5.6-luna';
 const ALLOWED = [
   'https://arcana-table.pages.dev',
   'http://localhost:8788',
