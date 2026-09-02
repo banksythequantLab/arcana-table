@@ -4,6 +4,7 @@
 
 import {
   state, save, findToken, isWalkable, GRID_W, GRID_H, MAPS, QUEST,
+  REACH, DEFAULT_REACH, gridDistance,
   DEATH_SAVE_DC, DEATH_SAVE_FAILS, STRETCHES, WARMUP_PLANS, warmupSeq, OATH_KINDS,
 } from './state.js';
 
@@ -153,7 +154,9 @@ export function addToken({ name, kind = 'monster', art, x, y, hp = 10, maxHp }) 
     }
   }
   const id = `${kind}-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Math.random().toString(36).slice(2, 6)}`;
-  const tok = { id, name, kind, art, x: px, y: py, hp, maxHp: maxHp ?? hp, conditions: [], inventory: [] };
+  const r = REACH[art] || DEFAULT_REACH;
+  const tok = { id, name, kind, art, x: px, y: py, hp, maxHp: maxHp ?? hp,
+                reach: r.reach, range: r.range, conditions: [], inventory: [] };
   state.tokens.push(tok);
   logStory('action', 'DM', `${name} appears on the board.`);
   emit();
@@ -226,10 +229,81 @@ export function startCombat({ order } = {}) {
   }
   if (!ids.length) return { error: 'No combatants on the board.' };
   state.combat = { active: true, order: ids, turnIndex: 0, round: 1 };
+  // You cannot be asked to fight what you cannot see. Every combatant comes out
+  // of the fog when the fight starts.
+  ids.forEach(id => { const t = findToken(id); if (t) revealAround(t.x, t.y, 2); });
   const first = findToken(ids[0]);
   logStory('combat', 'DM', `⚔ Combat begins! Round 1 — ${first.name} acts first.`);
   emit('combat');
   return { ok: true, order: ids.map(id => findToken(id)?.name), current: first.name };
+}
+
+/** Where to stand to swing at this target: nearest open cell within reach. */
+function stepIntoReach(attacker, target, reach) {
+  const taken = new Set(state.tokens.filter(t => t.id !== attacker.id).map(t => `${t.x},${t.y}`));
+  let best = null;
+  for (let dy = -reach; dy <= reach; dy++) for (let dx = -reach; dx <= reach; dx++) {
+    const cx = target.x + dx, cy = target.y + dy;
+    if (cx === target.x && cy === target.y) continue;
+    if (!isWalkable(cx, cy) || taken.has(`${cx},${cy}`)) continue;
+    const d = gridDistance({ x: cx, y: cy }, attacker);
+    if (!best || d < best.d) best = { x: cx, y: cy, d };
+  }
+  return best ? { x: best.x, y: best.y } : null;
+}
+
+// A sword swung from eight squares away is the fastest way to make a board feel
+// fake. Every attack goes through here, so reach is a rule rather than a
+// suggestion the DM may forget: melee has to be adjacent, bows and spells work
+// at distance, and a hit always lifts the fog around what was hit — you cannot
+// be asked to fight something you were never shown.
+export function attack({ attackerId, targetId, kind = 'melee', damage, reason = '' }) {
+  const a = findToken(attackerId);
+  const t = findToken(targetId);
+  if (!a) return { error: `No attacker matches "${attackerId}".` };
+  if (!t) return { error: `No target matches "${targetId}".` };
+  if (a.id === t.id) return { error: `${a.name} cannot attack themselves.` };
+  if (timeStopped()) return { error: 'A hero is down and time has stopped. Nothing swings until they are back up.' };
+
+  const melee = kind === 'melee';
+  const limit = melee ? (a.reach ?? 1) : (a.range ?? 0);
+  const d = gridDistance(a, t);
+
+  if (limit === 0) {
+    const alt = melee ? 'ranged' : 'melee';
+    return { error: `${a.name} has no ${kind} attack. Try kind:"${alt}", or move someone who does.`,
+             attacker: a.name, reach: a.reach ?? 1, range: a.range ?? 0 };
+  }
+  if (d > limit) {
+    const spot = melee ? stepIntoReach(a, t, limit) : null;
+    return {
+      error: `${a.name} is ${d} squares from ${t.name} and a ${kind} attack reaches ${limit}. ` +
+             (melee
+               ? (spot ? `Move ${a.name} to (${spot.x},${spot.y}) first, then attack.`
+                       : `There is nowhere open beside ${t.name} to swing from.`)
+               : `Close to within ${limit}, or attack something nearer.`),
+      tooFar: true, distance: d, maxDistance: limit, moveTo: spot || undefined,
+    };
+  }
+
+  // In reach: you can see what you are hitting.
+  revealAround(t.x, t.y, 2);
+
+  // Through rollDice, so a Heroic Effort boost spends itself on the swing.
+  const roll = rollDice({ formula: 'd20', reason: reason || `${a.name} attacks ${t.name}` });
+  const ac = t.ac ?? 12;
+  const hit = roll.nat20 || (!roll.nat1 && roll.total >= ac);
+  if (!hit) {
+    logStory('combat', a.name, `swings at ${t.name} and misses.`);
+    emit('combat');
+    return { ok: true, hit: false, roll: roll.total, nat1: roll.nat1, targetAc: ac, distance: d, kind };
+  }
+
+  const dmg = Math.max(1, Math.round(Number(damage) || (roll.nat20 ? 12 : 6)));
+  const after = updateHp({ tokenId: t.id, delta: -dmg });
+  return { ok: true, hit: true, critical: !!roll.nat20, roll: roll.total, targetAc: ac,
+           damage: dmg, distance: d, kind, target: t.name,
+           targetHp: after.hp, targetDown: after.down, boosts: roll.boostsUsed };
 }
 
 export function endCombat() {
@@ -736,16 +810,45 @@ export function resetQuest() {
 }
 
 // ── reads ────────────────────────────────────────────────────────────────────
+/** Whoever the DM is acting as: the current combatant, else the party leader. */
+function actingToken() {
+  if (state.combat.active) {
+    const t = findToken(state.combat.order[state.combat.turnIndex]);
+    if (t) return t;
+  }
+  return state.tokens.find(t => t.kind === 'pc') || null;
+}
+
 export function getBoardState() {
   return {
     scene: state.scene,
     grid: { width: GRID_W, height: GRID_H, legend: '# wall · . floor · , rubble · ~ water · D door · L lava', rows: MAPS[state.scene.mapId].rows },
-    tokens: state.tokens.map(t => ({ id: t.id, name: t.name, kind: t.kind, art: t.art, x: t.x, y: t.y, hp: t.hp, maxHp: t.maxHp, conditions: t.conditions })),
+    // Distances are measured from whoever is acting (or the party leader out of
+    // combat), because "can I hit it from here?" is the question the DM keeps
+    // getting wrong. inMeleeReach / inRangedRange answer it outright.
+    tokens: state.tokens.map(t => {
+      const from = actingToken();
+      const d = from ? gridDistance(from, t) : null;
+      return {
+        id: t.id, name: t.name, kind: t.kind, art: t.art, x: t.x, y: t.y,
+        hp: t.hp, maxHp: t.maxHp, conditions: t.conditions,
+        reach: t.reach ?? 1, range: t.range ?? 0,
+        distanceFromActor: from && from.id !== t.id ? d : undefined,
+        inMeleeReach: from && from.id !== t.id ? d <= (from.reach ?? 1) : undefined,
+        inRangedRange: from && from.id !== t.id ? (from.range ?? 0) > 0 && d <= (from.range ?? 0) : undefined,
+        visible: state.revealed.includes(`${t.x},${t.y}`),
+      };
+    }),
+    actor: actingToken()?.name,
     combat: state.combat.active ? { active: true, round: state.combat.round, order: state.combat.order.map(id => findToken(id)?.name), current: findToken(state.combat.order[state.combat.turnIndex])?.name } : { active: false },
     activeBoosts: { ...state.boosts },
     party: state.party,
     quest: getQuest(),
     recentLog: state.log.slice(-12).map(l => `[${l.type}] ${l.actor}: ${l.text}`),
+    combatNote: 'Attacks go through the attack tool, which enforces reach: melee needs ' +
+      'inMeleeReach true (move first if it is not), ranged and spells need inRangedRange. ' +
+      'A token with visible:false is still in the fog — move someone closer or reveal_area ' +
+      'before asking the player to fight it.',
   };
 }
 

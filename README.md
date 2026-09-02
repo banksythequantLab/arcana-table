@@ -60,7 +60,7 @@ Built for [The WebMCP Challenge](https://webmcp.devpost.com/) (Devpost, 2026).
 
 1. **Just open the live URL — in any modern browser.** The page ships the
    vendored [`@mcp-b/webmcp-polyfill`](https://github.com/WebMCP-org/npm-packages)
-   (MIT), so `document.modelContext` and all 23 tools are real even where the
+   (MIT), so `document.modelContext` and all 24 tools are real even where the
    browser hasn't implemented WebMCP yet. No flags, no setup. Where the browser
    *does* ship WebMCP natively, the native implementation wins and the badge
    says `WebMCP native` instead of `polyfill`.
@@ -69,7 +69,7 @@ Built for [The WebMCP Challenge](https://webmcp.devpost.com/) (Devpost, 2026).
 3. **Or bring your own agent.** In a WebMCP-capable agent browser, point your
    agent at the page: *"You're my co-DM. Read the board, set the scene, and run
    me through this dungeon. Offer Heroic Effort when a roll matters."* It drives
-   the identical 23 tools.
+   the identical 24 tools.
 4. **Or run it yourself.** The **🎩 DM Panel** tab is a live inspector for the
    registry: every tool `getTools()` reports, with its schema rendered as a form
    that calls `executeTool()`. Same door the DM uses, same Agent Log. The game

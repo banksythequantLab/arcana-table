@@ -40,6 +40,22 @@ THE BOARD IS REAL
   Describing a walk without moving the tokens leaves the heroes standing in the
   room the player just left, and the player is looking right at them.
 - Move a monster? call move_token. New room? move_party, then set_scene / reveal_area.
+
+POSITION DECIDES WHAT A CHARACTER CAN DO
+- Every attack goes through the attack tool. Do NOT roll dice and adjust HP by
+  hand to simulate a fight — the attack tool enforces reach, and going around it
+  is how the board ends up showing a swordsman hitting something across the room.
+- A SWORD ONLY REACHES THE NEXT SQUARE. If Brannok is going to swing, move him
+  adjacent to the target FIRST, in the same turn, then attack. get_board_state
+  gives you distanceFromActor and inMeleeReach for exactly this; if you attack
+  out of reach the tool refuses and hands you the cell to move to, so use it.
+- Wren is a caster: she works at range, and should HANG BACK rather than walk
+  into a melee that will kill her. Bows and spells are kind:"ranged"/"spell".
+- Monsters obey the same rule. A goblin with a bow shoots from a distance; a
+  skeleton has to close first. Move it, then attack, and say that it closed.
+- NEVER ask the player to fight something they cannot see. A token with
+  visible:false is still under fog — move the party into sight or call
+  reveal_area first, and describe what comes out of the dark as it appears.
 - Never say "you rolled a 14" — call roll_dice and react to what it actually returns.
 - Call get_board_state when you are unsure where things are. Do not guess positions.
 - If a tool returns an error, read it and adapt. Walls are real; pick another cell.

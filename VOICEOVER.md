@@ -47,17 +47,17 @@ and the guided warm-up running.*
 ## 4 · Title card — "How it works" *(4.5s, silent)*
 
 > **HOW IT WORKS**
-> **23 tools on `document.modelContext`**
+> **24 tools on `document.modelContext`**
 > The built-in DM calls `getTools()` and `executeTool()` — the same contract your
 > agent would use.
 
 ## 5 · VO-03a — No back door  ·  9.5s
 
 > **Note on the tool count.** The recorded audio says "twenty one tools", which
-> was true when it was cut. The build now registers **23** (19 base + 3 combat +
-> `death_save`), because `move_party` was added after a playtest found the DM
-> narrating the party walking off without moving anyone. The video therefore
-> under-claims by two, which is the harmless direction. Do not edit the spoken
+> was true when it was cut. The build now registers **24** (20 base + 3 combat +
+> `death_save`), because `move_party` and the reach-enforcing `attack` were both
+> added after playtests. The video therefore under-claims by three, which is the
+> harmless direction. Do not edit the spoken
 > lines below to say 23 unless the audio is re-cut — this file is the transcript
 > of what was actually recorded.
 

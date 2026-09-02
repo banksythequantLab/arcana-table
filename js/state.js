@@ -104,6 +104,29 @@ export const QUEST = {
   ],
 };
 
+// ── reach and range ──────────────────────────────────────────────────────────
+// A sword does not hit across a room. Every combatant carries a melee reach (in
+// squares, diagonals counting as one) and a ranged/spell range; 0 means it has
+// no attack of that sort. This is what stops the DM narrating Brannok swinging
+// at something eight squares away in the dark — the tool refuses and tells it
+// where to stand instead.
+export const REACH = {
+  knight:   { reach: 1, range: 0 },   // longsword
+  wizard:   { reach: 1, range: 8 },   // dagger in hand, spells well past a bowshot
+  villager: { reach: 1, range: 0 },
+  goblin:   { reach: 1, range: 4 },   // shortbow
+  skeleton: { reach: 1, range: 0 },
+  wolf:     { reach: 1, range: 0 },
+  dragon:   { reach: 2, range: 5 },   // long neck, longer breath
+  chest:    { reach: 0, range: 0 },
+};
+export const DEFAULT_REACH = { reach: 1, range: 0 };
+
+/** Grid distance, diagonals counting as one square. */
+export function gridDistance(a, b) {
+  return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+}
+
 // A downed hero freezes the board. Three failed death saves ends the run —
 // but reps buy a failure back, so effort is always a way out.
 export const DEATH_SAVE_DC = 10;
@@ -169,9 +192,9 @@ function freshState() {
   return {
     scene: { mapId: 'dungeon', title: 'The Sunken Keep', mood: 'Torchlight flickers over wet stone…' },
     tokens: [
-      { id: 'pc-brannok', name: 'Brannok', kind: 'pc', art: 'knight', x: 2, y: 2, hp: 24, maxHp: 24, ac: 17, str: 16, dex: 10, con: 14, int: 8, wis: 12, cha: 13, conditions: [], inventory: ['Longsword', 'Shield', 'Torch ×3'] },
-      { id: 'pc-wren', name: 'Wren', kind: 'pc', art: 'wizard', x: 3, y: 3, hp: 14, maxHp: 14, ac: 12, str: 8, dex: 14, con: 12, int: 17, wis: 13, cha: 10, conditions: [], inventory: ['Spellbook', 'Dagger', 'Component pouch'] },
-      { id: 'npc-chest', name: 'Old Chest', kind: 'object', art: 'chest', x: 18, y: 11, hp: 10, maxHp: 10, conditions: [], inventory: [] },
+      { id: 'pc-brannok', name: 'Brannok', kind: 'pc', art: 'knight', x: 2, y: 2, hp: 24, maxHp: 24, ac: 17, str: 16, dex: 10, con: 14, int: 8, wis: 12, cha: 13, reach: 1, range: 0, conditions: [], inventory: ['Longsword', 'Shield', 'Torch ×3'] },
+      { id: 'pc-wren', name: 'Wren', kind: 'pc', art: 'wizard', x: 3, y: 3, hp: 14, maxHp: 14, ac: 12, str: 8, dex: 14, con: 12, int: 17, wis: 13, cha: 10, reach: 1, range: 8, conditions: [], inventory: ['Spellbook', 'Dagger', 'Component pouch'] },
+      { id: 'npc-chest', name: 'Old Chest', kind: 'object', art: 'chest', x: 18, y: 11, hp: 10, maxHp: 10, reach: 0, range: 0, conditions: [], inventory: [] },
     ],
     revealed: [],                 // ['x,y', …] cells cleared of fog
     combat: { active: false, order: [], turnIndex: 0, round: 1 },

@@ -138,6 +138,18 @@ export const BASE_TOOLS = [
     handler: a => A.moveToken(a),
   },
   {
+    name: 'attack',
+    description: 'Make one attack and resolve it: rolls to hit against the target\'s AC, applies damage, and lifts the fog around whatever was hit. REACH IS ENFORCED HERE — a melee attack must be adjacent (or within the attacker\'s reach) and will be REFUSED with the exact cell to move to if it is not; ranged and spell attacks work out to the attacker\'s range. Use this for every swing, shot and spell instead of rolling dice and adjusting HP by hand: it is what keeps the board honest, and any Heroic Effort boost the player earned is spent on the roll automatically.',
+    inputSchema: obj({
+      attackerId: str('Who is attacking — token id or name'),
+      targetId: str('Who they are attacking — token id or name'),
+      kind: { type: 'string', enum: ['melee', 'ranged', 'spell'], description: 'melee needs adjacency; ranged and spell work at the attacker\'s range' },
+      damage: num('Damage on a hit. Omit for a sensible default (more on a critical).'),
+      reason: str('What the attack is, in DM voice — "Brannok brings the longsword down"'),
+    }, ['attackerId', 'targetId']),
+    handler: a => A.attack(a),
+  },
+  {
     name: 'move_party',
     description: 'Move the WHOLE party to a grid cell in one call — use this whenever the players travel: through a door, into the next room, across the hall, following something. The leader lands on the cell, companions take open cells beside them, and the fog lifts around all of them. Walls are rejected. Prefer this over repeated move_token calls: if you describe the party going somewhere, call this in the same turn or the board will contradict you.',
     inputSchema: obj({
