@@ -389,6 +389,9 @@ function bindChallengeModal() {
   $('#chal-decline').onclick = () => A.declineChallenge();
   // A hold counts itself down — tapping does nothing, and that is correct.
   $('#chal-tap').onclick = () => { if (state.challenge?.mode !== 'hold') A.tickChallenge(1); };
+  // Leave a set you started. It resolves as declined — no reward — so nothing
+  // is handed out that was not earned, but nobody is ever stuck watching a clock.
+  $('#chal-skip').onclick = () => A.declineChallenge();
   window.addEventListener('keydown', e => {
     if (e.code === 'Space' && state.challenge?.status === 'active' && state.challenge.mode !== 'hold') {
       e.preventDefault(); A.tickChallenge(1);
@@ -412,9 +415,35 @@ function bindOath() {
 }
 
 let chalTimer = null;
+// The whole premise is that your hands are on the floor, so a rep challenge
+// opens the microphone by itself — counting out loud is the ONLY input that
+// works mid-push-up, and leaving it behind a checkbox meant most players never
+// found it. Whatever the mic was doing before, it goes back to that afterwards.
+let micWasOpenedForChallenge = false, chalMicTimer = null;
+function syncChallengeMic(c) {
+  const wantsEar = !!c && c.status === 'active' && c.mode !== 'hold' && voice.supported;
+  if (wantsEar && !voice.listening && !voice.handsFree) {
+    micWasOpenedForChallenge = true;
+    startListening(speakTurn);
+    // The DM has usually just finished saying "ten push-ups, go", so the ear is
+    // inside its echo tail and that first call is deferred. Keep asking until it
+    // actually opens — the player is already counting.
+    clearInterval(chalMicTimer);
+    chalMicTimer = setInterval(() => {
+      if (!micWasOpenedForChallenge || voice.listening) { clearInterval(chalMicTimer); chalMicTimer = null; return; }
+      startListening(speakTurn);
+    }, 300);
+  } else if (!wantsEar && micWasOpenedForChallenge) {
+    clearInterval(chalMicTimer); chalMicTimer = null;
+    micWasOpenedForChallenge = false;
+    if (!voice.handsFree) stopListening();
+  }
+}
+
 function renderChallenge() {
   const c = state.challenge;
   const m = $('#challenge-modal');
+  syncChallengeMic(c);
   if (!c) { m.hidden = true; if (chalTimer) { clearInterval(chalTimer); chalTimer = null; } return; }
   m.hidden = false;
   const hold = c.mode === 'hold';
@@ -429,7 +458,12 @@ function renderChallenge() {
     $('#chal-count').textContent = hold ? `${c.reps - c.progress}s` : `${c.progress} / ${c.reps}`;
     const pct = (c.progress / c.reps) * 100;
     $('#chal-tap').style.setProperty('--pct', pct + '%');
-    $('#ring-hint').textContent = hold ? 'HOLD IT — the clock is running' : 'TAP or SPACE per rep';
+    // Name every way in, and say which one is live right now.
+    $('#ring-hint').textContent = hold
+      ? 'HOLD IT — the clock is running'
+      : voice.listening ? '🎙 COUNT OUT LOUD · or SPACE · or TAP'
+      : voice.supported ? 'SPACE or TAP · say the count once the mic opens'
+      : 'SPACE or TAP per rep';
     if (!chalTimer) chalTimer = setInterval(() => {
       if (state.challenge?.startedAt) $('#chal-time').textContent = Math.round((Date.now() - state.challenge.startedAt) / 1000) + 's';
     }, 250);
@@ -604,6 +638,32 @@ function renderWarmup() {
   $('#warm-pause').textContent = w.paused ? 'Resume' : 'Pause';
 }
 
+// ── beat cleared ─────────────────────────────────────────────────────────────
+// Finishing a beat used to be one line in the log, which is no reward at all for
+// the hardest thing in the run. It now raises a banner naming what you earned —
+// and it is deliberately NOT a modal: it lands, it reads, it leaves, and play
+// never stops to acknowledge it.
+let msShownAt = 0, msTimer = null;
+function renderMilestone() {
+  const m = state.milestone;
+  const el = $('#milestone');
+  if (!el || !m || m.t === msShownAt) return;
+  msShownAt = m.t;
+
+  $('#ms-step').textContent = `BEAT ${m.beatNumber} OF ${m.of}`;
+  $('#ms-title').textContent = m.title;
+  const chips = [];
+  (m.items || []).forEach(i => chips.push(`<span class="ms-chip">🎁 ${esc(i)}</span>`));
+  if (m.gold) chips.push(`<span class="ms-chip">🪙 ${m.gold} gold</span>`);
+  if (m.boon) chips.push(`<span class="ms-chip boon">⚡ ${esc(m.boon)}</span>`);
+  if (m.healed) chips.push(`<span class="ms-chip heal">❤️ party back to full</span>`);
+  $('#ms-rewards').innerHTML = chips.join('');
+
+  el.hidden = false;
+  clearTimeout(msTimer);
+  msTimer = setTimeout(() => { el.hidden = true; }, 7000);
+}
+
 // ── an Oath ──────────────────────────────────────────────────────────────────
 function renderOath() {
   const o = state.oath;
@@ -687,6 +747,7 @@ function render() {
   renderQuest();
   renderLog();
   renderSay();
+  renderMilestone();
   renderStarters();
   renderParty();
   renderAgent();

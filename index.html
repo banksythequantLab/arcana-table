@@ -192,6 +192,13 @@
   </div>
 </div>
 
+<!-- Beat cleared. Not a modal — it should not stop play, just land. -->
+<div id="milestone" class="ms-banner" hidden role="status" aria-live="polite">
+  <div class="ms-eyebrow"><span id="ms-step">BEAT 1 OF 5</span> · CLEARED</div>
+  <div id="ms-title" class="ms-title"></div>
+  <div id="ms-rewards" class="ms-rewards"></div>
+</div>
+
 <div id="ending" class="ending-backdrop" hidden>
   <div class="ending-card">
     <div id="ending-eyebrow" class="ending-eyebrow">THE RUN</div>
@@ -218,6 +225,11 @@
         <span id="ring-hint" class="ring-hint">TAP or SPACE per rep</span>
       </button>
       <div id="chal-time" class="chal-time">0s</div>
+      <!-- No timer in this game should be a trap. A hold counts itself down and
+           reps want you to actually do them, but someone trying the table for
+           five minutes must always be able to leave — without collecting a
+           reward they did not earn. -->
+      <button id="chal-skip" class="btn ghost chal-skip" type="button">Skip this ▸</button>
     </div>
   </div>
 </div>

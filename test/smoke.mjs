@@ -276,7 +276,12 @@ let last = null;
 for (let i = 0; i < 3; i++) last = await call('advance_quest', { summary: 'onward' });
 check('final beat spawns the boss', last.bossSpawned === 'The Cinder Wight', JSON.stringify(last).slice(0, 140));
 check('final beat is flagged as final', (await call('get_quest')).current.isFinalBeat === true);
-check('boss is really on the board', (await call('get_board_state')).tokens.some(t => t.name === 'The Cinder Wight' && t.maxHp === 46));
+// Not a hardcoded HP total — that drifts every time the boss is tuned. What
+// matters is that it is on the board, is a genuine threat, and reads as a boss.
+const wight = (await call('get_board_state')).tokens.find(t => t.name === 'The Cinder Wight');
+check('boss is really on the board', !!wight, JSON.stringify(wight || {}).slice(0, 90));
+check('boss has boss-sized hit points', (wight?.maxHp || 0) >= 40, `${wight?.maxHp} hp`);
+check('boss has its own art, not the plain skeleton', wight?.art === 'wight', wight?.art);
 
 // ── going down: time stops, and reps are the way out ────────────────────────
 console.log('— a hero goes down —');

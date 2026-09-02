@@ -1,0 +1,132 @@
+// Clearing a beat was one line in the log — no reward at all for the hardest
+// thing in the run. It should pay, visibly, and it should pay more each time.
+import { chromium } from 'playwright';
+import { createServer } from 'http';
+import { readFile } from 'fs/promises';
+import { extname, join } from 'path';
+import { fileURLToPath } from 'url';
+
+const root = join(fileURLToPath(import.meta.url), '..', '..');
+const MIME = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css' };
+const srv = createServer(async (q, s) => {
+  const p = q.url === '/' ? '/index.html' : q.url.split('?')[0];
+  try { s.writeHead(200, { 'content-type': MIME[extname(p)] || 'text/plain' });
+        s.end(await readFile(join(root, p))); } catch { s.writeHead(404); s.end(); }
+});
+await new Promise(r => srv.listen(8080, r));
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM });
+const page = await b.newPage({ viewport: { width: 1400, height: 900 } });
+const errs = []; page.on('pageerror', e => errs.push(String(e)));
+await page.route('**/arcana-dm*/**', r => r.abort());
+await page.goto('http://localhost:8080/');
+await page.waitForFunction(() => window.arcana);
+await page.evaluate(() => localStorage.clear());
+await page.reload(); await page.waitForFunction(() => window.arcana);
+await page.click('#intro-type');
+
+let pass = 0, fail = 0;
+const ck = (l, ok, x = '') => { ok ? pass++ : fail++; console.log(`  ${ok ? '✓' : '✗ FAIL'} ${l}${x ? '  ' + x : ''}`); };
+const call = (n, a = {}) => page.evaluate(([n, a]) => window.arcana.call(n, a), [n, a]);
+
+console.log('— clearing a beat pays, and pays visibly —');
+// Bloody the party first, so the short rest is something you can see.
+await page.evaluate(() => window.__st.tokens.filter(t => t.kind === 'pc').forEach(t => { t.hp = 3; }));
+const r1 = await call('advance_quest', { summary: 'Cut the drowned guard down.' });
+ck('the beat advanced', !r1.error && r1.beatNumber === 2, JSON.stringify(r1).slice(0, 70));
+ck('it names what was cleared and what it paid', !!r1.cleared && !!r1.paid, JSON.stringify(r1.paid));
+ck('a boon is banked for the next beat', !!r1.paid.boon, r1.paid.boon || '(none)');
+ck('the boon is real, not just a label', await page.evaluate(() =>
+  window.__st.boosts.bonus > 0 || window.__st.boosts.advantage || window.__st.boosts.setRoll != null),
+  JSON.stringify(await page.evaluate(() => window.__st.boosts)));
+ck('the party is back to full', await page.evaluate(() =>
+  window.__st.tokens.filter(t => t.kind === 'pc').every(t => t.hp === t.maxHp)));
+ck('loot and gold landed', (r1.paid.items || []).length > 0 && r1.paid.gold >= 40,
+   `${r1.paid.items} · ${r1.paid.gold}g`);
+
+console.log('— and the banner says so —');
+await page.waitForSelector('#milestone:not([hidden])', { timeout: 4000 });
+const banner = await page.evaluate(() => ({
+  step: document.getElementById('ms-step').textContent,
+  title: document.getElementById('ms-title').textContent,
+  chips: [...document.querySelectorAll('#ms-rewards .ms-chip')].map(c => c.textContent),
+}));
+ck('the banner names the beat', /BEAT 1 OF 5/.test(banner.step) && banner.title.length > 4, JSON.stringify(banner.step));
+ck('it lists the loot, the boon and the heal', banner.chips.length >= 3 &&
+   banner.chips.some(c => /⚡/.test(c)) && banner.chips.some(c => /full/.test(c)), JSON.stringify(banner.chips));
+await page.screenshot({ path: 'screens/milestone.png' });
+ck('it is not a modal — you can still type', await page.isEnabled('#say'));
+
+console.log('— the rewards escalate across the run —');
+const paid = [{ gold: r1.paid.gold, boon: r1.paid.boon }];
+for (let i = 0; i < 3; i++) {
+  const r = await call('advance_quest', { summary: 'Onward.' });
+  if (r.paid) paid.push({ gold: r.paid.gold, boon: r.paid.boon });
+}
+ck('gold rises every beat', paid.every((p, i) => i === 0 || p.gold > paid[i - 1].gold),
+   paid.map(p => p.gold).join(' → '));
+ck('every beat banks a boon', paid.every(p => !!p.boon), paid.map(p => p.boon).join(' · '));
+
+console.log('— and the Warden is not Brannok —');
+const warden = await page.evaluate(() =>
+  window.__st.tokens.find(t => /warden/i.test(t.name)));
+ck('the Warden beat spawns a stone warden', warden?.art === 'warden',
+   warden ? `${warden.name} · art=${warden.art}` : '(not spawned)');
+ck('it is not drawn with the knight art', warden?.art !== 'knight');
+ck('a warden drawing exists', await page.evaluate(async () =>
+  !!(await import('/js/art.js')).TOKEN_ART.warden));
+
+console.log('— no timer is a trap —');
+// A judge trying the table for five minutes must always be able to leave.
+await page.evaluate(async () => {
+  const A = await import('/js/actions.js');
+  A.proposeChallenge({ mode: 'hold', exercise: 'plank', seconds: 120, reward: 'set10', reason: 'x' });
+  A.acceptChallenge();
+});
+await page.waitForSelector('#challenge-modal:not([hidden])');
+ck('a running hold offers a way out', await page.isVisible('#chal-skip'));
+await page.click('#chal-skip');
+await page.waitForTimeout(250);
+ck('clicking it ends the hold', await page.evaluate(() => window.__st.challenge === null));
+ck('and pays nothing, because nothing was done', await page.evaluate(() =>
+  window.__st.boosts.setRoll === null), JSON.stringify(await page.evaluate(() => window.__st.boosts)));
+
+await page.evaluate(async () => {
+  const A = await import('/js/actions.js');
+  A.proposeOath({ label: 'the sink', kind: 'chores', minutes: 25, reward: 'nat20', reason: 'x' });
+  A.acceptOath();
+});
+await page.waitForSelector('#oath:not([hidden])');
+ck('a 25-minute Oath can still be abandoned', await page.isVisible('#oath-quit'));
+await page.click('#oath-quit');
+await page.waitForTimeout(250);
+ck('and that releases the table', await page.evaluate(() => window.__st.oath === null));
+
+const warm = await page.evaluate(async () => {
+  const A = await import('/js/actions.js');
+  A.startWarmup({ plan: '3min' });
+  return true;
+});
+await page.waitForSelector('#warmup:not([hidden])');
+ck('a ten-minute warm-up can be ended at any point', await page.isVisible('#warm-done'));
+await page.click('#warm-done');
+await page.waitForTimeout(250);
+ck('and it ends', await page.evaluate(() => window.__st.warmup === null));
+
+console.log('— the boss looks like a boss —');
+const boss = await page.evaluate(async () => {
+  const { QUEST } = await import('/js/state.js');
+  return QUEST.beats[QUEST.beats.length - 1].boss;
+});
+ck('the Cinder Wight has its own art', boss.art === 'wight', `art=${boss.art}`);
+ck('and draws at twice the size', boss.scale === 2, `scale=${boss.scale}`);
+ck('a wight drawing exists', await page.evaluate(async () =>
+  !!(await import('/js/art.js')).TOKEN_ART.wight));
+ck('scale survives a spawn', await page.evaluate(async () => {
+  const A = await import('/js/actions.js');
+  return A.addToken({ name: 'Big', kind: 'monster', art: 'wight', x: 8, y: 3, hp: 40, scale: 2 }).token.scale === 2;
+}));
+
+ck('no page errors', errs.length === 0, errs.slice(0, 2).join(' | '));
+console.log(`\n${pass} passed, ${fail} failed`);
+await b.close(); srv.close();
+process.exit(fail ? 1 : 0);

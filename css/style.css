@@ -330,6 +330,8 @@ input[type=checkbox]{flex:0 0 auto;width:18px;height:18px;padding:0;accent-color
 .ring-count{font:800 34px "Baloo 2",cursive;background:var(--paper);border-radius:999px;padding:6px 16px;border:3px solid var(--ink)}
 .ring-hint{font-size:11px;font-weight:800;color:#5C5165;letter-spacing:.06em}
 .chal-time{font:800 22px "Baloo 2",cursive;color:#8A3A12;min-width:60px}
+.chal-skip{font-size:13px;padding:6px 12px;color:var(--ink);border-color:var(--ink);opacity:.75}
+.chal-skip:hover{opacity:1}
 
 /* responsive */
 @media (max-width: 860px){
@@ -481,6 +483,32 @@ input[type=checkbox]{flex:0 0 auto;width:18px;height:18px;padding:0;accent-color
 .pip-label{font-size:11.5px;font-weight:800;color:#B9AECB;align-self:center;margin-right:4px}
 
 /* ── the run is over ───────────────────────────────────────────────────────── */
+/* ── beat cleared ─────────────────────────────────────────────────────────── */
+.ms-banner{
+  /* Below the quest rail, not over it — the rail is the progress this is
+     celebrating, and covering it up was self-defeating. */
+  position:fixed;left:50%;top:168px;transform:translateX(-50%);z-index:76;
+  background:linear-gradient(180deg,#FFF3DC,#F4E9D0);color:var(--ink);
+  border:4px solid var(--ink);border-radius:18px;box-shadow:0 10px 0 rgba(0,0,0,.45);
+  padding:14px 26px;text-align:center;min-width:340px;max-width:min(560px,90vw);
+  animation:msIn .42s cubic-bezier(.2,1.5,.4,1);
+}
+.ms-eyebrow{font:800 11.5px "Baloo 2",cursive;letter-spacing:.18em;color:#8A3A12}
+.ms-title{font:800 30px/1.1 "Baloo 2",cursive;margin:2px 0 8px;
+  text-shadow:2px 2px 0 rgba(46,34,51,.16)}
+.ms-rewards{display:flex;flex-wrap:wrap;gap:7px;justify-content:center}
+.ms-chip{
+  font-size:13px;font-weight:800;border:2.5px solid var(--ink);border-radius:999px;
+  padding:4px 12px;background:#FFE9C9;
+}
+.ms-chip.boon{background:var(--gold)}
+.ms-chip.heal{background:#DFF0D8}
+@keyframes msIn{from{opacity:0;transform:translateX(-50%) translateY(-22px) scale(.94)}
+                to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}
+@media (prefers-reduced-motion:reduce){ .ms-banner{animation:none} }
+@media (max-width:860px){ .ms-banner{top:auto;bottom:96px;min-width:0;width:92vw;padding:11px 16px}
+  .ms-title{font-size:22px} }
+
 .ending-backdrop{
   position:fixed;inset:0;z-index:85;display:flex;align-items:center;justify-content:center;
   background:radial-gradient(circle at 50% 40%, rgba(60,40,80,.6), rgba(10,6,14,.96) 70%);

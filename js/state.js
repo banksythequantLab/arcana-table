@@ -77,29 +77,35 @@ export const QUEST = {
     {
       id: 'breach', mapId: 'dungeon', title: 'Breach the flooded hall',
       objective: 'Get the party through the flooded entry hall of the Sunken Keep. Something drowned guards it — fight or outwit it.',
-      reward: { items: ['Keep Warden\'s Key'], gold: 15 },
+      reward: { items: ['Keep Warden\'s Key'], gold: 40 },
+      boon: 'bonus+3',
     },
     {
       id: 'vault', mapId: 'dungeon', title: 'Open the drowned vault',
       objective: 'The old chest in the far chamber is the Warden\'s vault. Reach it, open it, survive what is guarding it.',
-      reward: { items: ['Emberward Charm'], gold: 40 },
+      reward: { items: ['Emberward Charm', 'Flask of Deep Water'], gold: 90 },
+      boon: 'bonus+5',
     },
     {
       id: 'glade', mapId: 'forest', title: 'Cross the Whispering Glade',
       objective: 'The road to the crypt runs through the glade. It is watched. Get the party to the far side.',
-      reward: { items: ['Glade-Sung Arrow'], gold: 25 },
+      reward: { items: ['Glade-Sung Arrow', 'Whispering Cloak'], gold: 140 },
+      boon: 'advantage',
     },
     {
       id: 'warden', mapId: 'forest', title: 'Break the Warden\'s ring',
       objective: 'A standing ring of stone wardens bars the crypt door. Beat the one that wakes.',
-      reward: { items: ['Crypt Door Sigil'], gold: 60 },
+      reward: { items: ['Crypt Door Sigil', 'Warden\'s Broken Crown'], gold: 220 },
+      boon: 'bonus+8',
       elite: true,
+      spawn: { name: 'The Waking Warden', art: 'warden', hp: 34, x: 11, y: 5 },
     },
     {
       id: 'crown', mapId: 'crypt', title: 'Take back the Ember Crown',
       objective: 'The Cinder Wight waits in the Ember Crypt wearing the Crown. This is the last fight of the run. Make it hurt.',
-      reward: { items: ['The Ember Crown'], gold: 200 },
-      boss: { name: 'The Cinder Wight', art: 'skeleton', hp: 46, x: 11, y: 3 },
+      reward: { items: ['The Ember Crown', 'Cinderheart Ember'], gold: 500 },
+      boon: 'nat20',
+      boss: { name: 'The Cinder Wight', art: 'wight', hp: 60, x: 11, y: 3, scale: 2 },
     },
   ],
 };
@@ -123,6 +129,8 @@ export const REACH = {
   wraith:   { reach: 1, range: 6 },   // cold at a distance
   ogre:     { reach: 2, range: 3 },   // long arms, and it throws things
   rat:      { reach: 1, range: 0 },
+  warden:   { reach: 2, range: 0 },   // stone arms, no ranged attack
+  wight:    { reach: 2, range: 6 },   // the Crown burns at a distance
   chest:    { reach: 0, range: 0 },
 };
 export const DEFAULT_REACH = { reach: 1, range: 0 };
@@ -204,6 +212,7 @@ function freshState() {
     party: { gold: 0, loot: [] },
     dice: null,                   // last roll result
     spellFx: null,                // {x, y, kind, t} — the board paints the burst
+    milestone: null,              // {t, title, items, gold, boon} — the beat-cleared banner
     boosts: { bonus: 0, advantage: false, setRoll: null },  // earned via Heroic Effort
     challenge: null,              // active exercise challenge
     fitness: {

@@ -188,9 +188,9 @@ export function moveParty({ x, y, who = 'all' }) {
   return { ok: true, moved, left: pcs.length - moved.length };
 }
 
-export function addToken({ name, kind = 'monster', art, x, y, hp = 10, maxHp }) {
+export function addToken({ name, kind = 'monster', art, x, y, hp = 10, maxHp, scale }) {
   if (!name) return { error: 'Token needs a name.' };
-  const arts = ['knight', 'wizard', 'goblin', 'skeleton', 'dragon', 'wolf', 'ooze', 'spider', 'wraith', 'ogre', 'rat', 'chest', 'villager'];
+  const arts = ['knight', 'wizard', 'goblin', 'skeleton', 'dragon', 'wolf', 'ooze', 'spider', 'wraith', 'ogre', 'rat', 'warden', 'wight', 'chest', 'villager'];
   if (!art) art = kind === 'monster' ? 'goblin' : kind === 'object' ? 'chest' : 'villager';
   if (!arts.includes(art)) return { error: `Unknown art "${art}". Choose one of: ${arts.join(', ')}.` };
   let px = Math.max(0, Math.min(GRID_W - 1, Math.round(x ?? 10)));
@@ -204,7 +204,11 @@ export function addToken({ name, kind = 'monster', art, x, y, hp = 10, maxHp }) 
   const id = `${kind}-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Math.random().toString(36).slice(2, 6)}`;
   const r = REACH[art] || DEFAULT_REACH;
   const tok = { id, name, kind, art, x: px, y: py, hp, maxHp: maxHp ?? hp,
-                reach: r.reach, range: r.range, conditions: [], inventory: [] };
+                reach: r.reach, range: r.range,
+                // A boss should read as one from across the room, so it draws
+                // bigger than its square rather than politely inside it.
+                scale: Math.max(1, Math.min(2.5, Number(scale) || 1)),
+                conditions: [], inventory: [] };
   state.tokens.push(tok);
   logStory('action', 'DM', `${name} appears on the board.`);
   emit();
@@ -336,6 +340,24 @@ export function attack({ attackerId, targetId, kind = 'melee', damage, reason = 
   }
   if (d > limit) {
     const spot = melee ? stepIntoReach(a, t, limit) : null;
+
+    // A MONSTER CLOSES AND SWINGS. Telling the model "move it, then attack" did
+    // not work — it narrated the lunge and left the creature standing across the
+    // room, because that is two calls for one obvious act. A monster that could
+    // reach the target this turn now does: it walks in and the swing resolves,
+    // in the one call the DM already made. Player characters still get the
+    // refusal, because where YOUR heroes stand is the player's decision, not the
+    // model's.
+    if (melee && spot && a.kind === 'monster') {
+      const from = { x: a.x, y: a.y };
+      a.x = spot.x; a.y = spot.y;
+      revealAround(a.x, a.y, 2);
+      logStory('combat', a.name, `closes the distance from ${d} squares away.`);
+      emit('combat');
+      return { ...attack({ attackerId: a.id, targetId: t.id, kind, damage, reason }),
+               closed: { from, to: spot, squares: d } };
+    }
+
     return {
       error: `${a.name} is ${d} squares from ${t.name} and a ${kind} attack reaches ${limit}. ` +
              (melee
@@ -883,6 +905,38 @@ export function advanceQuest({ summary = '' } = {}) {
   logStory('quest', 'DM', `✦ ${beat.title} — complete. ${summary}`.trim());
   if (beat.reward) awardLoot(beat.reward);
 
+  // Clearing a beat used to pay a trinket and a little gold, and then the next
+  // fight started with the party as battered as they finished the last one.
+  // A cleared beat now pays three things you can feel:
+  //   1. the loot, which escalates hard across the run,
+  //   2. a BOON — a real dice reward banked for the next beat, the same currency
+  //      Heroic Effort pays in, so progress and sweat spend the same way,
+  //   3. a short rest: every hero back to full, because arriving at the Cinder
+  //      Wight on four hit points is not a difficulty curve, it is a dead end.
+  const healed = [];
+  state.tokens.filter(t => t.kind === 'pc' && t.hp < t.maxHp).forEach(t => {
+    healed.push({ name: t.name, from: t.hp, to: t.maxHp });
+    t.hp = t.maxHp;
+  });
+  if (healed.length) {
+    logStory('quest', 'DM', `The party takes a breath. ${healed.map(h => h.name).join(' and ')} back to full.`);
+  }
+
+  let boon = null;
+  if (beat.boon && REWARDS[beat.boon]) {
+    REWARDS[beat.boon].apply(state.boosts);
+    boon = REWARDS[beat.boon].label;
+    logStory('quest', 'DM', `✦ Milestone boon: ${boon}. Spend it well.`);
+  }
+
+  // The board throws a small party over the heroes, and the UI raises a banner.
+  state.milestone = {
+    t: Date.now(), title: beat.title,
+    beatNumber: q.beatIndex + 1, of: QUEST.beats.length,
+    items: beat.reward?.items || [], gold: beat.reward?.gold || 0,
+    boon, healed: healed.length,
+  };
+
   q.beatIndex++;
   const next = QUEST.beats[q.beatIndex];
   if (!next) {
@@ -891,18 +945,26 @@ export function advanceQuest({ summary = '' } = {}) {
     endCombat();
     logStory('quest', 'DM', `👑 ${QUEST.name} is yours. The marshes cool. The run is won.`);
     emit('quest');
-    return { ok: true, questComplete: true, status: 'won', totalReps: state.fitness.totalReps, loot: state.party.loot, gold: state.party.gold };
+    return { ok: true, questComplete: true, status: 'won', totalReps: state.fitness.totalReps,
+             loot: state.party.loot, gold: state.party.gold, boon, healed: healed.length };
   }
 
   if (next.mapId !== state.scene.mapId) setScene({ mapId: next.mapId });
   logStory('quest', 'DM', `✦ Next: ${next.title} — ${next.objective}`);
-  const spawned = next.boss ? addToken({ ...next.boss, kind: 'monster', maxHp: next.boss.hp }) : null;
+  // A beat can name the thing that bars it, so the DM does not have to invent a
+  // token for the set-piece — and cannot reach for the knight art, which is
+  // Brannok's own picture, for a stone guardian.
+  const arrival = next.boss || next.spawn || null;
+  const spawned = arrival ? addToken({ ...arrival, kind: 'monster', maxHp: arrival.hp }) : null;
   emit('quest');
   return {
     ok: true, beat: next.id, title: next.title, objective: next.objective,
     beatNumber: q.beatIndex + 1, of: QUEST.beats.length,
     bossSpawned: spawned?.token?.name || null,
-    note: next.boss ? 'This is the final beat. Play it like one.' : undefined,
+    cleared: beat.title,
+    paid: { items: beat.reward?.items || [], gold: beat.reward?.gold || 0, boon, healedToFull: healed.length },
+    note: (next.boss ? 'This is the final beat. Play it like one. ' : '') +
+          'Tell the player what they just earned — the loot, the boon, and that the party is back to full.',
   };
 }
 

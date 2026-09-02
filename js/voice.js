@@ -69,6 +69,9 @@ export function inQuietPeriod() {
   return voice.speaking || Date.now() < quietUntil;
 }
 
+/** Milliseconds of quiet left — exposed so tests can say WHY the ear is shut. */
+export function quietLeft() { return Math.max(0, quietUntil - Date.now()); }
+
 // ── ears ────────────────────────────────────────────────────────────────────
 function build() {
   if (!SR) return null;
@@ -223,7 +226,12 @@ export async function say(text) {
   // ear reopens straight into the DM's opening syllable.
   const wasHandsFree = voice.handsFree;
   voice.speaking = true;
-  quietUntil = Infinity;              // nothing heard from here is the player
+  // NOT Infinity. voice.speaking is the real guard while a line is playing; this
+  // is only a backstop, and an unreachable one strands the microphone forever if
+  // the finally below is ever skipped — a page hidden mid-line, an audio element
+  // that never fires ended, any throw on an unexpected path. A minute is longer
+  // than any line and still self-heals.
+  quietUntil = Date.now() + 60_000;
   rememberSpoken(line);
   clearTimeout(restartTimer);
   if (voice.listening) { try { recog.abort(); } catch { /* fine */ } }
@@ -256,11 +264,20 @@ export async function say(text) {
   }
 }
 
+let endPlayback = null;    // lets shutUp() finish a line that is still playing
+
 function playUrl(url) {
   return new Promise(resolve => {
+    // Pausing an <audio> fires neither 'ended' nor 'error', so a plain
+    // onended-only promise never settles when the player mutes mid-line — and
+    // say()'s finally never runs, leaving the microphone shut for good. Hand
+    // shutUp() a way to settle it.
+    let done = false;
+    const finish = () => { if (done) return; done = true; endPlayback = null; resolve(); };
+    endPlayback = finish;
     audio = new Audio(url);
-    audio.onended = audio.onerror = () => resolve();
-    audio.play().catch(() => resolve());   // autoplay blocked until first click
+    audio.onended = audio.onerror = finish;
+    audio.play().catch(finish);            // autoplay blocked until first click
   });
 }
 
@@ -294,6 +311,7 @@ export async function unlockAudio() {
 export function shutUp() {
   if (audio) { try { audio.pause(); } catch { /* fine */ } }
   try { window.speechSynthesis?.cancel(); } catch { /* fine */ }
+  if (endPlayback) endPlayback();      // let the awaiting say() run its finally
   voice.speaking = false;
   // Cutting the DM off mid-word still leaves that word in the room.
   quietUntil = Date.now() + ECHO_TAIL_MS;

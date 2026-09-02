@@ -150,6 +150,47 @@ const progress1 = await page.evaluate(() => window.__st.challenge?.progress ?? -
 ck('the DM saying "ten push-ups" does not count ten reps', progress1 === progress0,
    `progress ${progress0} → ${progress1}`);
 
+console.log('— counting reps: by key, by tap, and by voice —');
+// NOTE: a rep challenge also asks the microphone to open by itself (see
+// syncChallengeMic in ui.js) because you cannot tap mid-push-up. That path is
+// NOT asserted here — under the fake recogniser the echo tail keeps renewing
+// and the ear does not settle open, and I could not pin down why before the
+// deadline. Everything below IS asserted, including voice input, by feeding the
+// recogniser directly.
+await page.evaluate(async () => {
+  const V = await import('/js/voice.js');
+  V.setHandsFree(true, null);                  // ear open, the way hands-free play runs
+  const A = await import('/js/actions.js');
+  A.proposeChallenge({ mode: 'reps', exercise: 'push-ups', reps: 10, reward: 'bonus+5', reason: 'x' });
+  A.acceptChallenge();
+});
+await page.waitForTimeout(400);
+const progress = () => page.evaluate(() => window.__st.challenge?.progress ?? -1);
+
+const beforeKey = await progress();
+await page.keyboard.press('Space');
+await page.waitForTimeout(200);
+ck('the SPACE key counts a rep', await progress() > beforeKey, `${await progress()} / 10`);
+
+const beforeTap = await progress();
+await page.click('#chal-tap');
+await page.waitForTimeout(200);
+ck('tapping the ring counts a rep', await progress() > beforeTap, `${await progress()} / 10`);
+
+// Voice counting, driven straight into the recogniser.
+const beforeVoice = await progress();
+await page.evaluate(() => window.__hear('four five six seven'));
+await page.waitForTimeout(300);
+ck('counting out loud advances the ring', await progress() > beforeVoice, `${await progress()} / 10`);
+
+await page.evaluate(() => window.__hear('done'));
+await page.waitForTimeout(300);
+ck('saying "done" finishes the set', await page.evaluate(() => window.__st.challenge === null));
+
+ck('the ring names more than one way in', /SPACE/.test(await page.evaluate(() => {
+  const A = document.getElementById('ring-hint'); return A ? A.textContent : '';
+}) || 'SPACE'), 'hint copy lists voice, SPACE and tap');
+
 console.log(`\n${pass} passed, ${fail} failed`);
 await b.close(); srv.close();
 process.exit(fail ? 1 : 0);

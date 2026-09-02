@@ -16,6 +16,7 @@ let lastPos = new Map();
 let lastHp = new Map();
 let lastDiceT = 0;
 let lastSpellT = 0;
+let lastMsT = 0;
 let lastFrame = performance.now();
 
 // Someone who asked for less motion should not get a guttering torch.
@@ -86,6 +87,19 @@ function detectChanges(prime = false) {
     ring(sp.x, sp.y, '#F0762E');
     flash('rgba(240,118,46,.22)', 380);
     kick(10);
+  }
+
+  // A cleared beat throws a small party over the heroes.
+  const ms = state.milestone;
+  if (ms && ms.t !== lastMsT) {
+    lastMsT = ms.t;
+    state.tokens.filter(t => t.kind === 'pc').forEach(t => {
+      burst(t.x, t.y, 26, '#F2C14E');
+      burst(t.x, t.y, 12, '#79B255');
+      ring(t.x, t.y, '#F2C14E');
+    });
+    flash('rgba(242,193,78,.26)', 700);
+    kick(9);
   }
 
   const d = state.dice;
@@ -406,7 +420,10 @@ function drawToken(t, px, py, now, lifted) {
     // their own id — so a room full of them reads as a room full of creatures
     // rather than a row of stamps. Heroes and objects are left exactly as drawn:
     // the player should always recognise their own party instantly.
-    const vary = t.kind === 'monster';
+    // A named boss is drawn once, deliberately, and must look exactly as drawn —
+    // the tint that keeps five goblins apart was turning the Cinder Wight's
+    // burning crown green. Variation is for the rank and file.
+    const vary = t.kind === 'monster' && (t.scale || 1) <= 1;
     const u = vary ? hashUnit(t.id) : 0;
     const v = vary ? hashUnit(t.id + '~') : 0;   // a second, independent axis
     const size = cell - pad * 2;
@@ -425,7 +442,8 @@ function drawToken(t, px, py, now, lifted) {
         ctx.filter = `hue-rotate(${hue}deg) saturate(${sat}) brightness(${light})`;
       }
     }
-    const grow = vary ? 1 + (v - 0.5) * 0.32 : 1;          // ±16% of stature
+    // A token's own scale (a boss is 2) multiplies the small random variation.
+    const grow = (t.scale || 1) * (vary ? 1 + (v - 0.5) * 0.32 : 1);
     const w = size * grow, off = (size - w) / 2;
     if (vary && u > 0.5) {                                  // half of them face the other way
       ctx.translate(px + pad + off + w, py + pad + off + lift);

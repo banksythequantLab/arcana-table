@@ -160,12 +160,13 @@ export const BASE_TOOLS = [
   },
   {
     name: 'add_token',
-    description: 'Spawn a creature or object on the board. Eleven creature arts plus a chest: goblin, skeleton, dragon, wolf, ooze, spider, wraith, ogre, rat, knight, wizard, villager. Pick the one that actually fits what you are describing, and vary it — a hall of identical goblins looks like a bug, not an encounter.',
+    description: 'Spawn a creature or object on the board. Eleven creature arts plus a chest: goblin, skeleton, dragon, wolf, ooze, spider, wraith, ogre, rat, warden (a carved stone guardian), knight, wizard, villager. NEVER use "knight" or "wizard" for an enemy — those are the player\'s own heroes, and the board would look like the party is fighting itself. Pick the one that actually fits what you are describing, and vary it — a hall of identical goblins looks like a bug, not an encounter.',
     inputSchema: obj({
       name: str('Display name, e.g. "Snaggle the Goblin"'),
       kind: { type: 'string', enum: ['monster', 'npc', 'object'], description: 'What it is' },
-      art: { type: 'string', enum: ['knight', 'wizard', 'goblin', 'skeleton', 'dragon', 'wolf', 'ooze', 'spider', 'wraith', 'ogre', 'rat', 'chest', 'villager'], description: 'Token art. VARY IT — do not spawn two of the same art in one scene if another fits.' },
+      art: { type: 'string', enum: ['knight', 'wizard', 'goblin', 'skeleton', 'dragon', 'wolf', 'ooze', 'spider', 'wraith', 'ogre', 'rat', 'warden', 'wight', 'chest', 'villager'], description: 'Token art. VARY IT — do not spawn two of the same art in one scene if another fits.' },
       x: num('Grid x'), y: num('Grid y'), hp: num('Hit points (also max HP unless maxHp given)'), maxHp: num('Max hit points'),
+      scale: num('How big it draws, 1-2.5. Leave it at 1 for ordinary creatures; use 2 for a boss you want to read as one from across the room.'),
     }, ['name']),
     handler: a => A.addToken(a),
   },

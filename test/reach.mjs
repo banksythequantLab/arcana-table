@@ -96,6 +96,32 @@ ck('the party is never caught in it', await page.evaluate(() =>
 const melee = await call('attack', { attackerId: 'Brannok', targetId: 'Pack A', kind: 'melee' });
 ck('a sword swing is not a fireball', melee.fireball !== true, JSON.stringify(melee).slice(0, 70));
 
+console.log('— a monster closes the distance and swings —');
+// "Move it, then attack" is two calls for one obvious act, and the model kept
+// skipping the first — so the creature lunged in the prose and stood still on
+// the board. A monster that could reach you this turn now walks in itself.
+await put('Brannok', 5, 6);
+await call('add_token', { name: 'Charger', kind: 'monster', art: 'skeleton', x: 12, y: 6, hp: 14 });
+const posOf = n => page.evaluate(n => {
+  const t = window.__st.tokens.find(t => t.name === n); return t ? `${t.x},${t.y}` : null; }, n);
+const wasAt = await posOf('Charger');
+const rush = await call('attack', { attackerId: 'Charger', targetId: 'Brannok', kind: 'melee', damage: 3 });
+ck('the attack is not refused for range', !rush.error && !rush.tooFar, JSON.stringify(rush).slice(0, 90));
+ck('the monster actually moved on the board', await posOf('Charger') !== wasAt,
+   `${wasAt} → ${await posOf('Charger')}`);
+ck('it reports how far it closed', !!rush.closed, JSON.stringify(rush.closed));
+ck('and it ends up adjacent', rush.distance <= 1, `distance ${rush.distance}`);
+ck('the swing resolved, hit or miss', typeof rush.hit === 'boolean', `hit=${rush.hit}`);
+
+// The player's own heroes are still the player's decision.
+await put('Brannok', 3, 6);
+await call('add_token', { name: 'Standoff', kind: 'monster', art: 'ogre', x: 16, y: 6, hp: 14 });
+const heroWas = await posOf('Brannok');
+const heroSwing = await call('attack', { attackerId: 'Brannok', targetId: 'Standoff', kind: 'melee' });
+ck('a HERO out of reach is still refused, not auto-moved', heroSwing.tooFar === true,
+   (heroSwing.error || '').slice(0, 60));
+ck('and the hero did not move', await posOf('Brannok') === heroWas, `${heroWas} → ${await posOf('Brannok')}`);
+
 console.log('— you can see what you are fighting —');
 await page.evaluate(() => { window.__st.revealed = []; });
 await call('add_token', { name: 'Lurker', kind: 'monster', art: 'skeleton', x: 8, y: 10, hp: 9 });

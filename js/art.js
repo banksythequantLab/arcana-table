@@ -136,6 +136,41 @@ export const TOKEN_ART = {
     <path d="M36 64 Q50 74 64 64 L58 64 L56 70 L50 64 L44 70 L42 64 Z" fill="#FFF7E0"/>
     <path d="M40 58 L40 64 M60 58 L60 64" fill="none" stroke-width="4"/>
   `),
+  // The Warden's ring used to spawn with the KNIGHT art — the same picture as
+  // Brannok — so the thing barring the crypt door looked like your own fighter.
+  // Carved stone, cracked down the face, lit from inside: nothing like a hero.
+  warden: svg(`
+    <path d="M24 26 L50 16 L76 26 L76 84 L24 84 Z" fill="#7C7A86"/>
+    <path d="M24 26 L50 16 L76 26 L50 34 Z" fill="#9C9AA8" stroke="none"/>
+    <path d="M30 40 L44 40 L44 52 L30 52 Z" fill="#3A3742"/>
+    <path d="M56 40 L70 40 L70 52 L56 52 Z" fill="#3A3742"/>
+    <path d="M33 43 L41 43 L41 49 L33 49 Z" fill="#F0762E" stroke="none"/>
+    <path d="M59 43 L67 43 L67 49 L59 49 Z" fill="#F0762E" stroke="none"/>
+    <path d="M50 34 L50 58" fill="none" stroke-width="4"/>
+    <path d="M38 64 L62 64 M38 72 L62 72" fill="none" stroke-width="4"/>
+    <path d="M52 16 L46 40 L58 44 L44 84" fill="none" stroke="#4A4753" stroke-width="3"/>
+    <path d="M24 56 L14 62 L14 80 M76 56 L86 62 L86 80" fill="none" stroke-width="6"/>
+  `),
+  // The boss shared the plain skeleton art, so the thing wearing the Ember
+  // Crown looked like every other walking bone pile. Bigger skull, burning
+  // sockets, and the Crown itself alight on its brow.
+  wight: svg(`
+    <path d="M50 4 L44 16 L38 8 L34 18 L26 12 L28 24 L50 30 L72 24 L74 12 L66 18 L62 8 L56 16 Z" fill="#F0762E"/>
+    <path d="M50 10 L47 18 L53 18 Z" fill="#FFE08A" stroke="none"/>
+    <path d="M36 16 L34 22 L39 21 Z" fill="#FFE08A" stroke="none"/>
+    <path d="M64 16 L66 22 L61 21 Z" fill="#FFE08A" stroke="none"/>
+    <path d="M26 26 L74 26 L74 34 L26 34 Z" fill="#C9A227"/>
+    <path d="M24 52 Q24 32 50 32 Q76 32 76 52 L76 62 Q76 70 68 70 L32 70 Q24 70 24 62 Z" fill="#E8E0CE"/>
+    <ellipse cx="39" cy="50" rx="9" ry="10" fill="#2A1410" stroke="none"/>
+    <ellipse cx="61" cy="50" rx="9" ry="10" fill="#2A1410" stroke="none"/>
+    <circle cx="39" cy="50" r="4" fill="#F0762E" stroke="none"/>
+    <circle cx="61" cy="50" r="4" fill="#F0762E" stroke="none"/>
+    <path d="M45 60 L50 54 L55 60 Z" fill="#2A1410" stroke="none"/>
+    <path d="M34 70 L34 78 M42 70 L42 78 M50 70 L50 78 M58 70 L58 78 M66 70 L66 78" fill="none" stroke-width="3"/>
+    <path d="M30 78 L70 78 L66 94 L34 94 Z" fill="#E8E0CE"/>
+    <path d="M40 84 L60 84 M40 90 L60 90 M50 78 L50 94" fill="none" stroke-width="3"/>
+    <path d="M24 60 L10 66 M76 60 L90 66" fill="none" stroke-width="6"/>
+  `),
   rat: svg(`
     <path d="M22 34 Q10 24 22 18 Q32 22 32 34 M78 34 Q90 24 78 18 Q68 22 68 34" fill="#8C7A6B"/>
     <path d="M50 26 Q76 32 76 56 Q76 78 50 86 Q24 78 24 56 Q24 32 50 26 Z" fill="#A8968A"/>
