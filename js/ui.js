@@ -33,13 +33,14 @@ function bindIntro() {
 
 function renderStarters() {
   const el = $('#starters');
-  const show = !chat.busy && chat.messages.filter(m => m.role === 'user').length === 0;
-  el.hidden = !show;
-  if (!show) { el.innerHTML = ''; return; }
-  if (el.dataset.built) return;
-  el.dataset.built = '1';
-  el.innerHTML = STARTERS.map((t, i) => `<button class="starter" data-i="${i}" type="button">${esc(t)}</button>`).join('');
-  el.querySelectorAll('.starter').forEach(b => b.onclick = () => speakTurn(STARTERS[+b.dataset.i]));
+  // Build once and only toggle visibility. (Emptying it while the DM was busy
+  // opening the scene used to leave the row permanently blank.)
+  if (!el.dataset.built) {
+    el.dataset.built = '1';
+    el.innerHTML = STARTERS.map((t, i) => `<button class="starter" data-i="${i}" type="button">${esc(t)}</button>`).join('');
+    el.querySelectorAll('.starter').forEach(b => b.onclick = () => speakTurn(STARTERS[+b.dataset.i]));
+  }
+  el.hidden = chat.busy || chat.messages.some(m => m.role === 'user');
 }
 
 export function initUI() {

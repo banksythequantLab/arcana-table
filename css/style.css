@@ -105,7 +105,7 @@ main{flex:1;display:flex;min-height:0}
 @keyframes pulse{50%{box-shadow:0 3px 0 var(--ink),0 0 0 7px rgba(217,83,79,.28)}}
 #voice-row{display:flex;align-items:center;gap:10px;padding:0 10px 8px;font-size:12.5px;color:var(--muted)}
 .vtoggle{display:flex;align-items:center;gap:6px;font-weight:800;cursor:pointer}
-.vtoggle input{width:16px;height:16px;flex:0}
+.vtoggle input{width:16px;height:16px;flex:0 0 auto;margin:0;accent-color:var(--gold)}
 .vhint{font-weight:400;opacity:.75}
 .vmute{margin-left:auto;background:none;border:0;font-size:16px;cursor:pointer;opacity:.85}
 .vmute.off{opacity:.4}
@@ -138,7 +138,8 @@ main{flex:1;display:flex;min-height:0}
 input,select{
   background:#fff;border:2.5px solid var(--ink);border-radius:8px;padding:6px 8px;min-width:0;flex:1;color:var(--ink);
 }
-input[type=checkbox]{flex:0;width:18px;height:18px}
+/* flex:0 is 0 0 0% — it collapsed every checkbox in the app to nothing. */
+input[type=checkbox]{flex:0 0 auto;width:18px;height:18px;padding:0;accent-color:var(--gold)}
 .btn{
   background:var(--gold);color:var(--ink);border:2.5px solid var(--ink);border-radius:10px;
   padding:6px 12px;font-weight:800;cursor:pointer;box-shadow:0 3px 0 var(--ink);flex:0 0 auto;
@@ -226,8 +227,9 @@ input[type=checkbox]{flex:0;width:18px;height:18px}
   main{flex-direction:column;overflow-y:auto}
   body{overflow:auto}
   #board-wrap{height:52vh;flex:none}
-  #side{width:auto;border-left:0;border-top:var(--outline)}
-  .tabpane{max-height:40vh}
+  /* the panel takes the rest of the screen rather than leaving dead space */
+  #side{width:auto;min-width:0;border-left:0;border-top:var(--outline);flex:1;min-height:0}
+  .tabpane{flex:1;min-height:140px;max-height:none}
 }
 
 /* ── first run ────────────────────────────────────────────────────────────── */
@@ -250,7 +252,7 @@ input[type=checkbox]{flex:0;width:18px;height:18px}
 .intro-points code{background:#E7DCC4;border-radius:5px;padding:1px 5px;font:600 12.5px ui-monospace,monospace}
 .intro-card .btn.big{width:100%;font-size:19px;padding:14px}
 .intro-quiet{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:12px;font-size:13px;color:#6B5E76;cursor:pointer}
-.intro-quiet input{width:15px;height:15px;flex:0}
+.intro-quiet input{width:16px;height:16px;flex:0 0 auto;margin:0;accent-color:var(--gold)}
 
 /* starter prompts — a judge should never face a blank box */
 #starters{display:flex;flex-wrap:wrap;gap:6px;padding:0 10px 8px}
@@ -271,7 +273,7 @@ input[type=checkbox]{flex:0;width:18px;height:18px}
   .badge{font-size:10.5px;padding:4px 8px;white-space:nowrap}
   .badge .hint{display:none}
   #board-wrap{height:38vh;padding:8px}
-  .tabpane{max-height:34vh}
+  .tabpane{min-height:120px}
   .tab{font-size:12.5px;padding:7px 2px}
   #say-row{padding:8px}
   #say-row input{font-size:16px}         /* <16px makes iOS zoom on focus */

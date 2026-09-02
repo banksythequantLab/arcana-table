@@ -157,6 +157,16 @@ await page.click('.approval .no');
 const denied = await denyPromise;
 check('remove PC denied via ✗', denied.denied === true, JSON.stringify(denied));
 
+// Sweeping a defeated monster is bookkeeping, not consent — it must not stall.
+await call('add_token', { name: 'Husk', kind: 'monster', art: 'skeleton', x: 3, y: 9, hp: 1 });
+const swept = await Promise.race([
+  call('remove_token', { tokenId: 'Husk' }),
+  new Promise(r => setTimeout(() => r({ stalled: true }), 4000)),
+]);
+check('removing a monster needs no approval', swept.ok === true, JSON.stringify(swept));
+check('no approval prompt was raised for the monster',
+  (await page.$$('.approval')).length === 0);
+
 check('apply_condition ok', (await call('apply_condition', { tokenId: 'Snaggle', condition: 'poisoned' })).ok === true);
 check('end_combat ok', (await call('end_combat')).ok === true);
 const toolsAfter = await page.evaluate(() => window.arcana.tools());

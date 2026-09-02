@@ -27,14 +27,17 @@ let approvalSeq = 0;
 const approvalWaiters = new Map();
 export const pendingApprovals = [];   // rendered by ui.js
 
+// Resolves 'ok' | 'denied' | 'timeout'. A judge who never notices the prompt
+// should not watch the DM sit frozen — 45s and the turn moves on.
+const APPROVAL_WINDOW_MS = 45_000;
 function requestApproval(description) {
-  if (state.settings.autoApprove) return Promise.resolve(true);
+  if (state.settings.autoApprove) return Promise.resolve('ok');
   const id = ++approvalSeq;
   return new Promise(resolve => {
     pendingApprovals.push({ id, description });
     approvalWaiters.set(id, resolve);
     emit('approvals');
-    setTimeout(() => { if (approvalWaiters.has(id)) settleApproval(id, false, true); }, 120_000);
+    setTimeout(() => { if (approvalWaiters.has(id)) settleApproval(id, false, true); }, APPROVAL_WINDOW_MS);
   });
 }
 
@@ -43,7 +46,7 @@ export function settleApproval(id, approved, timedOut = false) {
   if (i >= 0) pendingApprovals.splice(i, 1);
   const w = approvalWaiters.get(id);
   approvalWaiters.delete(id);
-  if (w) w(approved && !timedOut);
+  if (w) w(timedOut ? 'timeout' : approved ? 'ok' : 'denied');
   emit('approvals');
 }
 
@@ -134,9 +137,14 @@ export const BASE_TOOLS = [
   },
   {
     name: 'remove_token',
-    description: 'Remove a token from the board (defeated monster, opened chest). Removing anything requires player approval — the call waits for their ✓.',
+    description: 'Remove a token from the board (defeated monster, opened chest). Clearing monsters and objects is immediate; removing a PLAYER CHARACTER requires the player\'s approval — that call waits for their ✓.',
     inputSchema: obj({ tokenId: str('Token id or name') }, ['tokenId']),
-    approval: a => `Remove ${a.tokenId} from the board`,
+    // Consent protects the player's own pieces. Sweeping a dead goblin off the
+    // board is bookkeeping — gating it just stalls the DM mid-scene.
+    approval: a => {
+      const t = findToken(a.tokenId);
+      return (t && t.kind === 'pc') ? `Remove ${t.name} from the board` : null;
+    },
     handler: a => A.removeToken(a),
   },
   {
@@ -213,8 +221,13 @@ function wrap(def) {
           const ask = def.approval(input || {});
           if (ask) {
             updateAgent(entry, 'awaiting-approval', ask);
-            const ok = await requestApproval(ask);
-            if (!ok) { updateAgent(entry, 'denied'); return { denied: true, note: 'The player declined this action. Respect it and narrate around it.' }; }
+            const verdict = await requestApproval(ask);
+            if (verdict !== 'ok') {
+              updateAgent(entry, 'denied', verdict === 'timeout' ? 'no answer — carried on without it' : '');
+              return verdict === 'timeout'
+                ? { denied: true, note: 'The player did not answer in time. Do not retry this call; carry the scene forward without it.' }
+                : { denied: true, note: 'The player declined this action. Respect it and narrate around it.' };
+            }
           }
         }
         const result = await def.handler(input || {});
