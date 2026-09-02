@@ -99,10 +99,10 @@ await waitDM(1);                                   // opening scene
 await page.waitForTimeout(2500);
 
 for (const line of [
-  'I creep deeper into the crypt, sword drawn, listening for movement.',
-  'I attack whatever is in front of me!',
-  'I steel myself and charge it head-on — everything rides on this swing.',
-  'This is the killing blow. I put every ounce of strength behind it.',
+  'What are we here to do?',
+  'I wade into the flooded hall, sword drawn.',
+  'I attack it!',
+  'Everything rides on this swing — I want it down now.',
   'I finish it.',
 ]) {
   const before = await playerSays(line);

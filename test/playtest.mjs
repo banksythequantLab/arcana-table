@@ -68,9 +68,11 @@ console.log('=== opening scene (DM speaks first, unprompted) ===');
 await waitForDM(1, 'open');
 
 const turns = [
-  'I creep deeper into the crypt, sword drawn, listening for movement.',
-  'I attack whatever is in front of me!',
-  'I steel myself and charge the thing head-on — this is the moment.',
+  'What are we actually here to do? Tell me the job.',
+  'I wade into the flooded hall, sword drawn, looking for whatever is guarding it.',
+  'I attack it!',
+  'I put everything into this swing — I want this thing down now.',
+  'Good. We push on toward the vault.',
 ];
 for (const t of turns) {
   const before = await dmCount();
@@ -117,11 +119,16 @@ const report = await page.evaluate(() => ({
   tokens: [...document.querySelectorAll('canvas')].length,
 }));
 const board = await page.evaluate(() => window.arcana.call('get_board_state'));
+const quest = await page.evaluate(() => window.arcana.call('get_quest'));
 
 console.log('\n=== TRANSCRIPT ===');
 report.transcript.forEach(l => console.log('  ' + l));
 console.log('\n=== TOOL CALLS THE DM MADE ===');
 [...new Set(report.toolCalls)].slice(0, 25).forEach(l => console.log('  ' + l));
+console.log('\n=== QUEST AFTER PLAY ===');
+console.log('  beat  :', quest.beatNumber, 'of', quest.of, '—', quest.current?.title);
+console.log('  done  :', quest.completed.join(' · ') || '(none yet)');
+console.log('  frozen:', quest.timeStopped, quest.downed ? JSON.stringify(quest.downed) : '');
 console.log('\n=== BOARD AFTER PLAY ===');
 console.log('  scene :', board.scene.title, '—', board.scene.mood);
 console.log('  tokens:', board.tokens.map(t => `${t.name}(${t.x},${t.y}) ${t.hp}/${t.maxHp}`).join(' · '));
