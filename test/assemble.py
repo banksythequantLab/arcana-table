@@ -38,17 +38,23 @@ print('vo:', json.dumps(VOS, indent=1), '\nfootage:', round(FOOT_LEN,1), 's')
 # (kind, source, length, footage_start)   kind: card | shot | slate
 CUT = [
     # footage_start values are tuned to the current screens/video bed:
-    #  ~18s intro card · ~36s quest rail + opening beat · ~52s combat begins
-    #  ~74s Heroic Effort offer · ~78s the reps · ~85s the natural 20
+    #  ~22s intro card · ~40s quest rail + opening · ~62-75s the warm-up
+    #  ~100s the Oath offered · ~104s the table locked · ~110s combat
+    #  ~130s the 10-squat offer · ~140s the reps · ~144s the natural 20
     ('card', 'open',   4.0, None),
-    ('shot', None,     VOS['vo01_problem'] + VOS['vo02_whatitis'], 16.0),
+    ('shot', None,     VOS['vo01_problem'] + VOS['vo02_whatitis'], 22.0),
     ('card', 'webmcp', 3.0, None),
-    ('shot', None,     VOS['vo03_webmcp'], 42.0),
+    ('shot', None,     VOS['vo03_webmcp'], 106.0),
     ('card', 'heroic', 3.0, None),
-    ('shot', None,     VOS['vo04_heroic'], 71.0),
+    ('shot', None,     VOS['vo04_heroic'], 127.0),
     ('slate','burpees',10.0, None),          # ← his push-up footage drops in here
-    ('shot', None,     VOS['vo04b_payoff'], 84.0),
-    ('shot', None,     VOS['vo05_hood'], 50.0),
+    ('shot', None,     VOS['vo04b_payoff'], 143.2),
+    # A silent stretch: the VO predates Oaths and the warm-up, so the footage
+    # and one card carry them instead of pretending the narration covers it.
+    ('card', 'oath',   4.5, None),
+    ('shot', None,     8.0,  98.0),          # the Oath sworn, the table locked
+    ('shot', None,     6.0,  63.0),          # the warm-up, chat still live beside it
+    ('shot', None,     VOS['vo05_hood'], 110.0),
     ('card', 'close',  VOS['vo06_close'] + 1.5, None),
 ]
 
@@ -94,7 +100,9 @@ ORDER = [
     ('sil', 3.0), ('vo', 'vo03_webmcp'),
     ('sil', 3.0), ('vo', 'vo04_heroic'),
     ('sil', 10.0),                                  # the push-up slot
-    ('vo', 'vo04b_payoff'), ('vo', 'vo05_hood'), ('vo', 'vo06_close'),
+    ('vo', 'vo04b_payoff'),
+    ('sil', 18.5),                                  # the Oath card + its two shots
+    ('vo', 'vo05_hood'), ('vo', 'vo06_close'),
     ('sil', 1.5),
 ]
 apieces = []

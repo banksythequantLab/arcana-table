@@ -6,6 +6,7 @@ const CARDS = [
   { id: 'open',    kicker: '', title: 'Arcana Table', sub: 'Play D&amp;D with an AI co-DM — and do real push-ups for your natural 20s.', big: true },
   { id: 'webmcp',  kicker: 'How it works', title: '21 tools on <code>document.modelContext</code>', sub: 'The built-in DM calls <code>getTools()</code> and <code>executeTool()</code> — the same contract your agent would use.' },
   { id: 'heroic',  kicker: 'The signature move', title: 'Heroic&nbsp;Effort', sub: '10 jumping jacks → +2 · 15 squats → advantage · 10 push-ups → a natural 20' },
+  { id: 'oath',    kicker: 'The other way to pay', title: 'Can&rsquo;t do push-ups today?', sub: 'Swear an <b>Oath</b> instead — the dishes, ten pages, twenty minutes of study. The table locks until you&rsquo;re back, and it pays exactly the same.' },
   { id: 'burpees', kicker: '[ DROP YOUR PUSH-UP FOOTAGE HERE ]', title: 'Do the reps.', sub: 'Hands on the floor. Count out loud. The table is listening.' },
   { id: 'close',   kicker: '', title: 'Roll with your whole self.', sub: 'arcana-table.pages.dev · github.com/banksythequantLab/arcana-table', big: true },
 ];

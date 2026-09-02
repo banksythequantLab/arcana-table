@@ -99,17 +99,39 @@ await waitDM(1);                                   // opening scene
 await page.waitForTimeout(2500);
 
 for (const line of [
-  'What are we here to do?',
+  "Yes — give me the 90 second warm-up.",
   'I wade into the flooded hall, sword drawn.',
-  'I attack it!',
-  'Everything rides on this swing — I want it down now.',
+  "I attack it! My shoulder's wrecked today though — no push-ups. But I've got a sink full of dishes I've been avoiding.",
+  'Everything rides on this swing.',
   'I finish it.',
 ]) {
   const before = await playerSays(line);
   const outcome = await Promise.race([
     page.waitForSelector('#challenge-modal:not([hidden])', { timeout: 90000 }).then(() => 'challenge'),
+    page.waitForSelector('#oath:not([hidden])', { timeout: 90000 }).then(() => 'oath'),
+    page.waitForSelector('#warmup:not([hidden])', { timeout: 90000 }).then(() => 'warmup'),
     page.waitForFunction(k => document.querySelectorAll('.say.dm:not(.thinking)').length >= k, before + 1, { timeout: 90000 }).then(() => 'spoke'),
   ]).catch(() => 'timeout');
+
+  if (outcome === 'warmup') {
+    console.log('  warm-up on camera — letting three stretches run');
+    await page.waitForTimeout(9000);              // three stretches at 15s, sped past
+    await page.evaluate(() => window.arcana.finishWarmup());
+    await waitDM(before + 1);
+    await page.waitForTimeout(1800);
+  }
+
+  if (outcome === 'oath') {
+    console.log('  OATH offered on camera');
+    await page.waitForTimeout(4200);              // let the offer read
+    await page.click('#oath-accept');
+    await page.waitForTimeout(3400);              // the locked table, clock ticking
+    await page.evaluate(() => { window.__st.oath.endsAt = Date.now() - 1; });
+    await page.waitForTimeout(1400);
+    await page.click('#oath-keep');
+    await waitDM(before + 1);
+    await page.waitForTimeout(2200);
+  }
 
   if (outcome === 'challenge') {
     const reps = parseInt(await page.innerText('#chal-title'), 10) || 10;
