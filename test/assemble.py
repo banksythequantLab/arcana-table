@@ -11,6 +11,12 @@ HERE = pathlib.Path(__file__).parent
 VO   = HERE / 'vo'
 CARD = HERE / 'screens/cards'
 FOOT = HERE / 'screens/video/arcana-screen.mp4'
+# The one shot no harness can produce: Derek actually doing the reps. When it
+# is present the slate becomes that footage under a lower-third; when it is
+# not, the placeholder card stands in so the pipeline still builds.
+PUSHUPS = HERE / '../media/pushups.mp4'
+LOWER   = HERE / 'screens/cards/lower-third.png'
+PUSHUP_CROP = 'crop=1700:956:150:124'      # tighten the room, keep him whole
 BUILD = HERE / 'build'; BUILD.mkdir(exist_ok=True)
 W, H, FPS = 1280, 720, 30
 
@@ -49,7 +55,19 @@ CUT = [
 parts = []
 for i, (kind, src, length, start) in enumerate(CUT):
     out = BUILD / f'{i:02d}.mp4'
-    if kind in ('card', 'slate'):
+    if kind == 'slate' and PUSHUPS.exists():
+        vf = f'{PUSHUP_CROP},scale={W}:{H},eq=saturation=0.92:contrast=1.06'
+        if LOWER.exists():
+            run(['ffmpeg','-y','-loglevel','error','-i',str(PUSHUPS),'-i',str(LOWER),
+                 '-filter_complex',f'[0:v]{vf}[v];[v][1:v]overlay=0:0',
+                 '-t',f'{length:.3f}','-r',str(FPS),'-an','-c:v','libx264','-preset','veryfast',
+                 '-crf','20','-pix_fmt','yuv420p',str(out)])
+        else:
+            run(['ffmpeg','-y','-loglevel','error','-i',str(PUSHUPS),'-vf',vf,
+                 '-t',f'{length:.3f}','-r',str(FPS),'-an','-c:v','libx264','-preset','veryfast',
+                 '-crf','20','-pix_fmt','yuv420p',str(out)])
+        src = 'pushups'
+    elif kind in ('card', 'slate'):
         run(['ffmpeg','-y','-loglevel','error','-loop','1','-i',str(CARD/f'{src}.png'),
              '-t',f'{length:.3f}','-r',str(FPS),'-c:v','libx264','-preset','veryfast',
              '-crf','20','-pix_fmt','yuv420p','-vf',f'scale={W}:{H}',str(out)])
