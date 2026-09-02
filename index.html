@@ -119,9 +119,14 @@
     </div>
 
     <form id="say-row" autocomplete="off">
+      <button id="mic-btn" class="btn mic" type="button" aria-label="Hold to speak" title="Click to speak a turn">🎤</button>
       <input id="say" placeholder="What do you do?" aria-label="Tell the Dungeon Master what you do" maxlength="400">
       <button id="say-btn" class="btn" type="submit" aria-label="Send">▶</button>
     </form>
+    <div id="voice-row">
+      <label class="vtoggle"><input type="checkbox" id="hands-free"> 🙌 Hands-free <span class="vhint">(play mid-burpee)</span></label>
+      <button id="mute-btn" class="vmute" type="button" aria-label="Mute the DM's voice">🔊</button>
+    </div>
 
     <div id="agent-section">
       <div class="agent-head">🤖 Agent log <span id="agent-sub"></span></div>

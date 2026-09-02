@@ -88,6 +88,35 @@ function healPayload(payload, message) {
   return null;                                       // nothing we know how to fix
 }
 
+// ── /speak ── give the DM a voice. Text in, spoken audio out.
+async function speak(req, env, origin) {
+  const { text, voice } = await req.json().catch(() => ({}));
+  const line = String(text || '').slice(0, 900);          // one DM beat, not a novel
+  if (!line.trim()) return json({ error: 'Nothing to say.' }, 400, origin);
+
+  const r = await fetch('https://api.openai.com/v1/audio/speech', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${env.OPENAI_API_KEY}` },
+    body: JSON.stringify({
+      model: env.TTS_MODEL || 'gpt-4o-mini-tts',
+      voice: voice || env.TTS_VOICE || 'onyx',            // low, warm — a DM behind a screen
+      input: line,
+      response_format: 'mp3',
+      instructions: 'Speak as a tabletop Dungeon Master narrating to one player at the table: low and warm, unhurried, a touch of theatrical menace. Land the pauses.',
+    }),
+  });
+
+  if (!r.ok) {
+    let detail = (await r.text()).slice(0, 200);
+    try { detail = JSON.parse(detail)?.error?.message || detail; } catch { /* keep */ }
+    return json({ error: `Voice unavailable: ${detail}` }, r.status, origin);
+  }
+  return new Response(r.body, {
+    status: 200,
+    headers: { 'content-type': 'audio/mpeg', 'cache-control': 'no-store', ...cors(origin) },
+  });
+}
+
 export default {
   async fetch(req, env) {
     const origin = pickOrigin(req, env);
@@ -103,6 +132,8 @@ export default {
     if (await rateLimited(req, env)) {
       return json({ error: "The table is busy — too many requests from your connection just now. Give it a minute, or keep playing from the DM panel." }, 429, origin);
     }
+
+    if (new URL(req.url).pathname === '/speak') return speak(req, env, origin);
 
     const raw = await req.text();
     if (raw.length > LIMITS.bodyBytes) return json({ error: 'Request too large.' }, 413, origin);

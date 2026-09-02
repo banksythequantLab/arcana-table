@@ -6,8 +6,10 @@
 
 import { state } from './state.js';
 import { emit, onChange } from './actions.js';
+import { DM_ENDPOINT } from './config.js';
+import { say } from './voice.js';
 
-export const DM_ENDPOINT = 'https://arcana-dm.dj-b02.workers.dev';
+export { DM_ENDPOINT };
 
 const MAX_TOOL_HOPS = 6;      // tool → result → tool … before we must speak
 const HISTORY_TURNS = 22;
@@ -143,12 +145,13 @@ export async function sendToDM(playerText, { silent = false } = {}) {
           chat.messages.push({ role: 'dm', text: reply.content.trim(), t: Date.now() });
           spoke = true;
           emit('chat');
+          say(reply.content.trim());
         }
         continue;                        // let the DM react to what the tools returned
       }
 
       const text = (reply.content || '').trim();
-      if (text) { chat.messages.push({ role: 'dm', text, t: Date.now() }); spoke = true; }
+      if (text) { chat.messages.push({ role: 'dm', text, t: Date.now() }); spoke = true; say(text); }
       break;
     }
 
@@ -157,11 +160,9 @@ export async function sendToDM(playerText, { silent = false } = {}) {
     if (!spoke) {
       const last = await ask([...convo, { role: 'user', content: '(Now describe what just happened, in your DM voice. Do not call any tools.)' }], []);
       const text = (last.content || '').trim();
-      chat.messages.push({
-        role: 'dm',
-        text: text || 'The dust settles. What do you do?',
-        t: Date.now(),
-      });
+      const fallback = text || 'The dust settles. What do you do?';
+      chat.messages.push({ role: 'dm', text: fallback, t: Date.now() });
+      say(fallback);
     }
   } catch (e) {
     chat.error = String(e.message || e);

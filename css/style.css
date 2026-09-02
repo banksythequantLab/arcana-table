@@ -100,6 +100,16 @@ main{flex:1;display:flex;min-height:0}
 #say-row input:disabled{background:#E8E1D2;color:#7A6E80}
 #say-row .btn{padding:8px 14px}
 #say-row .btn:disabled{opacity:.5;cursor:default}
+#say-row .mic{background:var(--panel-2);color:var(--paper);padding:8px 12px}
+#say-row .mic.on{background:var(--red);color:#fff;animation:pulse 1.1s infinite}
+@keyframes pulse{50%{box-shadow:0 3px 0 var(--ink),0 0 0 7px rgba(217,83,79,.28)}}
+#voice-row{display:flex;align-items:center;gap:10px;padding:0 10px 8px;font-size:12.5px;color:var(--muted)}
+.vtoggle{display:flex;align-items:center;gap:6px;font-weight:800;cursor:pointer}
+.vtoggle input{width:16px;height:16px;flex:0}
+.vhint{font-weight:400;opacity:.75}
+.vmute{margin-left:auto;background:none;border:0;font-size:16px;cursor:pointer;opacity:.85}
+.vmute.off{opacity:.4}
+.say.heard{background:#DCE8FA;margin-left:22px;opacity:.7;font-style:italic}
 #agent-sub{font-weight:400;opacity:.7;text-transform:none;letter-spacing:0}
 
 /* party */

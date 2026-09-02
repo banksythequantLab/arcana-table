@@ -7,6 +7,7 @@ import * as A from './actions.js';
 import { onChange } from './actions.js';
 import { agentState, pendingApprovals, settleApproval } from './tools.js';
 import { chat, sendToDM } from './dm.js';
+import { voice, startListening, stopListening, toggleHandsFree, shutUp } from './voice.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -85,24 +86,47 @@ function renderLog() {
   el.scrollTop = el.scrollHeight;
 }
 
+const speakTurn = text => {
+  if (!text || chat.busy) return;
+  $('#say').value = '';
+  sendToDM(text);
+  document.querySelector('.tab[data-pane="pane-story"]')?.click();
+};
+
 function bindSay() {
   const form = $('#say-row'), input = $('#say');
   form.addEventListener('submit', e => {
     e.preventDefault();
-    const text = input.value.trim();
-    if (!text || chat.busy) return;
-    input.value = '';
-    sendToDM(text);
-    document.querySelector('.tab[data-pane="pane-story"]')?.click();
+    speakTurn(input.value.trim());
   });
+
+  $('#mic-btn').onclick = () => {
+    shutUp();                                  // barge in on the DM if needed
+    if (voice.listening) stopListening();
+    else startListening(speakTurn);
+  };
+  $('#hands-free').onchange = () => { shutUp(); toggleHandsFree(speakTurn); };
+  $('#mute-btn').onclick = () => { voice.muted = !voice.muted; if (voice.muted) shutUp(); render(); };
 }
 
 function renderSay() {
-  const input = $('#say'), btn = $('#say-btn');
+  const input = $('#say'), btn = $('#say-btn'), mic = $('#mic-btn');
   input.disabled = chat.busy;
   btn.disabled = chat.busy;
   btn.textContent = chat.busy ? '…' : '▶';
-  input.placeholder = chat.busy ? 'The DM is thinking…' : 'What do you do?';
+  input.placeholder = voice.listening ? (voice.partial || 'Listening…')
+    : chat.busy ? 'The DM is thinking…' : 'What do you do? (or tap 🎤)';
+
+  mic.classList.toggle('on', voice.listening);
+  mic.textContent = voice.listening ? '🔴' : '🎤';
+  mic.disabled = !voice.supported;
+  mic.title = voice.supported ? (voice.listening ? 'Listening — click to stop' : 'Click to speak your turn')
+                              : 'This browser has no speech recognition';
+  $('#hands-free').checked = voice.handsFree;
+  $('#hands-free').disabled = !voice.supported;
+  const mute = $('#mute-btn');
+  mute.textContent = voice.muted ? '🔇' : voice.speaking ? '🗣️' : '🔊';
+  mute.classList.toggle('off', voice.muted);
 }
 
 // ── party panel ──────────────────────────────────────────────────────────────
