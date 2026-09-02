@@ -90,9 +90,11 @@ export const TOKEN_ART = {
   `),
 };
 
-// Cartoony tile palette (cel-shade: flat fill + darker edge, no gradients)
+// Cartoony tile palette (cel-shade: flat fill + darker edge, no gradients).
+// Warmer and more saturated than a literal "wet stone" grey — the board is lit
+// by torchlight in the renderer, and mud-grey floors kill that light dead.
 export const TILE_COLORS = {
-  dungeon: { '#': '#3A2E4A', '.': '#8C7B9C', ',': '#7A6A8A', '~': '#3E7BB5', 'D': '#B07B3E', 'L': '#E0662E', edge: '#2E2233', floorDot: '#9E8FAE' },
-  forest:  { '#': '#2E5B33', '.': '#7CAF5C', ',': '#6B9E4E', '~': '#3E8BB5', 'D': '#B07B3E', 'L': '#E0662E', edge: '#1F4023', floorDot: '#8CBd6C' },
-  crypt:   { '#': '#33262B', '.': '#7D6E74', ',': '#6D5E64', '~': '#3E5BB5', 'D': '#8A5A2B', 'L': '#E8562E', edge: '#241A1E', floorDot: '#8D7E84' },
+  dungeon: { '#': '#332748', '.': '#6B5A87', ',': '#5D4D77', '~': '#2F6BA8', 'D': '#A9722F', 'L': '#F0762E', edge: '#1E1530', void: '#120C1D' },
+  forest:  { '#': '#245730', '.': '#5E9448', ',': '#4F833B', '~': '#2F7FAD', 'D': '#A9722F', 'L': '#F0762E', edge: '#143119', void: '#0C1C11' },
+  crypt:   { '#': '#3A2226', '.': '#76575D', ',': '#67494F', '~': '#3A4EA0', 'D': '#8E5526', 'L': '#FF6A2E', edge: '#241318', void: '#150B0E' },
 };

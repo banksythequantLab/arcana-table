@@ -1,21 +1,31 @@
 // ── Arcana Table · board renderer ────────────────────────────────────────────
-// Canvas grid: cel-shaded tiles, chunky outlines, fog of war, drag-to-move.
+// Canvas grid: cel-shaded tiles, chunky outlines, torchlight, fog of war,
+// drag-to-move — and effects, so the board reacts instead of just updating.
 
 import { state, GRID_W, GRID_H, currentMap, isRevealed, isWalkable, findToken } from './state.js';
 import { moveToken, onChange, emit } from './actions.js';
 import { TOKEN_ART, TILE_COLORS } from './art.js';
+import { fx, step, draw as drawFx, damageNumber, burst, ring, kick, flash } from './fx.js';
 
 let canvas, ctx, cell = 44, offX = 0, offY = 0;
-let drag = null;           // {token, px, py}
+let drag = null;
 let hoverCell = null;
 let anims = new Map();     // tokenId → {fx, fy, tx, ty, t0}
-let lastPos = new Map();   // tokenId → {x, y} to detect agent moves
+let lastPos = new Map();
+let lastHp = new Map();
+let lastDiceT = 0;
+let lastFrame = performance.now();
+
+// Deterministic per-cell jitter so stone looks laid, not printed.
+const hash = (x, y) => {
+  const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+  return n - Math.floor(n);
+};
 
 export function initBoard(el) {
   canvas = el;
   ctx = canvas.getContext('2d');
-  const ro = new ResizeObserver(resize);
-  ro.observe(canvas.parentElement);
+  new ResizeObserver(resize).observe(canvas.parentElement);
   resize();
 
   canvas.addEventListener('pointerdown', onDown);
@@ -23,8 +33,8 @@ export function initBoard(el) {
   canvas.addEventListener('pointerup', onUp);
   canvas.addEventListener('pointercancel', () => { drag = null; });
 
-  onChange(() => detectMoves());
-  detectMoves(true);
+  onChange(() => detectChanges());
+  detectChanges(true);
   requestAnimationFrame(frame);
 }
 
@@ -41,18 +51,68 @@ function resize() {
   offY = Math.floor((box.height - cell * GRID_H) / 2);
 }
 
-function detectMoves(prime = false) {
+// Watch state for things worth reacting to: movement, damage, dice.
+function detectChanges(prime = false) {
   for (const t of state.tokens) {
     const prev = lastPos.get(t.id);
     if (!prime && prev && (prev.x !== t.x || prev.y !== t.y) && (!drag || drag.token.id !== t.id)) {
       anims.set(t.id, { fx: prev.x, fy: prev.y, tx: t.x, ty: t.y, t0: performance.now() });
     }
     lastPos.set(t.id, { x: t.x, y: t.y });
+
+    const hp = lastHp.get(t.id);
+    if (!prime && hp !== undefined && hp !== t.hp) {
+      damageNumber(t.x, t.y, t.hp - hp);
+      if (t.hp === 0) { burst(t.x, t.y, 22, '#D9534F'); kick(12); }
+    }
+    lastHp.set(t.id, t.hp);
   }
-  for (const id of [...lastPos.keys()]) if (!findToken(id)) { lastPos.delete(id); anims.delete(id); }
+  for (const id of [...lastPos.keys()]) {
+    if (!findToken(id)) { lastPos.delete(id); lastHp.delete(id); anims.delete(id); }
+  }
+
+  const d = state.dice;
+  if (!prime && d && d.t !== lastDiceT) {
+    lastDiceT = d.t;
+    const pc = state.tokens.find(t => t.kind === 'pc');
+    if (d.nat20) { flash('rgba(242,193,78,.34)', 620); kick(14); if (pc) { burst(pc.x, pc.y, 30, '#F2C14E'); ring(pc.x, pc.y, '#F2C14E'); } }
+    else if (d.boostsUsed?.length && pc) { ring(pc.x, pc.y, '#8BE0D6'); burst(pc.x, pc.y, 14, '#8BE0D6'); }
+    else if (d.nat1) { flash('rgba(60,56,74,.4)', 420); }
+  }
 }
 
 const cellXY = (x, y) => [offX + x * cell, offY + y * cell];
+
+// ── fog buffer ───────────────────────────────────────────────────────────────
+// Rebuilt only when the revealed set (or layout) changes — a few hundred radial
+// gradients per frame would cost more than the whole rest of the render.
+let fogCanvas = null, fogKey = '';
+function fogLayer(w, h) {
+  const key = `${w}x${h}:${cell}:${state.revealed.length}:${state.scene.mapId}`;
+  if (fogCanvas && fogKey === key) return fogCanvas;
+
+  fogCanvas = fogCanvas || document.createElement('canvas');
+  fogCanvas.width = w; fogCanvas.height = h;
+  const f = fogCanvas.getContext('2d');
+  f.clearRect(0, 0, w, h);
+  f.fillStyle = 'rgba(8,5,13,.965)';
+  f.fillRect(0, 0, w, h);
+  f.globalCompositeOperation = 'destination-out';
+  for (let y = 0; y < GRID_H; y++) for (let x = 0; x < GRID_W; x++) {
+    if (!isRevealed(x, y)) continue;
+    const [px, py] = cellXY(x, y);
+    const cx = px + cell / 2, cy = py + cell / 2;
+    const g = f.createRadialGradient(cx, cy, cell * 0.45, cx, cy, cell * 0.95);
+    g.addColorStop(0, 'rgba(0,0,0,1)');
+    g.addColorStop(0.72, 'rgba(0,0,0,.99)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    f.fillStyle = g;
+    f.fillRect(px - cell, py - cell, cell * 3, cell * 3);
+  }
+  f.globalCompositeOperation = 'source-over';
+  fogKey = key;
+  return fogCanvas;
+}
 
 function pickCell(e) {
   const r = canvas.getBoundingClientRect();
@@ -77,64 +137,118 @@ function onUp(e) {
   const t = drag.token;
   drag = null;
   if (c && (c.x !== t.x || c.y !== t.y) && isWalkable(c.x, c.y)) {
-    lastPos.set(t.id, c);                       // no snap-back animation
+    lastPos.set(t.id, c);
     moveToken({ tokenId: t.id, x: c.x, y: c.y });
-    emit('player-move');                        // the DM should react to this
+    ring(c.x, c.y, '#F2C14E');
+    emit('player-move');
   }
 }
 
 // ── render loop ──────────────────────────────────────────────────────────────
 function frame(now) {
+  const dt = Math.min(48, now - lastFrame);
+  lastFrame = now;
+  step(dt);
   draw(now);
   requestAnimationFrame(frame);
 }
 
 function draw(now) {
   const w = canvas.clientWidth, h = canvas.clientHeight;
-  ctx.clearRect(0, 0, w, h);
   const pal = TILE_COLORS[state.scene.mapId] || TILE_COLORS.dungeon;
   const rows = currentMap().rows;
 
-  // frame mat
-  ctx.fillStyle = '#241B2E';
-  ctx.fillRect(0, 0, w, h);
+  ctx.save();
+  if (fx.shake) {
+    ctx.translate((Math.random() - 0.5) * fx.shake, (Math.random() - 0.5) * fx.shake);
+  }
 
+  ctx.fillStyle = pal.void || '#14101C';
+  ctx.fillRect(-20, -20, w + 40, h + 40);
+
+  // ── tiles ─────────────────────────────────────────────────────────────────
   for (let y = 0; y < GRID_H; y++) {
     for (let x = 0; x < GRID_W; x++) {
       const t = rows[y]?.[x] ?? '#';
       const [px, py] = cellXY(x, y);
+      const n = hash(x, y);
+
       ctx.fillStyle = pal[t] || pal['.'];
       ctx.fillRect(px, py, cell, cell);
-      if (t === '#') {                                   // chunky wall cap
+
+      // per-stone shade variation — flat colour reads as printed paper
+      ctx.fillStyle = n > 0.5 ? 'rgba(255,255,255,.045)' : 'rgba(0,0,0,.07)';
+      ctx.fillRect(px, py, cell, cell);
+
+      if (t === '#') {
         ctx.fillStyle = pal.edge;
         ctx.fillRect(px, py + cell * 0.72, cell, cell * 0.28);
+        ctx.fillStyle = 'rgba(255,255,255,.06)';
+        ctx.fillRect(px, py, cell, cell * 0.1);          // top light catch
       }
-      if (t === ',') {                                   // rubble dots
+      if (t === ',') {
         ctx.fillStyle = pal.edge;
-        ctx.beginPath(); ctx.arc(px + cell * 0.3, py + cell * 0.6, cell * 0.06, 0, 7); ctx.fill();
-        ctx.beginPath(); ctx.arc(px + cell * 0.65, py + cell * 0.35, cell * 0.05, 0, 7); ctx.fill();
+        ctx.beginPath(); ctx.arc(px + cell * (0.24 + n * 0.2), py + cell * 0.62, cell * 0.06, 0, 7); ctx.fill();
+        ctx.beginPath(); ctx.arc(px + cell * (0.6 + n * 0.18), py + cell * 0.33, cell * 0.045, 0, 7); ctx.fill();
       }
-      if (t === '~') {                                   // waves
+      if (t === '~') {
         ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 2;
+        const bob = Math.sin(now / 620 + x * 0.9 + y) * cell * 0.05;
         ctx.beginPath();
-        ctx.moveTo(px + cell * .15, py + cell * .5);
-        ctx.quadraticCurveTo(px + cell * .35, py + cell * .35, px + cell * .5, py + cell * .5);
-        ctx.quadraticCurveTo(px + cell * .68, py + cell * .65, px + cell * .85, py + cell * .5);
+        ctx.moveTo(px + cell * .15, py + cell * .5 + bob);
+        ctx.quadraticCurveTo(px + cell * .35, py + cell * .34 + bob, px + cell * .5, py + cell * .5 + bob);
+        ctx.quadraticCurveTo(px + cell * .68, py + cell * .66 + bob, px + cell * .85, py + cell * .5 + bob);
         ctx.stroke();
       }
-      if (t === 'L') {                                   // lava bubbles
-        ctx.fillStyle = '#F2C14E';
-        ctx.beginPath(); ctx.arc(px + cell * .5, py + cell * .5, cell * .1 * (1 + .3 * Math.sin(now / 300 + x + y)), 0, 7); ctx.fill();
+      if (t === 'L') {
+        const pulse = 1 + 0.3 * Math.sin(now / 300 + x + y);
+        const g = ctx.createRadialGradient(px + cell / 2, py + cell / 2, 0, px + cell / 2, py + cell / 2, cell * 0.5);
+        g.addColorStop(0, 'rgba(255,180,90,.42)');
+        g.addColorStop(1, 'rgba(255,120,40,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(px - cell * .2, py - cell * .2, cell * 1.4, cell * 1.4);
+        ctx.fillStyle = '#FFD86B';
+        ctx.beginPath(); ctx.arc(px + cell * .5, py + cell * .5, cell * .1 * pulse, 0, 7); ctx.fill();
       }
-      if (t === 'D') {                                   // door planks
+      if (t === 'D') {
         ctx.strokeStyle = pal.edge; ctx.lineWidth = 2;
-        for (let i = 1; i < 4; i++) { ctx.beginPath(); ctx.moveTo(px + (cell / 4) * i, py + 4); ctx.lineTo(px + (cell / 4) * i, py + cell - 4); ctx.stroke(); }
+        for (let i = 1; i < 4; i++) {
+          ctx.beginPath();
+          ctx.moveTo(px + (cell / 4) * i, py + 4);
+          ctx.lineTo(px + (cell / 4) * i, py + cell - 4);
+          ctx.stroke();
+        }
+        ctx.fillStyle = 'rgba(255,220,150,.14)';
+        ctx.fillRect(px, py, cell, cell);
       }
-      // grid line
-      ctx.strokeStyle = 'rgba(0,0,0,.16)'; ctx.lineWidth = 1;
+
+      ctx.strokeStyle = 'rgba(0,0,0,.18)'; ctx.lineWidth = 1;
       ctx.strokeRect(px + .5, py + .5, cell - 1, cell - 1);
     }
   }
+
+  // ── torchlight ────────────────────────────────────────────────────────────
+  // Warm pools around the party and every fire, with a slow flicker. This is
+  // what turns a grey grid into a dungeon.
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const flicker = 1 + Math.sin(now / 170) * 0.045 + Math.sin(now / 61) * 0.025;
+  const lights = [];
+  state.tokens.filter(t => t.kind === 'pc').forEach(t => lights.push({ x: t.x, y: t.y, r: 4.2, c: [255, 184, 98], i: 0.40 }));
+  for (let y = 0; y < GRID_H; y++) for (let x = 0; x < GRID_W; x++) {
+    if ((rows[y]?.[x]) === 'L') lights.push({ x, y, r: 2.2, c: [255, 138, 52], i: 0.30 });
+  }
+  for (const L of lights) {
+    const [px, py] = cellXY(L.x, L.y);
+    const R = L.r * cell * flicker;
+    const g = ctx.createRadialGradient(px + cell / 2, py + cell / 2, cell * 0.2, px + cell / 2, py + cell / 2, R);
+    g.addColorStop(0, `rgba(${L.c[0]},${L.c[1]},${L.c[2]},${L.i})`);
+    g.addColorStop(0.4, `rgba(${L.c[0]},${L.c[1]},${L.c[2]},${L.i * 0.34})`);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(px + cell / 2 - R, py + cell / 2 - R, R * 2, R * 2);
+  }
+  ctx.restore();
 
   // hover
   if (hoverCell && isWalkable(hoverCell.x, hoverCell.y)) {
@@ -143,9 +257,8 @@ function draw(now) {
     ctx.strokeRect(px + 2, py + 2, cell - 4, cell - 4);
   }
 
-  // tokens
-  const order = [...state.tokens].sort((a, b) => a.y - b.y);
-  for (const t of order) {
+  // ── tokens ────────────────────────────────────────────────────────────────
+  for (const t of [...state.tokens].sort((a, b) => a.y - b.y)) {
     let dx = t.x, dy = t.y;
     const a = anims.get(t.id);
     if (a) {
@@ -164,37 +277,60 @@ function draw(now) {
     drawToken(t, px, py, now, false);
   }
 
-  // fog of war
-  for (let y = 0; y < GRID_H; y++) for (let x = 0; x < GRID_W; x++) {
-    if (!isRevealed(x, y)) {
-      const [px, py] = cellXY(x, y);
-      ctx.fillStyle = 'rgba(18,11,26,.88)';
-      ctx.fillRect(px - .5, py - .5, cell + 1, cell + 1);
-    }
+  // ── fog of war, with soft edges ───────────────────────────────────────────
+  // Punched on its own buffer: destination-out on the main canvas would erase
+  // the dungeon along with the fog.
+  ctx.drawImage(fogLayer(w, h), 0, 0);
+
+  drawFx(ctx, cellXY, cell);
+
+  // ── vignette ──────────────────────────────────────────────────────────────
+  const vg = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.34, w / 2, h / 2, Math.max(w, h) * 0.78);
+  vg.addColorStop(0, 'rgba(0,0,0,0)');
+  vg.addColorStop(1, 'rgba(0,0,0,.55)');
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, w, h);
+
+  if (fx.flash) {
+    const k = (performance.now() - fx.flash.t0) / fx.flash.life;
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, 1 - k);
+    ctx.fillStyle = fx.flash.colour;
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
   }
+
+  ctx.restore();
 }
 
 function drawToken(t, px, py, now, lifted) {
   const img = TOKEN_ART[t.art] || TOKEN_ART.villager;
   const pad = cell * 0.08;
   const isTurn = state.combat.active && state.combat.order[state.combat.turnIndex] === t.id;
+  const seed = t.id.charCodeAt(0) + t.id.length;
+  const bob = t.hp === 0 ? 0 : Math.sin(now / 700 + seed) * cell * 0.022;
 
-  // shadow
-  ctx.fillStyle = 'rgba(0,0,0,.3)';
+  ctx.fillStyle = 'rgba(0,0,0,.42)';
   ctx.beginPath();
   ctx.ellipse(px + cell / 2, py + cell * .88, cell * .32, cell * .1, 0, 0, 7);
   ctx.fill();
 
-  // turn ring
   if (isTurn) {
+    const pulse = 2.5 * Math.sin(now / 220);
+    ctx.save();
+    ctx.shadowColor = '#F2C14E'; ctx.shadowBlur = 16;
     ctx.strokeStyle = '#F2C14E'; ctx.lineWidth = 4;
-    ctx.beginPath(); ctx.arc(px + cell / 2, py + cell / 2, cell * .52 + 2 * Math.sin(now / 200), 0, 7); ctx.stroke();
+    ctx.beginPath(); ctx.arc(px + cell / 2, py + cell / 2, cell * .52 + pulse, 0, 7); ctx.stroke();
+    ctx.restore();
   }
 
-  const bounce = lifted ? -6 : 0;
-  if (img.complete) ctx.drawImage(img, px + pad, py + pad + bounce, cell - pad * 2, cell - pad * 2);
+  const lift = lifted ? -8 : bob;
+  if (img.complete) {
+    if (t.kind === 'monster') { ctx.save(); ctx.shadowColor = 'rgba(217,83,79,.55)'; ctx.shadowBlur = 10; }
+    ctx.drawImage(img, px + pad, py + pad + lift, cell - pad * 2, cell - pad * 2);
+    if (t.kind === 'monster') ctx.restore();
+  }
 
-  // hp bar (skip full-health objects)
   if (t.maxHp && (t.hp < t.maxHp || t.kind !== 'object')) {
     const bw = cell * .7, bx = px + (cell - bw) / 2, by = py + 1;
     ctx.fillStyle = '#2E2233'; ctx.fillRect(bx - 1, by - 1, bw + 2, 6);
@@ -203,16 +339,15 @@ function drawToken(t, px, py, now, lifted) {
     ctx.fillRect(bx, by, bw * frac, 4);
   }
 
-  // condition pips
   if (t.conditions?.length) {
-    ctx.fillStyle = '#7A4FBF';
+    ctx.fillStyle = '#A46BFF';
     t.conditions.slice(0, 4).forEach((c, i) => {
       ctx.beginPath(); ctx.arc(px + cell * .16 + i * 8, py + cell * .95 - 4, 3.4, 0, 7); ctx.fill();
       ctx.strokeStyle = '#2E2233'; ctx.lineWidth = 1.4; ctx.stroke();
     });
   }
 
-  if (t.hp === 0) {          // downed X
+  if (t.hp === 0) {
     ctx.strokeStyle = '#D9534F'; ctx.lineWidth = 5; ctx.lineCap = 'round';
     ctx.beginPath();
     ctx.moveTo(px + cell * .25, py + cell * .25); ctx.lineTo(px + cell * .75, py + cell * .75);
