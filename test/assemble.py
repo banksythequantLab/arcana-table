@@ -38,26 +38,26 @@ print('vo:', json.dumps(VOS, indent=1), '\nfootage:', round(FOOT_LEN,1), 's')
 # (kind, source, length, footage_start)   kind: card | shot | slate
 CUT = [
     # footage_start values are tuned to the current screens/video bed:
-    #  ~22s intro card · ~40s quest rail + opening · ~62-75s the warm-up
-    #  ~98s the Oath offered · ~104s the table locked · ~110s combat
-    #  ~130s the 10-squat offer · ~140s the reps · ~145s the natural 20
+    #  ~20s intro card · ~40s quest rail + opening · ~62-76s the warm-up
+    #  ~99s the Oath offered and sworn · ~101-116s the table locked
+    #  ~118-140s combat · ~145s the natural 20 on the new d20
     #
     # Silence lives ONLY under title cards now — 11.5s of 166, down from 40.
     # Every other second has Derek talking over it.
     ('card', 'open',   3.0, None),
     ('shot', None,     VOS['vo01_problem'] + VOS['vo02_whatitis'], 40.0),
     ('card', 'webmcp', 2.5, None),
-    ('shot', None,     VOS['vo03_webmcp'], 106.0),
+    ('shot', None,     VOS['vo03_webmcp'], 148.0),
     ('card', 'heroic', 2.5, None),
-    ('shot', None,     VOS['vo04_heroic'], 127.0),
+    ('shot', None,     VOS['vo04_heroic'], 78.0),
     # His push-up footage runs under "not everyone can drop and give me ten",
     # which is the line it was always meant to illustrate.
     ('slate','burpees',10.0, None),
-    ('shot', None,     (VOS['vo07_swap'] - 10.0) + VOS['vo04b_payoff'], 143.2),
+    ('shot', None,     (VOS['vo07_swap'] - 10.0) + VOS['vo04b_payoff'], 142.5),
     ('card', 'oath',   2.5, None),
-    ('shot', None,     VOS['vo08_oath'], 98.0),      # the Oath sworn, table locked
-    ('shot', None,     VOS['vo09_micro'], 108.0),    # back in play, the run continues
-    ('shot', None,     VOS['vo05_hood'], 126.0),     # the agent log doing the work
+    ('shot', None,     VOS['vo08_oath'], 96.0),      # the Oath sworn, table locked
+    ('shot', None,     VOS['vo09_micro'], 106.0),    # back in play, the run continues
+    ('shot', None,     VOS['vo05_hood'], 44.0),     # the agent log doing the work
     ('card', 'close',  VOS['vo06_close'] + 1.0, None),
 ]
 
