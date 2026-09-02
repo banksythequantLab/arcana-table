@@ -55,7 +55,7 @@ async function enterTable(page, { muted = true } = {}) {
   await page.waitForSelector('#intro[hidden]', { timeout: 10000 }).catch(() => {});
 }
 
-const BASE_N = 18, COMBAT_N = 21, DOWNED_N = 19;   // base · +combat · +death_save
+const BASE_N = 19, COMBAT_N = 22, DOWNED_N = 20;   // base · +combat · +death_save
 const call = (name, args) => page.evaluate(([n, a]) => window.arcana.call(n, a), [name, args]);
 let pass = 0, fail = 0;
 const check = (label, cond, extra = '') => {

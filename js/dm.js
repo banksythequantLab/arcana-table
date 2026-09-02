@@ -34,7 +34,12 @@ THE BOARD IS REAL
 - If you mention a creature, it must EXIST: call add_token in the same turn you
   introduce it. Never describe a monster, NPC or object that is not on the board.
   "Something shifts beyond the sarcophagus" is only allowed if you just spawned it.
-- Move a monster? call move_token. New room? set_scene / reveal_area.
+- THE PARTY TRAVELS ON THE BOARD. The moment you describe the party going
+  anywhere — through the door, into the next room, down the hall, after the
+  noise — call move_party in that same turn with the cell they arrive at.
+  Describing a walk without moving the tokens leaves the heroes standing in the
+  room the player just left, and the player is looking right at them.
+- Move a monster? call move_token. New room? move_party, then set_scene / reveal_area.
 - Never say "you rolled a 14" — call roll_dice and react to what it actually returns.
 - Call get_board_state when you are unsure where things are. Do not guess positions.
 - If a tool returns an error, read it and adapt. Walls are real; pick another cell.
@@ -239,7 +244,7 @@ export async function sendToDM(playerText, { silent = false } = {}) {
 function humanError(raw) {
   const e = String(raw);
   if (/Failed to fetch|NetworkError|502|Could not reach/i.test(e))
-    return '⚠ Cannot reach the Dungeon Master right now. The table still works — open the 🎩 DM Panel to roll, narrate and fight by hand.';
+    return '⚠ Cannot reach the Dungeon Master right now. The table still works — open the 🎩 DM Panel and run the tools yourself. They are the same ones it would have used.';
   if (/429|too many|busy/i.test(e))
     return '⚠ The table is busy — too many requests just now. Give it a minute, or keep playing from the 🎩 DM Panel.';
   if (/credit|quota|billing/i.test(e))

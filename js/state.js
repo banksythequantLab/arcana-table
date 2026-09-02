@@ -136,13 +136,25 @@ export const STRETCHES = [
   { name: 'Ankles + shake out',    cue: 'Circle each ankle, then shake everything loose.',       note: 'You are warm. That is the point.' },
 ];
 
-// Same twenty stretches, sliced to whatever time the player actually has.
+// The same twenty stretches, but a short plan SPANS the body rather than
+// slicing the top off the list. Taking the first six gave three consecutive
+// neck holds and never reached the legs, which is not a warm-up — it is a neck
+// routine. Each plan below walks head to ankle in whatever time there is, and
+// left/right stretches are always kept together so no side is left cold.
 export const WARMUP_PLANS = {
-  '90s':  { label: '90 seconds', count: 6,  hold: 15 },
-  '3min': { label: '3 minutes',  count: 12, hold: 15 },
-  '5min': { label: '5 minutes',  count: 20, hold: 15 },
-  '10min':{ label: '10 minutes', count: 20, hold: 30 },
+  '90s':  { label: '90 seconds', hold: 15,
+            seq: [0, 3, 11, 12, 13, 14] },                 // neck · shoulders · twist · fold · quads
+  '3min': { label: '3 minutes',  hold: 15,
+            seq: [0, 3, 4, 5, 8, 9, 10, 11, 12, 13, 14, 19] },
+  '5min': { label: '5 minutes',  hold: 15, seq: null },    // null = all twenty, in order
+  '10min':{ label: '10 minutes', hold: 30, seq: null },
 };
+
+/** The stretch indices a plan actually runs, head to ankle. */
+export function warmupSeq(plan) {
+  const p = WARMUP_PLANS[plan];
+  return p?.seq ? p.seq.slice() : STRETCHES.map((_, i) => i);
+}
 
 // What the table can ask for. Reps and holds are physical; an Oath is anything
 // in the room the app cannot see — dishes, a chapter, twenty minutes of study.
@@ -177,7 +189,7 @@ function freshState() {
     },
     quest: { beatIndex: 0, status: 'active', completed: [], startedAt: Date.now() },
     downed: null,                 // {tokenId, saves, fails} — the board is frozen while this is set
-    warmup: null,                 // {planId, index, seconds, remaining, paused}
+    warmup: null,                 // {planId, index, seq, hold, count, remaining, paused}
     oath: null,                   // {label, kind, minutes, endsAt, reward} — the table waits
     settings: { autoApprove: false, exercisePool: ['push-ups', 'crunches', 'jumping jacks', 'squats'] },
   };
@@ -190,8 +202,10 @@ function load() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const s = JSON.parse(raw);
-      if (s && s.tokens && s.scene) return { ...freshState(), ...s, challenge: null };
-      // (challenge is never restored — a half-finished set of push-ups is not a save state)
+      // Neither a live challenge nor a running warm-up is a save state: half a
+      // set of push-ups means nothing, and a restored warm-up has no interval
+      // behind it, so its card would sit frozen on a stretch forever.
+      if (s && s.tokens && s.scene) return { ...freshState(), ...s, challenge: null, warmup: null };
     }
   } catch (e) { /* private mode / corrupt save — start fresh */ }
   return freshState();

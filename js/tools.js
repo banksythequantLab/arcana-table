@@ -138,6 +138,15 @@ export const BASE_TOOLS = [
     handler: a => A.moveToken(a),
   },
   {
+    name: 'move_party',
+    description: 'Move the WHOLE party to a grid cell in one call — use this whenever the players travel: through a door, into the next room, across the hall, following something. The leader lands on the cell, companions take open cells beside them, and the fog lifts around all of them. Walls are rejected. Prefer this over repeated move_token calls: if you describe the party going somewhere, call this in the same turn or the board will contradict you.',
+    inputSchema: obj({
+      x: num('Grid x (0-21)'), y: num('Grid y (0-13)'),
+      who: str('Omit to move everyone. A token id or name moves only that hero.'),
+    }, ['x', 'y']),
+    handler: a => A.moveParty(a),
+  },
+  {
     name: 'add_token',
     description: 'Spawn a creature or object on the board. Art options: knight, wizard, goblin, skeleton, dragon, wolf, chest, villager.',
     inputSchema: obj({
@@ -374,6 +383,9 @@ export async function initTools() {
       return wrap(def).execute(args);
     },
     resetQuest: () => A.resetQuest(),
+    // The warm-up runs on a wall clock, so tests need to step it by hand.
+    currentStretch: () => A.currentStretch(),
+    skipStretch: () => A.skipStretch(),
     finishWarmup: (o) => A.finishWarmup(o || { early: true }),
   };
   window.__st = state;                 // tests reach in to fast-forward clocks

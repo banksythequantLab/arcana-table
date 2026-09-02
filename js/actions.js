@@ -4,7 +4,7 @@
 
 import {
   state, save, findToken, isWalkable, GRID_W, GRID_H, MAPS, QUEST,
-  DEATH_SAVE_DC, DEATH_SAVE_FAILS, STRETCHES, WARMUP_PLANS, OATH_KINDS,
+  DEATH_SAVE_DC, DEATH_SAVE_FAILS, STRETCHES, WARMUP_PLANS, warmupSeq, OATH_KINDS,
 } from './state.js';
 
 const listeners = new Set();
@@ -94,6 +94,49 @@ export function moveToken({ tokenId, x, y }) {
   logStory('action', t.name, `moved to (${x}, ${y})`);
   emit();
   return { ok: true, token: t.id, x, y };
+}
+
+/** The nearest open cell to (x,y) that nothing is standing on. */
+function nearestFree(x, y, taken) {
+  for (let r = 0; r < 8; r++) {
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      const cx = x + dx, cy = y + dy;
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;   // walk the ring
+      if (!isWalkable(cx, cy)) continue;
+      if (taken.has(`${cx},${cy}`)) continue;
+      return { x: cx, y: cy };
+    }
+  }
+  return null;
+}
+
+// The party travels together. Asking the model for one move_token per hero
+// meant it narrated the walk and left everyone standing in the last room —
+// routine travel is exactly the bookkeeping a model skips. One call moves the
+// whole party, keeps the companions at the leader's shoulder, and lifts the fog
+// at the far end, so "we head through the door" is a single, reliable act.
+export function moveParty({ x, y, who = 'all' }) {
+  const pcs = state.tokens.filter(t => t.kind === 'pc' && (who === 'all' || t.id === who || t.name === who));
+  if (!pcs.length) return { error: who === 'all' ? 'No party on the board.' : `No party member matches "${who}".` };
+  x = Math.max(0, Math.min(GRID_W - 1, Math.round(x)));
+  y = Math.max(0, Math.min(GRID_H - 1, Math.round(y)));
+  if (!isWalkable(x, y)) return { error: `(${x},${y}) is a wall — pick an open floor cell. Call get_board_state if you are unsure.` };
+
+  // Everyone not travelling still occupies their cell.
+  const taken = new Set(state.tokens.filter(t => !pcs.includes(t)).map(t => `${t.x},${t.y}`));
+  const moved = [];
+  pcs.forEach((t, i) => {
+    const spot = i === 0 ? { x, y } : nearestFree(x, y, taken);
+    if (!spot) return;
+    taken.add(`${spot.x},${spot.y}`);
+    t.x = spot.x; t.y = spot.y;
+    revealAround(spot.x, spot.y, 3);
+    moved.push({ token: t.id, name: t.name, x: spot.x, y: spot.y });
+  });
+  if (!moved.length) return { error: `Nowhere to stand near (${x},${y}) — every cell is occupied.` };
+  logStory('action', 'Party', `moves to (${x}, ${y}).`);
+  emit();
+  return { ok: true, moved, left: pcs.length - moved.length };
 }
 
 export function addToken({ name, kind = 'monster', art, x, y, hp = 10, maxHp }) {
@@ -518,13 +561,19 @@ export function startWarmup({ plan = '90s' } = {}) {
   if (!WARMUP_PLANS[plan]) return { error: `Unknown plan "${plan}". Choose: ${Object.keys(WARMUP_PLANS).join(', ')}.` };
   if (state.warmup) return { error: 'A warm-up is already running.' };
   const p = WARMUP_PLANS[plan];
-  state.warmup = { planId: plan, index: 0, hold: p.hold, count: p.count, remaining: p.hold, paused: false, startedAt: Date.now() };
-  logStory('challenge', 'DM', `🤸 Warm-up — ${p.label}, ${p.count} stretches. Stand up.`);
+  // seq is the list of stretch indices this plan runs — it spans the body, so
+  // index is a position in seq, never a position in STRETCHES.
+  const seq = warmupSeq(plan);
+  state.warmup = { planId: plan, index: 0, seq, hold: p.hold, count: seq.length,
+                   remaining: p.hold, paused: false, startedAt: Date.now() };
+  logStory('challenge', 'DM', `🤸 Warm-up — ${p.label}, ${seq.length} stretches. Stand up.`);
   clearInterval(warmTimer);
   warmTimer = setInterval(tickWarmup, 1000);
   prologueBeat(0);                       // give the board something to do at once
   emit('warmup');
-  return { ok: true, plan, stretches: p.count, holdSeconds: p.hold, totalSeconds: p.count * p.hold, first: STRETCHES[0].name };
+  return { ok: true, plan, stretches: seq.length, holdSeconds: p.hold,
+           totalSeconds: seq.length * p.hold, first: STRETCHES[seq[0]].name,
+           order: seq.map(i => STRETCHES[i].name) };
 }
 
 // While you stretch, the game should not sit frozen. Each stretch advances a
@@ -581,7 +630,7 @@ export function skipStretch() {
   if (w.index >= w.count) return finishWarmup();
   w.remaining = w.hold;
   emit('warmup');
-  return { ok: true, now: STRETCHES[w.index].name };
+  return { ok: true, now: STRETCHES[w.seq[w.index]].name };
 }
 
 export function pauseWarmup(paused) {
@@ -612,8 +661,10 @@ export function finishWarmup({ early = false } = {}) {
 export function currentStretch() {
   const w = state.warmup;
   if (!w) return null;
-  const s = STRETCHES[w.index] || STRETCHES[STRETCHES.length - 1];
-  return { ...s, index: w.index, of: w.count, remaining: w.remaining, hold: w.hold, paused: w.paused };
+  const s = STRETCHES[w.seq[w.index]] || STRETCHES[w.seq[w.seq.length - 1]];
+  const next = w.seq[w.index + 1];
+  return { ...s, index: w.index, of: w.count, remaining: w.remaining, hold: w.hold,
+           paused: w.paused, next: next === undefined ? null : STRETCHES[next].name };
 }
 
 // ── the quest ────────────────────────────────────────────────────────────────
