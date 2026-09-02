@@ -83,7 +83,10 @@ main{flex:1;display:flex;min-height:0}
 
 /* the table: spoken turns */
 .say{border-radius:12px;padding:8px 11px;font-size:14.5px;line-height:1.45;border:2.5px solid var(--ink)}
-.say b{display:block;font:700 11px "Baloo 2",cursive;letter-spacing:.09em;text-transform:uppercase;opacity:.65;margin-bottom:2px}
+/* the speaker label only — not bold words inside the DM's own prose */
+.say > b:first-child{display:block;font:700 11px "Baloo 2",cursive;letter-spacing:.09em;text-transform:uppercase;opacity:.65;margin-bottom:2px}
+.say strong{font-weight:800;color:#8A3A12}
+.say em{font-style:italic}
 .say.dm{background:#FFF6E2;box-shadow:2px 2px 0 rgba(46,34,51,.2)}
 .say.you{background:#DCE8FA;margin-left:22px}
 .say.sys{background:transparent;border:2px dashed #B8A77E;color:#6B5E76;font-size:13px;font-style:italic;text-align:center}

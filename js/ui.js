@@ -15,8 +15,8 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 // The DM writes in light markdown. Escape first, then honour **bold** and
 // *italic* only — anything else stays literal text.
 const prose = s => esc(s)
-  .replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>')
-  .replace(/(^|[\s(])\*([^*\n]+)\*/g, '$1<i>$2</i>');
+  .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+  .replace(/(^|[\s(])\*([^*\n]+)\*/g, '$1<em>$2</em>');
 
 const STARTERS = [
   'Look around and tell me what I see.',
