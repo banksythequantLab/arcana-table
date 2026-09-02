@@ -31,15 +31,18 @@ print('vo:', json.dumps(VOS, indent=1), '\nfootage:', round(FOOT_LEN,1), 's')
 # ── the cut ─────────────────────────────────────────────────────────────────
 # (kind, source, length, footage_start)   kind: card | shot | slate
 CUT = [
+    # footage_start values are tuned to the current screens/video bed:
+    #  ~6s intro card · ~28s opening beat · ~44s scene change · ~52s combat
+    #  ~74s Heroic Effort offer · ~80s the reps · ~84s the natural 20
     ('card', 'open',   4.0, None),
-    ('shot', None,     VOS['vo01_problem'] + VOS['vo02_whatitis'], 0.0),
+    ('shot', None,     VOS['vo01_problem'] + VOS['vo02_whatitis'], 6.0),
     ('card', 'webmcp', 3.0, None),
-    ('shot', None,     VOS['vo03_webmcp'], 31.5),
+    ('shot', None,     VOS['vo03_webmcp'], 26.0),
     ('card', 'heroic', 3.0, None),
-    ('shot', None,     VOS['vo04_heroic'], 46.0),
+    ('shot', None,     VOS['vo04_heroic'], 70.0),
     ('slate','burpees',10.0, None),          # ← his push-up footage drops in here
-    ('shot', None,     VOS['vo04b_payoff'], 55.0),
-    ('shot', None,     VOS['vo05_hood'], 8.0),
+    ('shot', None,     VOS['vo04b_payoff'], 83.0),
+    ('shot', None,     VOS['vo05_hood'], 50.0),
     ('card', 'close',  VOS['vo06_close'] + 1.5, None),
 ]
 
