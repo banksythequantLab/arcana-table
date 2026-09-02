@@ -55,6 +55,7 @@ async function enterTable(page, { muted = true } = {}) {
   await page.waitForSelector('#intro[hidden]', { timeout: 10000 }).catch(() => {});
 }
 
+const BASE_N = 16, COMBAT_N = 19, DOWNED_N = 17;   // base · +combat · +death_save
 const call = (name, args) => page.evaluate(([n, a]) => window.arcana.call(n, a), [name, args]);
 let pass = 0, fail = 0;
 const check = (label, cond, extra = '') => {
@@ -81,7 +82,7 @@ check('registerTool + getTools + executeTool available', mcInfo.hasRegister && m
 const mcNames = () => page.evaluate(async () =>
   (await (document.modelContext || navigator.modelContext).getTools()).map(t => t.name));
 const listed = await mcNames();
-check(`WebMCP registry lists 14 tools (got ${listed.length})`, listed.length === 14, listed.join(','));
+check(`WebMCP registry lists ${BASE_N} tools (got ${listed.length})`, listed.length === BASE_N, listed.join(','));
 check('readOnlyHint set on the read tools', await page.evaluate(async () => {
   const tools = await (document.modelContext || navigator.modelContext).getTools();
   const reads = ['get_board_state', 'get_character_sheet', 'get_fitness_log'];
@@ -103,7 +104,7 @@ check('executeTool("roll_dice") via WebMCP rolls 3d6', rollViaMc?.rolls?.length 
 
 console.log('— tool surface (shim) —');
 const tools = await page.evaluate(() => window.arcana.tools());
-check(`14 base tools registered (got ${tools.length})`, tools.length === 14, tools.join(','));
+check(`${BASE_N} base tools registered (got ${tools.length})`, tools.length === BASE_N, tools.join(','));
 
 console.log('— reads —');
 const board = await call('get_board_state');
@@ -134,9 +135,9 @@ check('advance_turn gated before combat', !!(await call('advance_turn')).error);
 const combat = await call('start_combat');
 check('start_combat ok', combat.ok === true, JSON.stringify(combat));
 const toolsInCombat = await page.evaluate(() => window.arcana.tools());
-check(`combat tools live (got ${toolsInCombat.length})`, toolsInCombat.length === 17);
+check(`combat tools live (got ${toolsInCombat.length})`, toolsInCombat.length === COMBAT_N);
 const mcInCombat = await mcNames();
-check(`WebMCP registry grew to 17 during combat (got ${mcInCombat.length})`, mcInCombat.length === 17, mcInCombat.join(','));
+check(`WebMCP registry grew to ${COMBAT_N} during combat (got ${mcInCombat.length})`, mcInCombat.length === COMBAT_N, mcInCombat.join(','));
 check('advance_turn is in the live WebMCP registry', mcInCombat.includes('advance_turn'));
 check('advance_turn works in combat', (await call('advance_turn')).ok === true);
 const dmg = await call('update_hp', { tokenId: 'Snaggle', delta: -3 });
@@ -170,9 +171,9 @@ check('no approval prompt was raised for the monster',
 check('apply_condition ok', (await call('apply_condition', { tokenId: 'Snaggle', condition: 'poisoned' })).ok === true);
 check('end_combat ok', (await call('end_combat')).ok === true);
 const toolsAfter = await page.evaluate(() => window.arcana.tools());
-check(`combat tools unregistered (got ${toolsAfter.length})`, toolsAfter.length === 14);
+check(`combat tools unregistered (got ${toolsAfter.length})`, toolsAfter.length === BASE_N);
 const mcAfter = await mcNames();
-check(`WebMCP registry shrank back to 14 via AbortSignal (got ${mcAfter.length})`, mcAfter.length === 14, mcAfter.join(','));
+check(`WebMCP registry shrank back to ${BASE_N} via AbortSignal (got ${mcAfter.length})`, mcAfter.length === BASE_N, mcAfter.join(','));
 check('advance_turn really left the WebMCP registry', !mcAfter.includes('advance_turn'), mcAfter.join(','));
 
 console.log('— Heroic Effort —');
@@ -192,6 +193,67 @@ check('boost consumed after roll', fit2.unspentBoosts.setRoll === null);
 
 check('loot awarded', (await call('award_loot', { items: ['Dragonfang Dagger'], gold: 50 })).gold === 50);
 
+// ── the quest: five beats, a boss, an ending ─────────────────────────────────
+console.log('— quest arc —');
+const q0 = await call('get_quest');
+check('quest starts on beat 1 of 5', q0.beatNumber === 1 && q0.of === 5 && q0.status === 'active', JSON.stringify(q0).slice(0, 120));
+check('current beat carries an objective for the DM', typeof q0.current?.objective === 'string' && q0.current.objective.length > 20);
+check('quest rides along in get_board_state', (await call('get_board_state')).quest?.current?.id === q0.current.id);
+
+const goldBefore = (await call('get_board_state')).party.gold;
+const adv1 = await call('advance_quest', { summary: 'Cut the drowned thing down in the shallows.' });
+check('advance_quest moves to beat 2', adv1.ok && adv1.beatNumber === 2, JSON.stringify(adv1).slice(0, 120));
+check('clearing a beat pays a milestone', (await call('get_board_state')).party.gold > goldBefore);
+check('completed beat is recorded', (await call('get_quest')).completed.length === 1);
+
+// walk to the final beat and confirm the boss actually spawns
+let last = null;
+for (let i = 0; i < 3; i++) last = await call('advance_quest', { summary: 'onward' });
+check('final beat spawns the boss', last.bossSpawned === 'The Cinder Wight', JSON.stringify(last).slice(0, 140));
+check('final beat is flagged as final', (await call('get_quest')).current.isFinalBeat === true);
+check('boss is really on the board', (await call('get_board_state')).tokens.some(t => t.name === 'The Cinder Wight' && t.maxHp === 46));
+
+// ── going down: time stops, and reps are the way out ────────────────────────
+console.log('— a hero goes down —');
+await call('start_combat');
+// Wren is a PC, so the killing blow needs the player's ✓ like any other.
+const dropP = call('update_hp', { tokenId: 'Wren', delta: -99 });
+await page.waitForSelector('.approval', { timeout: 5000 });
+await page.click('.approval .ok');
+await dropP;
+const dq = await call('get_quest');
+check('a downed PC stops time', dq.timeStopped === true && dq.downed?.name === 'Wren', JSON.stringify(dq.downed));
+check('death_save registers as a live WebMCP tool while down', (await mcNames()).includes('death_save'));
+check(`registry grows to ${DOWNED_N + 3} with combat + death_save (got ${(await mcNames()).length})`,
+  (await mcNames()).length === COMBAT_N + 1, (await mcNames()).join(','));
+
+const frozen = await call('move_token', { tokenId: 'Brannok', x: 6, y: 6 });
+check('the board refuses to move while a hero is down', frozen.timeStopped === true && !!frozen.error, JSON.stringify(frozen).slice(0, 100));
+check('reads still work while frozen', !!(await call('get_board_state')).tokens);
+
+// the point of the whole table: effort revives, no roll required
+const chalP = call('propose_challenge', { exercise: 'push-ups', reps: 3, reward: 'bonus+2', reason: 'Get up.' });
+await page.waitForSelector('#challenge-modal:not([hidden])', { timeout: 5000 });
+await page.click('#chal-accept');
+for (let i = 0; i < 3; i++) { await page.waitForTimeout(60); await page.click('#chal-tap'); }
+const revived = await chalP;
+check('completed reps revive the downed hero', revived.revived === 'Wren', JSON.stringify(revived).slice(0, 140));
+check('time is moving again', (await call('get_quest')).timeStopped === false);
+check('death_save left the registry on the way back up', !(await mcNames()).includes('death_save'));
+check('the revived hero is actually standing', (await call('get_board_state')).tokens.find(t => t.name === 'Wren').hp > 0);
+await call('end_combat');
+
+// ── winning ─────────────────────────────────────────────────────────────────
+const win = await call('advance_quest', { summary: 'The Wight falls. The Crown is taken.' });
+check('clearing the last beat wins the run', win.questComplete === true && win.status === 'won', JSON.stringify(win).slice(0, 120));
+check('victory screen is shown', await page.isVisible('#ending'));
+check('victory screen names the run', /Crown/i.test(await page.innerText('#ending-title')));
+check('advance_quest refuses after the run is over', !!(await call('advance_quest')).error);
+await page.screenshot({ path: 'screens/victory.png' });
+
+// back to an active run so the DM section below has a live table
+await page.evaluate(() => window.arcana.resetQuest());
+
 // ── the built-in AI DM ───────────────────────────────────────────────────────
 // Mock the brain so the loop is tested without spending a token: the "model"
 // asks for a tool call, we assert the board actually changed, then it speaks.
@@ -207,7 +269,7 @@ await page.fill('#say', 'I push open the iron door and step through.');
 await page.click('#say-btn');
 await page.waitForFunction(n => document.querySelectorAll('.say.dm').length >= n + 2, dmBase, { timeout: 20000 });
 
-check('DM was offered the live WebMCP tool list', Array.isArray(sawTools) && sawTools.length >= 14, `got ${sawTools?.length}`);
+check('DM was offered the live WebMCP tool list', Array.isArray(sawTools) && sawTools.length >= BASE_N, `got ${sawTools?.length}`);
 check('tool specs carry name + JSON-schema parameters',
   sawTools.every(t => t.type === 'function' && t.function.name && t.function.parameters?.type === 'object'));
 const spawned = await call('get_board_state');

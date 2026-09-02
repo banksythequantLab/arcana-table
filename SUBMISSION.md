@@ -49,7 +49,8 @@ next roll — publicly, in the on-screen dice tray.
   A ~120-line Cloudflare Worker holds the API key so none reaches a browser —
   origin-locked, size-capped, 40 req/min per IP.
 
-- **17 tools** registered through `document.modelContext` / `navigator.modelContext`
+- **20 tools** registered through `document.modelContext` / `navigator.modelContext`
+  (16 always on, 3 more while combat runs, 1 more while a hero is bleeding out)
   — reads (`get_board_state`, `get_character_sheet`, `get_fitness_log`, all
   `readOnlyHint: true`), board actions (`move_token`, `add_token`, `reveal_area`,
   `set_scene`), game flow (`roll_dice`, `narrate`, `start_combat`, `award_loot`)
@@ -61,7 +62,7 @@ next roll — publicly, in the on-screen dice tray.
   so agents refresh. Our tests assert it against the live registry: `getTools()`
   returns 14, 17 during combat, 14 after.
 - **No flag, no setup, for anyone:** the page vendors the MIT
-  `@mcp-b/webmcp-polyfill`, so `document.modelContext` and all 17 tools are real
+  `@mcp-b/webmcp-polyfill`, so `document.modelContext` and all 20 tools are real
   in any modern browser. Judges just open the URL. Where WebMCP ships natively,
   that implementation wins and the badge honestly reads `native` vs `polyfill`.
 - **Human-in-the-loop by construction:** destructive calls (removing a token,

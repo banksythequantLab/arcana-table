@@ -2,7 +2,7 @@
 // Every game mutation is a named action. The UI buttons call these; the WebMCP
 // tools call these. One API, two hands on the table.
 
-import { state, save, findToken, isWalkable, GRID_W, GRID_H, MAPS } from './state.js';
+import { state, save, findToken, isWalkable, GRID_W, GRID_H, MAPS, QUEST, DEATH_SAVE_DC, DEATH_SAVE_FAILS } from './state.js';
 
 const listeners = new Set();
 export function onChange(fn) { listeners.add(fn); }
@@ -213,9 +213,77 @@ export function updateHp({ tokenId, delta }) {
   t.hp = Math.max(0, Math.min(t.maxHp, t.hp + delta));
   const verb = delta < 0 ? `takes ${-delta} damage` : `heals ${delta} HP`;
   logStory('combat', t.name, `${verb} (${t.hp}/${t.maxHp}).`);
-  if (t.hp === 0) logStory('combat', 'DM', t.kind === 'pc' ? `${t.name} falls unconscious!` : `${t.name} is defeated!`);
+  if (t.hp === 0) {
+    if (t.kind === 'pc') { goDown(t); }
+    else logStory('combat', 'DM', `${t.name} is defeated!`);
+  }
+  // Healing a downed hero back above zero puts them on their feet.
+  if (t.hp > 0 && state.downed?.tokenId === t.id) return { ...standUp(`${t.name} is pulled back from the edge.`), hp: t.hp };
   emit();
-  return { ok: true, token: t.id, hp: t.hp, maxHp: t.maxHp, down: t.hp === 0 };
+  return { ok: true, token: t.id, hp: t.hp, maxHp: t.maxHp, down: t.hp === 0, timeStopped: !!state.downed };
+}
+
+// ── going down · time stops ─────────────────────────────────────────────────
+// A hero at 0 HP does not simply die and it is not simply ignored. The board
+// freezes. The only two ways forward are a death save or real effort — and a
+// completed Heroic Effort while down always wins, so sweat is never wasted.
+function goDown(t) {
+  state.downed = { tokenId: t.id, name: t.name, saves: 0, fails: 0 };
+  if (state.combat.active) state.combat.frozenAt = state.combat.turnIndex;
+  logStory('downed', 'DM', `${t.name} goes down. Time stops. Nothing moves until they are back on their feet.`);
+  emit('downed');
+}
+
+function standUp(text, hp = 1) {
+  const d = state.downed;
+  if (!d) return { error: 'Nobody is down.' };
+  const t = findToken(d.tokenId);
+  if (t && t.hp <= 0) t.hp = Math.max(hp, 1);
+  state.downed = null;
+  logStory('downed', 'DM', text);
+  emit('downed');
+  return { ok: true, revived: t?.name, hp: t?.hp, timeStopped: false };
+}
+
+/** The board is frozen while a hero is down; most tools refuse to act. */
+export function timeStopped() { return !!state.downed && state.quest.status === 'active'; }
+
+export function deathSave() {
+  const d = state.downed;
+  if (!d) return { error: 'Nobody is down — there is nothing to save against.' };
+  const roll = 1 + Math.floor(Math.random() * 20);
+  state.dice = { formula: 'd20', rolls: [roll], modifier: 0, total: roll, reason: `${d.name}'s death save`, nat20: roll === 20, nat1: roll === 1, at: Date.now() };
+  emit('dice');
+
+  if (roll === 20) return { ...standUp(`${d.name} rolls a natural 20 and surges back up, snarling.`, 3), roll, outcome: 'critical-success' };
+  if (roll >= DEATH_SAVE_DC) {
+    d.saves++;
+    logStory('downed', d.name, `steadies — death save ${roll}, success ${d.saves}/2.`);
+    if (d.saves >= 2) return { ...standUp(`${d.name} drags themself back to their feet.`), roll, outcome: 'stabilised' };
+    emit('downed');
+    return { ok: true, roll, outcome: 'success', saves: d.saves, fails: d.fails, note: 'Two successes and they are up. Or offer a Heroic Effort — reps always work.' };
+  }
+
+  d.fails++;
+  logStory('downed', d.name, `slips further — death save ${roll}, failure ${d.fails}/${DEATH_SAVE_FAILS}.`);
+  if (d.fails >= DEATH_SAVE_FAILS) {
+    state.quest.status = 'lost';
+    logStory('downed', 'DM', `${d.name} does not get up. The run ends here.`);
+    emit('quest');
+    return { ok: true, roll, outcome: 'run-lost', note: 'The run is over. Nothing but a fresh table will change that.' };
+  }
+  emit('downed');
+  return {
+    ok: true, roll, outcome: 'failure', saves: d.saves, fails: d.fails,
+    note: `${DEATH_SAVE_FAILS - d.fails} failure(s) from the end. Offer a Heroic Effort — completed reps clear a failure and put them back up.`,
+  };
+}
+
+/** Called when a challenge completes while a hero is down: effort always wins. */
+function repsRevive() {
+  const d = state.downed;
+  if (!d) return;
+  standUp(`${d.name} pushes up off the floor — in the room and on the board — and stands.`, 4);
 }
 
 export function applyCondition({ tokenId, condition, remove = false }) {
@@ -300,6 +368,9 @@ export function completeChallenge() {
   state.fitness.diceEarned.push(c.reward);
   logStory('challenge', 'Player', `completed ${c.reps} ${c.exercise} in ${secs}s — earned: ${REWARDS[c.reward].label}!`);
   const done = { status: 'completed', challengeId: c.id, exercise: c.exercise, reps: c.reps, seconds: secs, rewardGranted: REWARDS[c.reward].label };
+  // Reps done over a downed hero are never wasted: they clear a failed death
+  // save and put them back on their feet, whatever the dice have been doing.
+  if (state.downed) { done.revived = state.downed.name; done.note = 'The reps put them back up. Time moves again.'; repsRevive(); }
   const waiter = challengeWaiters.get(c.id);
   if (waiter) { challengeWaiters.delete(c.id); waiter(done); }
   state.challenge = null;
@@ -319,6 +390,74 @@ export function declineChallenge() {
   return res;
 }
 
+// ── the quest ────────────────────────────────────────────────────────────────
+export function currentBeat() {
+  const q = state.quest;
+  return q.status === 'active' ? QUEST.beats[q.beatIndex] || null : null;
+}
+
+/** Move to the next beat: pay out the milestone, swap the map, spawn the boss. */
+export function advanceQuest({ summary = '' } = {}) {
+  const q = state.quest;
+  if (q.status !== 'active') return { error: `This run is already ${q.status}. Nothing left to advance.` };
+  if (timeStopped()) return { error: 'A hero is down and time has stopped. Get them up before the story moves on.' };
+  const beat = QUEST.beats[q.beatIndex];
+  if (!beat) return { error: 'No beat is in progress.' };
+
+  q.completed.push({ id: beat.id, title: beat.title, at: Date.now(), summary: String(summary || '').slice(0, 240) });
+  logStory('quest', 'DM', `✦ ${beat.title} — complete. ${summary}`.trim());
+  if (beat.reward) awardLoot(beat.reward);
+
+  q.beatIndex++;
+  const next = QUEST.beats[q.beatIndex];
+  if (!next) {
+    q.status = 'won';
+    q.finishedAt = Date.now();
+    endCombat();
+    logStory('quest', 'DM', `👑 ${QUEST.name} is yours. The marshes cool. The run is won.`);
+    emit('quest');
+    return { ok: true, questComplete: true, status: 'won', totalReps: state.fitness.totalReps, loot: state.party.loot, gold: state.party.gold };
+  }
+
+  if (next.mapId !== state.scene.mapId) setScene({ mapId: next.mapId });
+  logStory('quest', 'DM', `✦ Next: ${next.title} — ${next.objective}`);
+  const spawned = next.boss ? addToken({ ...next.boss, kind: 'monster', maxHp: next.boss.hp }) : null;
+  emit('quest');
+  return {
+    ok: true, beat: next.id, title: next.title, objective: next.objective,
+    beatNumber: q.beatIndex + 1, of: QUEST.beats.length,
+    bossSpawned: spawned?.token?.name || null,
+    note: next.boss ? 'This is the final beat. Play it like one.' : undefined,
+  };
+}
+
+export function getQuest() {
+  const q = state.quest;
+  const beat = currentBeat();
+  return {
+    name: QUEST.name,
+    premise: QUEST.premise,
+    status: q.status,
+    beatNumber: Math.min(q.beatIndex + 1, QUEST.beats.length),
+    of: QUEST.beats.length,
+    current: beat ? { id: beat.id, title: beat.title, objective: beat.objective, map: MAPS[beat.mapId].name, isFinalBeat: !!beat.boss } : null,
+    upcoming: QUEST.beats.slice(q.beatIndex + 1).map(b => b.title),
+    completed: q.completed.map(c => c.title),
+    timeStopped: timeStopped(),
+    downed: state.downed ? { name: state.downed.name, successes: state.downed.saves, failures: state.downed.fails, of: DEATH_SAVE_FAILS } : null,
+    note: q.status === 'active'
+      ? 'Drive play toward current.objective. When the party has achieved it, call advance_quest — that is what moves the story and pays the milestone.'
+      : `The run is ${q.status}.`,
+  };
+}
+
+export function resetQuest() {
+  state.quest = { beatIndex: 0, status: 'active', completed: [], startedAt: Date.now() };
+  state.downed = null;
+  emit('quest');
+  return { ok: true, ...getQuest() };
+}
+
 // ── reads ────────────────────────────────────────────────────────────────────
 export function getBoardState() {
   return {
@@ -328,6 +467,7 @@ export function getBoardState() {
     combat: state.combat.active ? { active: true, round: state.combat.round, order: state.combat.order.map(id => findToken(id)?.name), current: findToken(state.combat.order[state.combat.turnIndex])?.name } : { active: false },
     activeBoosts: { ...state.boosts },
     party: state.party,
+    quest: getQuest(),
     recentLog: state.log.slice(-12).map(l => `[${l.type}] ${l.actor}: ${l.text}`),
   };
 }

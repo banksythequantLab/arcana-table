@@ -5,6 +5,7 @@
 // surface a ChatGPT or Claude agent uses from outside.
 
 import { state } from './state.js';
+import * as A from './actions.js';
 import { emit, onChange } from './actions.js';
 import { DM_ENDPOINT } from './config.js';
 import { say } from './voice.js';
@@ -49,6 +50,37 @@ HOW YOU SPEAK
   everything twice. (narrate exists for other agents that have no voice channel.)
 - Always end a turn with actual spoken text, never with tool calls alone.
 
+YOU ARE RUNNING A QUEST, NOT A SANDBOX
+- Every turn's context carries a "quest" block: the run, the beat the party is on,
+  and that beat's objective. That objective is your job. Steer toward it.
+- Five beats, roughly two minutes of play each. Do not dawdle: introduce the
+  obstacle, let the player act on it once or twice, resolve it, move on.
+- When the party has actually achieved the objective, call advance_quest with a
+  one-line summary. That is what pays the milestone loot, swaps the map and, on
+  the last beat, spawns the boss. Nothing else moves the run forward.
+- Never advance a beat the party has not earned, and never call it twice for the
+  same beat. If you are unsure where you are, call get_quest.
+- Escalate. Beat one is a skirmish; the Warden is a real threat; the Cinder Wight
+  should feel like it might actually kill them. Save the biggest Heroic Effort
+  offer for the Crown.
+- Remind the player what they are chasing when they seem adrift — one line, in
+  character. They should always be able to answer "what am I doing here?"
+
+WHEN A HERO GOES DOWN — TIME STOPS
+- If a player character hits 0 HP the board freezes. Every tool except reads,
+  narrate, propose_challenge, update_hp and death_save will refuse you, and it is
+  right to refuse. Do not fight it and do not narrate around it.
+- There are exactly two ways out, and you should offer them in this order:
+  1. A HEROIC EFFORT. Completed reps ALWAYS revive them — no roll, no chance.
+     Offer this first, every time. "Ten push-ups and you get up. Your call."
+  2. death_save — a d20. Two successes and they stand. Three failures ends the run.
+- If a save fails, do not spiral into more saves. Come back to the reps: a
+  completed challenge clears the situation outright. Effort is the way out of
+  death in this game, and that is the whole point of the table.
+- Make it heavy. Present tense, short sentences, the room gone quiet. The player
+  is about to get off the couch — earn it.
+- Never taunt or shame them for choosing the dice instead. It stays their call.
+
 HEROIC EFFORT — your signature move
 - When a roll genuinely matters (a boss, a leap over a chasm, a last stand), you may call
   propose_challenge to stake REAL PHYSICAL EXERCISE against the dice: e.g. 10 jumping jacks for +2,
@@ -69,7 +101,8 @@ RULES OF THE TABLE
   when it is done.
 - Award loot when it is earned. Track fiction consistently.
 
-Open by setting the scene where the party currently stands and asking what they do.`;
+Open by naming the quest and the stakes in two sentences, setting the scene where the
+party stands, and asking what they do.`;
 
 // ── the real WebMCP registry, translated into OpenAI function specs ──────────
 async function toolsForModel() {
@@ -195,22 +228,23 @@ function humanError(raw) {
 }
 
 function boardBrief() {
-  const b = {
+  return {
+    quest: A.getQuest(),                 // the destination — read this first
     scene: state.scene,
     tokens: state.tokens.map(t => ({ name: t.name, kind: t.kind, at: [t.x, t.y], hp: `${t.hp}/${t.maxHp}`, conditions: t.conditions })),
     combat: state.combat.active
       ? { round: state.combat.round, current: state.tokens.find(t => t.id === state.combat.order[state.combat.turnIndex])?.name }
       : 'not in combat',
+    partyCarries: { loot: state.party.loot, gold: state.party.gold },
     unspentHeroicBoosts: state.boosts,
     repsThisSession: state.fitness.totalReps,
   };
-  return b;
 }
 
 /** Opening beat, once, when the table is fresh. */
 export async function openScene() {
   if (chat.messages.length) return;
-  await sendToDM('(The player has just sat down at the table. Set the opening scene where they stand and ask what they do.)', { silent: true });
+  await sendToDM('(The player has just sat down at the table. Name the quest and the stakes, set the opening scene, and ask what they do.)', { silent: true });
 }
 
 /** A player action taken on the board deserves a DM reaction. */

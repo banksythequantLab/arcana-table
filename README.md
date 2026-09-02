@@ -19,13 +19,28 @@ a real exercise against the dice. Ten jumping jacks for +2. Fifteen squats for
 advantage. Ten push-ups and your next d20 is a **natural 20**. The agent brings
 the dungeon; you bring the muscle.
 
+## The run has an ending
+
+A session is not an open sandbox. **The Ember Crown** is a five-beat quest — two
+in the Sunken Keep, two in the Whispering Glade, and the Cinder Wight in the
+Ember Crypt — and the DM is handed the current objective in every turn's context
+and told to drive toward it. Each beat cleared pays a milestone. Clearing the
+fifth wins the run.
+
+And you can go down. If a player character hits 0 HP **time stops**: the board
+freezes and almost every tool refuses to act, including for the DM. There are
+exactly two ways out — a d20 death save, three failures of which ends the run,
+or a Heroic Effort, which **always** works. No roll, no chance. In this game
+effort is the way out of death, which is the argument the whole project is
+making.
+
 Built for [The WebMCP Challenge](https://webmcp.devpost.com/) (Devpost, 2026).
 
 ## Try it
 
 1. **Just open the live URL — in any modern browser.** The page ships the
    vendored [`@mcp-b/webmcp-polyfill`](https://github.com/WebMCP-org/npm-packages)
-   (MIT), so `document.modelContext` and all 17 tools are real even where the
+   (MIT), so `document.modelContext` and all 20 tools are real even where the
    browser hasn't implemented WebMCP yet. No flags, no setup. Where the browser
    *does* ship WebMCP natively, the native implementation wins and the badge
    says `WebMCP native` instead of `polyfill`.
@@ -34,7 +49,7 @@ Built for [The WebMCP Challenge](https://webmcp.devpost.com/) (Devpost, 2026).
 3. **Or bring your own agent.** In a WebMCP-capable agent browser, point your
    agent at the page: *"You're my co-DM. Read the board, set the scene, and run
    me through this dungeon. Offer Heroic Effort when a roll matters."* It drives
-   the identical 17 tools.
+   the identical 20 tools.
 4. **Or run it yourself.** The **🎩 DM Panel** tab does everything the tools do,
    by hand — the game never depends on a network call.
 
@@ -70,6 +85,9 @@ await arcana.call('roll_dice', { formula: 'd20', reason: 'Attack the dragon' })
 | `apply_condition` | poisoned, stunned, blessed… | combat-only |
 | `award_loot` | Items + gold | |
 | `propose_challenge` | **Heroic Effort**: stake exercise vs. dice reward | resolves when the player finishes or declines |
+| `get_quest` | The run: which of the five beats, its objective, what is done | `readOnlyHint` — the DM's destination |
+| `advance_quest` | Mark a beat achieved: pays the milestone, swaps the map, spawns the boss | clearing the last beat wins the run |
+| `death_save` | Roll for a hero at 0 HP | **only registered while someone is down** |
 
 Design choices worth noting:
 
@@ -80,7 +98,9 @@ Design choices worth noting:
   `registerTool(def, { signal })` — and unregistered by `controller.abort()`,
   which is how the WebMCP spec removes tools and fires `toolchange` so agents
   refresh. The test suite asserts this against the live registry: `getTools()`
-  returns 14, then 17 once combat starts, then 14 again when it ends.
+  returns 16, then 19 once combat starts, then 16 again when it ends — and 20
+  the moment a hero drops, because `death_save` exists only while someone is
+  bleeding out.
 - **Human-in-the-loop by construction.** Destructive calls (`remove_token`,
   PC damage via `update_hp`) suspend inside `execute()` until the player clicks
   ✓ Allow / ✗ Deny on the board. Denials return structured guidance, not errors.
@@ -139,11 +159,13 @@ npx serve .        # or: python3 -m http.server 8080
 cd test && npm install && node smoke.mjs
 ```
 
-44 assertions, Playwright + Chromium. Drives the full tool surface **through the
+68 assertions, Playwright + Chromium. Drives the full tool surface **through the
 real `document.modelContext`** — enumerating tools with `getTools()`, invoking
 them with `executeTool()`, asserting `readOnlyHint` on the read tools, and
-proving the combat toolset registers and unregisters (14 → 17 → 14) — plus the
-approval Allow *and* Deny paths and a complete push-ups-to-natural-20 loop.
+proving the dynamic toolsets register and unregister (16 → 19 → 16, and 20 while
+a hero is down) — plus the approval Allow *and* Deny paths, a complete
+push-ups-to-natural-20 loop, a five-beat run walked to victory, and the frozen
+board that only reps or a death save can unfreeze.
 
 ## Art pipeline
 

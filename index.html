@@ -52,6 +52,7 @@
   </div>
 </header>
 
+<div id="quest-rail" class="quest-rail" aria-label="Quest progress"></div>
 <div id="combat-strip" hidden></div>
 
 <main>
@@ -109,6 +110,11 @@
         </div>
       </div>
       <div class="dm-group">
+        <button id="dm-advance" class="btn wide">✦ Beat complete — advance the quest</button>
+        <button id="dm-save" class="btn wide" hidden>🎲 Roll a death save</button>
+      </div>
+
+      <div class="dm-group">
         <button id="dm-combat" class="btn wide">⚔ Start combat</button>
       </div>
       <div class="dm-group heroic">
@@ -165,6 +171,26 @@
 </div>
 
 <!-- Heroic Effort modal -->
+<div id="downed-banner" class="downed-banner" hidden>
+  <div class="downed-inner">
+    <div class="downed-eyebrow">⏳ TIME HAS STOPPED</div>
+    <div id="downed-who" class="downed-who">Brannok is down.</div>
+    <p class="downed-copy">Nothing on the board moves until they are back up.
+      Reps always work. The dice might not.</p>
+    <div id="downed-saves" class="downed-saves"></div>
+  </div>
+</div>
+
+<div id="ending" class="ending-backdrop" hidden>
+  <div class="ending-card">
+    <div id="ending-eyebrow" class="ending-eyebrow">THE RUN</div>
+    <h2 id="ending-title" class="ending-title">Victory</h2>
+    <p id="ending-sub" class="ending-sub"></p>
+    <div id="ending-stats" class="ending-stats"></div>
+    <button id="ending-again" class="btn big" type="button">Run it again →</button>
+  </div>
+</div>
+
 <div id="challenge-modal" class="chal-backdrop" hidden>
   <div class="chal-card">
     <div class="chal-eyebrow">💪 HEROIC EFFORT</div>

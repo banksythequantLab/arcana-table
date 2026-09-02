@@ -303,3 +303,87 @@ input[type=checkbox]{flex:0 0 auto;width:18px;height:18px;padding:0;accent-color
   position:absolute;width:1px;height:1px;padding:0;margin:-1px;
   overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;
 }
+
+/* ── the quest ─────────────────────────────────────────────────────────────
+   A five-beat rail under the header. A judge should be able to answer "what
+   am I doing and how far in am I?" without reading a word of the story log. */
+.quest-rail{
+  display:flex;flex-wrap:wrap;align-items:center;row-gap:6px;padding:8px 14px;
+  background:var(--panel);border-bottom:var(--outline);font-size:12px
+}
+.quest-rail[hidden]{display:none}
+.qr-name{
+  display:flex;align-items:center;gap:7px;padding-right:12px;margin-right:4px;
+  font:800 12.5px "Baloo 2",cursive;color:var(--gold);white-space:nowrap
+}
+.qr-beats{display:flex;flex:1 1 320px;gap:5px;min-width:0}
+.qr-beat{
+  flex:1;min-width:0;border-radius:8px;padding:5px 9px;border:2px solid var(--ink);
+  background:var(--panel-2);color:var(--muted);font-weight:800;font-size:11.5px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.55
+}
+.qr-beat .n{opacity:.65;margin-right:5px}
+.qr-beat.done{background:#2E4A38;color:#BFE3C8;opacity:.9}
+.qr-beat.now{background:var(--gold);color:var(--ink);opacity:1;box-shadow:0 3px 0 var(--ink)}
+.qr-beat.now.final{background:#D9534F;color:#fff}
+.qr-objective{
+  flex:0 0 100%;color:#CDBFE0;font-weight:600;font-size:12px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+}
+.qr-objective b{color:var(--gold)}
+
+/* ── a hero is down ────────────────────────────────────────────────────────── */
+/* sits UNDER the Heroic Effort modal (z-index 60): when the DM offers reps to
+   revive someone, the rep ring must never end up behind this. */
+.downed-banner{
+  position:fixed;inset:0;z-index:55;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle at 50% 45%, rgba(120,20,20,.30), rgba(8,4,10,.86) 72%);
+  pointer-events:none;animation:fadein .25s ease-out
+}
+@keyframes fadein{from{opacity:0}}
+.downed-inner{
+  pointer-events:auto;text-align:center;max-width:520px;padding:26px 30px;
+  background:rgba(20,10,16,.94);border:4px solid #D9534F;border-radius:18px;
+  box-shadow:0 12px 0 rgba(0,0,0,.5)
+}
+.downed-eyebrow{font:800 13px "Baloo 2",cursive;letter-spacing:.2em;color:#F2C14E;margin-bottom:10px}
+.downed-who{font:800 34px/1.1 "Baloo 2",cursive;color:#FFE9E7;text-shadow:3px 3px 0 #2E2233}
+.downed-copy{margin:10px 0 14px;color:#E0CFD6;font-size:14.5px;line-height:1.5}
+.downed-saves{display:flex;gap:7px;justify-content:center;flex-wrap:wrap}
+.pip{
+  width:16px;height:16px;border-radius:50%;border:2.5px solid var(--ink);background:#3A2A38;
+  display:inline-block
+}
+.pip.ok{background:#6FBF7A}
+.pip.bad{background:#D9534F}
+.pip-label{font-size:11.5px;font-weight:800;color:#B9AECB;align-self:center;margin-right:4px}
+
+/* ── the run is over ───────────────────────────────────────────────────────── */
+.ending-backdrop{
+  position:fixed;inset:0;z-index:85;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle at 50% 40%, rgba(60,40,80,.6), rgba(10,6,14,.96) 70%);
+  padding:20px;overflow-y:auto
+}
+.ending-card{
+  background:var(--paper);color:var(--ink);border:4px solid var(--ink);border-radius:20px;
+  box-shadow:0 14px 0 rgba(0,0,0,.45);max-width:560px;width:100%;padding:34px 34px 30px;text-align:center
+}
+.ending-eyebrow{font:800 13px "Baloo 2",cursive;letter-spacing:.2em;color:#8A3A12;margin-bottom:10px}
+.ending-title{font:800 52px/1 "Baloo 2",cursive;margin:0 0 10px}
+.ending-sub{margin:0 0 20px;font-size:16px;color:#5B4F66;line-height:1.5}
+.ending-stats{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:24px}
+.estat{
+  background:#FFF6E2;border:2.5px solid var(--ink);border-radius:12px;padding:9px 14px;min-width:96px
+}
+.estat b{display:block;font:800 24px "Baloo 2",cursive;color:#8A3A12}
+.estat span{font-size:11.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#7A6E80}
+
+@media (max-width: 560px){
+  .quest-rail{padding:0 8px 6px}
+  .qr-name{display:none}
+  .qr-beat{padding:4px 6px;font-size:0}          /* numbers only on a phone */
+  .qr-beat .n{font-size:11.5px;margin:0}
+  .qr-objective{font-size:11.5px}
+  .downed-who{font-size:26px}
+  .ending-title{font-size:36px}
+}

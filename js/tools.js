@@ -95,6 +95,19 @@ export const BASE_TOOLS = [
     handler: () => A.getFitnessLog(),
   },
   {
+    name: 'get_quest',
+    description: 'Read the run: which of the five beats the party is on, its objective, what is already done, what is still ahead, and whether a hero is down. Call this when you are unsure what the party should be doing — this is the destination the whole session is driving toward.',
+    inputSchema: obj({}),
+    annotations: { readOnlyHint: true },
+    handler: () => A.getQuest(),
+  },
+  {
+    name: 'advance_quest',
+    description: 'Mark the current beat achieved and move the run to the next one. This pays out the milestone loot, swaps the map when the next beat is elsewhere, and on the final beat spawns the boss. Call it the moment the party has actually done what the objective asked — never before, and never twice for the same beat. Advancing past the last beat wins the run.',
+    inputSchema: obj({ summary: str('One line on how the party pulled it off, in DM voice') }),
+    handler: a => A.advanceQuest(a),
+  },
+  {
     name: 'roll_dice',
     description: 'Roll dice on the table, visibly, with animation. Formula like "d20", "2d6+3". Any earned Heroic Effort boosts (bonus, advantage, or a set die) apply automatically to a single d20 and are consumed. Rolls are public — no fudging.',
     inputSchema: obj({ formula: str('Dice formula, e.g. "d20" or "2d6+3"'), reason: str('What the roll is for, e.g. "Brannok attacks the goblin"') }, ['formula']),
@@ -203,10 +216,25 @@ export const COMBAT_TOOLS = [
   },
 ];
 
+// Only exists while a hero is bleeding out. Registers on the way down and
+// aborts on the way back up, so the registry itself tells the story.
+export const DOWNED_TOOLS = [
+  {
+    name: 'death_save',
+    description: 'Roll a death save for the hero who is down. 10 or better is a success (two successes and they are up); under 10 is a failure, and three failures ends the run. A natural 20 puts them straight back on their feet. Before you spend a save on the dice, remember the other option: a completed Heroic Effort ALWAYS revives them. Offer the reps first — that is the point of this table.',
+    inputSchema: obj({}),
+    handler: () => A.deathSave(),
+  },
+];
+
 // ── registration ─────────────────────────────────────────────────────────────
 // Per the WebMCP spec, a tool is unregistered by aborting the AbortSignal it
 // was registered with — that fires `toolchange` so agents refresh their list.
 const registered = new Map();   // name → AbortController
+
+// The only writes allowed while a hero is down: say something, roll the save,
+// offer the reps, or heal them. Everything else waits.
+const FROZEN_OK = new Set(['death_save', 'propose_challenge', 'narrate', 'update_hp']);
 
 function wrap(def) {
   return {
@@ -217,6 +245,13 @@ function wrap(def) {
     execute: async (input) => {
       const entry = beginAgent(def.name, input);
       try {
+        // While a hero is down the board is frozen. Reads still work, and so do
+        // the two things that can end it — a death save, or real reps.
+        if (A.timeStopped() && !FROZEN_OK.has(def.name) && !def.annotations?.readOnlyHint) {
+          const msg = `Time has stopped: ${state.downed.name} is down (${state.downed.fails}/3 failures). Nothing else moves. Either call death_save, or — better — offer a Heroic Effort, because completed reps always put them back up.`;
+          updateAgent(entry, 'error', 'frozen — a hero is down');
+          return { error: msg, timeStopped: true, downed: state.downed.name };
+        }
         if (def.approval) {
           const ask = def.approval(input || {});
           if (ask) {
@@ -278,23 +313,36 @@ export async function initTools() {
   // dynamic combat toolset
   let combatWas = state.combat.active;
   if (combatWas) await registerSet(COMBAT_TOOLS);
+  // dynamic downed toolset — death_save only exists while someone is bleeding out
+  let downWas = !!state.downed;
+  if (downWas) await registerSet(DOWNED_TOOLS);
   onChange(() => {
     if (state.combat.active !== combatWas) {
       combatWas = state.combat.active;
       combatWas ? registerSet(COMBAT_TOOLS) : unregisterSet(COMBAT_TOOLS);
     }
+    if (!!state.downed !== downWas) {
+      downWas = !!state.downed;
+      downWas ? registerSet(DOWNED_TOOLS) : unregisterSet(DOWNED_TOOLS);
+    }
   });
 
   // ── dev shim: same tools, callable from the console or tests ──────────────
-  const all = () => [...BASE_TOOLS, ...(state.combat.active ? COMBAT_TOOLS : [])];
+  const all = () => [
+    ...BASE_TOOLS,
+    ...(state.combat.active ? COMBAT_TOOLS : []),
+    ...(state.downed ? DOWNED_TOOLS : []),
+  ];
   window.arcana = {
     tools: () => all().map(t => t.name),
     call: async (name, args = {}) => {
-      const def = [...BASE_TOOLS, ...COMBAT_TOOLS].find(t => t.name === name);
+      const def = [...BASE_TOOLS, ...COMBAT_TOOLS, ...DOWNED_TOOLS].find(t => t.name === name);
       if (!def) return { error: `No tool named "${name}". Tools: ${all().map(t => t.name).join(', ')}` };
       if (COMBAT_TOOLS.includes(def) && !state.combat.active) return { error: `"${name}" is only available during combat. Call start_combat first.` };
+      if (DOWNED_TOOLS.includes(def) && !state.downed) return { error: `"${name}" is only available while a hero is down.` };
       return wrap(def).execute(args);
     },
+    resetQuest: () => A.resetQuest(),
   };
   emit('agent');
 }

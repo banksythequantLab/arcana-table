@@ -66,6 +66,49 @@ export const MAPS = {
 export const GRID_W = 22;
 export const GRID_H = 14;
 
+// ── the quest ────────────────────────────────────────────────────────────────
+// Five beats across the three maps. The DM is handed this in every turn's
+// context and told to drive toward the current objective, so a session has a
+// destination instead of wandering pleasantly forever.
+export const QUEST = {
+  name: 'The Ember Crown',
+  premise: 'The Cinder Wight has taken the Ember Crown into the crypt beneath the Sunken Keep. While it wears the Crown the marshes burn. Take it back.',
+  beats: [
+    {
+      id: 'breach', mapId: 'dungeon', title: 'Breach the flooded hall',
+      objective: 'Get the party through the flooded entry hall of the Sunken Keep. Something drowned guards it — fight or outwit it.',
+      reward: { items: ['Keep Warden\'s Key'], gold: 15 },
+    },
+    {
+      id: 'vault', mapId: 'dungeon', title: 'Open the drowned vault',
+      objective: 'The old chest in the far chamber is the Warden\'s vault. Reach it, open it, survive what is guarding it.',
+      reward: { items: ['Emberward Charm'], gold: 40 },
+    },
+    {
+      id: 'glade', mapId: 'forest', title: 'Cross the Whispering Glade',
+      objective: 'The road to the crypt runs through the glade. It is watched. Get the party to the far side.',
+      reward: { items: ['Glade-Sung Arrow'], gold: 25 },
+    },
+    {
+      id: 'warden', mapId: 'forest', title: 'Break the Warden\'s ring',
+      objective: 'A standing ring of stone wardens bars the crypt door. Beat the one that wakes.',
+      reward: { items: ['Crypt Door Sigil'], gold: 60 },
+      elite: true,
+    },
+    {
+      id: 'crown', mapId: 'crypt', title: 'Take back the Ember Crown',
+      objective: 'The Cinder Wight waits in the Ember Crypt wearing the Crown. This is the last fight of the run. Make it hurt.',
+      reward: { items: ['The Ember Crown'], gold: 200 },
+      boss: { name: 'The Cinder Wight', art: 'skeleton', hp: 46, x: 11, y: 3 },
+    },
+  ],
+};
+
+// A downed hero freezes the board. Three failed death saves ends the run —
+// but reps buy a failure back, so effort is always a way out.
+export const DEATH_SAVE_DC = 10;
+export const DEATH_SAVE_FAILS = 3;
+
 const STORAGE_KEY = 'arcana-table-v1';
 
 function freshState() {
@@ -85,6 +128,8 @@ function freshState() {
     boosts: { bonus: 0, advantage: false, setRoll: null },  // earned via Heroic Effort
     challenge: null,              // active exercise challenge
     fitness: { totalReps: 0, byExercise: {}, challengesDone: 0, diceEarned: [] },
+    quest: { beatIndex: 0, status: 'active', completed: [], startedAt: Date.now() },
+    downed: null,                 // {tokenId, saves, fails} — the board is frozen while this is set
     settings: { autoApprove: false, exercisePool: ['push-ups', 'crunches', 'jumping jacks', 'squats'] },
   };
 }
@@ -97,6 +142,7 @@ function load() {
     if (raw) {
       const s = JSON.parse(raw);
       if (s && s.tokens && s.scene) return { ...freshState(), ...s, challenge: null };
+      // (challenge is never restored — a half-finished set of push-ups is not a save state)
     }
   } catch (e) { /* private mode / corrupt save — start fresh */ }
   return freshState();

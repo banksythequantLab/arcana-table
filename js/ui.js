@@ -2,7 +2,7 @@
 // Story log, party sheet, manual DM panel, agent log, approvals, dice overlay,
 // and the Heroic Effort challenge modal (tap / spacebar rep counter).
 
-import { state, MAPS } from './state.js';
+import { state, MAPS, QUEST } from './state.js';
 import * as A from './actions.js';
 import { onChange } from './actions.js';
 import { agentState, pendingApprovals, settleApproval } from './tools.js';
@@ -17,6 +17,8 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 const prose = s => esc(s)
   .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
   .replace(/(^|[\s(])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+
+const QUEST_TITLES = QUEST.beats.map(b => b.title);
 
 const STARTERS = [
   'Look around and tell me what I see.',
@@ -306,16 +308,77 @@ function bindDMPanel() {
   };
   $('#dm-auto').onchange = e => { state.settings.autoApprove = e.target.checked; };
   $('#dm-reset').onclick = () => { if (confirm('Reset the whole table?')) { localStorage.clear(); location.reload(); } };
+  $('#dm-advance').onclick = () => A.advanceQuest({ summary: 'Called by hand from the DM panel.' });
+  $('#dm-save').onclick = () => A.deathSave();
+  $('#ending-again').onclick = () => { localStorage.clear(); location.reload(); };
 }
 
 function renderDM() {
   $('#dm-combat').textContent = state.combat.active ? '⚔ End combat' : '⚔ Start combat';
   $('#dm-scene').value = state.scene.mapId;
+  const down = !!state.downed;
+  $('#dm-save').hidden = !down;
+  $('#dm-advance').disabled = down || state.quest.status !== 'active';
+}
+
+// ── the quest rail ───────────────────────────────────────────────────────────
+// Five beats under the header, so "what am I doing and how far in am I?" is
+// answerable at a glance without reading the story log.
+function renderQuest() {
+  const q = A.getQuest();
+  const rail = $('#quest-rail');
+  rail.hidden = q.status !== 'active';
+  if (!rail.hidden) {
+    const beats = q.completed.length + (q.current ? 1 : 0);
+    rail.innerHTML =
+      `<div class="qr-name">✦ ${esc(q.name)}</div>` +
+      `<div class="qr-beats">${QUEST_TITLES.map((t, i) => {
+        const cls = i < q.completed.length ? 'done' : i === q.completed.length ? 'now' : '';
+        const final = i === QUEST_TITLES.length - 1 ? ' final' : '';
+        return `<div class="qr-beat ${cls}${cls === 'now' ? final : ''}" title="${esc(t)}"><span class="n">${i + 1}</span>${esc(t)}</div>`;
+      }).join('')}</div>` +
+      (q.current ? `<div class="qr-objective"><b>Now:</b> ${esc(q.current.objective)}</div>` : '');
+    void beats;
+  }
+
+  // a hero is down — the board is frozen
+  const d = state.downed;
+  const banner = $('#downed-banner');
+  // While the rep ring is up it owns the screen — the banner would only shout over it.
+  banner.hidden = !d || q.status !== 'active' || !!state.challenge;
+  if (!banner.hidden) {
+    $('#downed-who').textContent = `${d.name} is down.`;
+    const pip = (n, total, cls) => Array.from({ length: total }, (_, i) =>
+      `<span class="pip ${i < n ? cls : ''}"></span>`).join('');
+    $('#downed-saves').innerHTML =
+      `<span class="pip-label">SAVES</span>${pip(d.saves, 2, 'ok')}` +
+      `<span class="pip-label" style="margin-left:14px">FAILS</span>${pip(d.fails, 3, 'bad')}`;
+  }
+
+  // the run is over
+  const end = $('#ending');
+  end.hidden = q.status === 'active';
+  if (!end.hidden) {
+    const won = q.status === 'won';
+    $('#ending-eyebrow').textContent = won ? 'THE EMBER CROWN' : 'THE RUN ENDS';
+    $('#ending-title').textContent = won ? 'The Crown is yours.' : 'They did not get up.';
+    $('#ending-sub').textContent = won
+      ? 'Five beats, one boss, and every rep you actually did along the way.'
+      : 'Three failed death saves. The reps were always there — next run, take them.';
+    const f = state.fitness;
+    $('#ending-stats').innerHTML = [
+      ['Beats cleared', q.completed.length],
+      ['Total reps', f.totalReps],
+      ['Heroic Efforts', f.challengesDone],
+      ['Gold', state.party.gold],
+    ].map(([k, v]) => `<div class="estat"><b>${v}</b><span>${k}</span></div>`).join('');
+  }
 }
 
 // ── master render ────────────────────────────────────────────────────────────
 function render() {
   renderHeader();
+  renderQuest();
   renderLog();
   renderSay();
   renderStarters();
