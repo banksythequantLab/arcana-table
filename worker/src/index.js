@@ -99,10 +99,17 @@ async function speak(req, env, origin) {
     headers: { 'content-type': 'application/json', authorization: `Bearer ${env.OPENAI_API_KEY}` },
     body: JSON.stringify({
       model: env.TTS_MODEL || 'gpt-4o-mini-tts',
-      voice: voice || env.TTS_VOICE || 'onyx',            // low, warm — a DM behind a screen
+      // 'fable' is the storyteller voice — warm and companionable. 'onyx' read
+      // as grim, and the old instructions were literally asking for menace.
+      voice: voice || env.TTS_VOICE || 'fable',
       input: line,
       response_format: 'mp3',
-      instructions: 'Speak as a tabletop Dungeon Master narrating to one player at the table: low and warm, unhurried, a touch of theatrical menace. Land the pauses.',
+      instructions: [
+        'You are a friendly Dungeon Master running a game for one friend at your kitchen table.',
+        'Warm, welcoming and a little playful. You are on their side and you want them to have a good time.',
+        'Conversational pace, natural pauses, genuine delight when something goes well and real sympathy when it does not.',
+        'Not a movie-trailer voice. Not grim, not booming, not sinister. Just a person who is pleased you came to play.',
+      ].join(' '),
     }),
   });
 

@@ -7,7 +7,7 @@ import * as A from './actions.js';
 import { onChange } from './actions.js';
 import { agentState, pendingApprovals, settleApproval } from './tools.js';
 import { chat, sendToDM, openScene } from './dm.js';
-import { voice, startListening, stopListening, toggleHandsFree, shutUp, unlockAudio } from './voice.js';
+import { voice, startListening, stopListening, toggleHandsFree, setHandsFree, shutUp, unlockAudio } from './voice.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -30,14 +30,28 @@ const STARTERS = [
 function bindIntro() {
   const intro = $('#intro');
   if (!intro) return;
-  $('#intro-go').onclick = async () => {
-    voice.muted = $('#intro-mute').checked;
-    // This click is the browser's required gesture — spend it on the DM's voice.
-    if (!voice.muted) await unlockAudio();
+
+  // No speech recognition (Firefox, Safari) — do not offer what we cannot do.
+  if (!voice.supported) {
+    $('#intro-voice').hidden = true;
+    $('#intro-type').textContent = 'Light the torches →';
+    $('#intro-type').classList.remove('ghost');
+    $('#intro-voice-note').textContent =
+      'This browser has no speech recognition, so you will type your turns. The DM still speaks aloud.';
+  }
+
+  // Both buttons spend the same click: it is the gesture browsers require
+  // before audio will play AND before the mic can be requested.
+  const enter = async (handsFree) => {
+    voice.muted = false;                 // the DM always talks; the mute button is right there
+    await unlockAudio();
     intro.hidden = true;
+    if (handsFree) setHandsFree(true, speakTurn);
     render();
-    openScene();                       // now its first line will actually be heard
+    openScene();                         // now its first line will actually be heard
   };
+  $('#intro-voice').onclick = () => enter(true);
+  $('#intro-type').onclick  = () => enter(false);
 }
 
 function renderStarters() {
@@ -170,6 +184,39 @@ function renderSay() {
   const mute = $('#mute-btn');
   mute.textContent = voice.muted ? '🔇' : voice.speaking ? '🗣️' : '🔊';
   mute.classList.toggle('off', voice.muted);
+  renderVoiceState();
+}
+
+// One always-visible line answering "what is it doing?" — the thing playtesters
+// could not work out from a small mic button changing colour.
+function renderVoiceState() {
+  const el = $('#voice-state');
+  if (!el) return;
+  let cls = '', icon = '⌨', text = 'Type your turn, or tap 🎤 to speak it.';
+
+  if (voice.error) {
+    cls = 'problem'; icon = '⚠';
+    text = voice.error + ' Typing still works.';
+  } else if (chat.busy) {
+    cls = 'thinking'; icon = '💭'; text = 'The Dungeon Master is thinking…';
+  } else if (voice.speaking) {
+    cls = 'speaking'; icon = '🗣'; text = voice.handsFree
+      ? 'The DM is speaking — it will listen again the moment it stops.'
+      : 'The DM is speaking.';
+  } else if (voice.listening) {
+    cls = 'listening'; icon = '🎙';
+    text = voice.partial ? '' : (state.challenge?.status === 'active'
+      ? 'Listening — count your reps out loud, or say "done".'
+      : 'Listening — just say what you do.');
+  } else if (voice.handsFree) {
+    cls = 'listening'; icon = '🎙'; text = 'Hands-free is on — opening the mic…';
+  } else if (!voice.supported) {
+    text = 'This browser has no speech recognition — type your turn.';
+  }
+
+  el.className = 'voice-state ' + cls;
+  el.innerHTML = `<span class="dot"></span><span>${icon}</span>` +
+    (voice.partial ? `<span class="heard">“${esc(voice.partial)}”</span>` : `<span>${esc(text)}</span>`);
 }
 
 // ── party panel ──────────────────────────────────────────────────────────────

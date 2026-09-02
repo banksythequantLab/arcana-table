@@ -88,7 +88,7 @@ export function startListening(cb) {
 
 export function stopListening() {
   clearTimeout(restartTimer);
-  voice.handsFree = false;
+  voice.handsFree = false;      // stopping by hand always ends hands-free
   voice.partial = '';
   if (recog && voice.listening) { try { recog.abort(); } catch { /* fine */ } }
   voice.listening = false;
@@ -96,7 +96,12 @@ export function stopListening() {
 }
 
 export function toggleHandsFree(cb) {
-  voice.handsFree = !voice.handsFree;
+  setHandsFree(!voice.handsFree, cb);
+}
+
+/** Deterministic, so the intro can switch it ON without knowing the old state. */
+export function setHandsFree(on, cb) {
+  voice.handsFree = !!on && voice.supported;
   if (voice.handsFree) startListening(cb); else stopListening();
   emit('voice');
 }

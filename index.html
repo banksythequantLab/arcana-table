@@ -26,6 +26,7 @@
      gesture that unlocks the voice, and the copy earns the click. -->
 <div id="intro" class="intro-backdrop">
   <div class="intro-card">
+   <div class="intro-scroll">
     <div class="intro-eyebrow">🎲 The WebMCP Challenge</div>
     <h1 class="intro-title">Arcana Table</h1>
     <p class="intro-lede">An AI Dungeon Master is already sitting at this table.
@@ -36,11 +37,18 @@
       <li><b>🤸 Warm up first, if you like.</b> Twenty standing stretches with cues and a timer that runs itself — ninety seconds, or up to ten minutes.</li>
       <li><b>🤖 Watch the Agent Log.</b> The DM has no back door: every move is a WebMCP tool call on <code>document.modelContext</code>, the same surface your own agent would use.</li>
     </ul>
-    <p class="intro-credit">The Dungeon Master thinks and speaks with <b>OpenAI</b> —
-      GPT with function calling over the live WebMCP tools, and OpenAI TTS for its voice.
-      Its hands are <b>WebMCP</b>. The key lives in a Cloudflare Worker, never in your browser.</p>
-    <button id="intro-go" class="btn big">Light the torches →</button>
-    <label class="intro-quiet"><input type="checkbox" id="intro-mute"> Start muted</label>
+   </div>
+    <!-- Pinned outside the scroller: who the DM actually is stays on screen at
+         every window height, rather than falling below the fold on a laptop. -->
+    <p class="intro-credit">🧠 The Dungeon Master thinks and speaks with <b>OpenAI</b> —
+      GPT with function calling, and OpenAI TTS for its voice. Its hands are
+      <b>WebMCP</b>. The key lives in a Cloudflare Worker, never in your browser.</p>
+    <div class="intro-go-row">
+      <button id="intro-voice" class="btn big">🎙 Play hands-free →</button>
+      <button id="intro-type" class="btn ghost big">⌨ I'll type instead</button>
+    </div>
+    <p id="intro-voice-note" class="intro-quiet">The DM speaks, and listens back —
+      your browser will ask for the microphone. You can switch either off any time.</p>
   </div>
 </div>
 
@@ -186,6 +194,7 @@
       <input id="say" placeholder="What do you do?" aria-label="Tell the Dungeon Master what you do" maxlength="400">
       <button id="say-btn" class="btn" type="submit" aria-label="Send">▶</button>
     </form>
+    <div id="voice-state" class="voice-state" role="status" aria-live="polite"></div>
     <div id="starters" aria-label="Suggested opening moves"></div>
     <div id="voice-row">
       <label class="vtoggle"><input type="checkbox" id="hands-free"> 🙌 Hands-free <span class="vhint">(play mid-push-up)</span></label>

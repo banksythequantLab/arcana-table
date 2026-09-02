@@ -522,8 +522,42 @@ export function startWarmup({ plan = '90s' } = {}) {
   logStory('challenge', 'DM', `🤸 Warm-up — ${p.label}, ${p.count} stretches. Stand up.`);
   clearInterval(warmTimer);
   warmTimer = setInterval(tickWarmup, 1000);
+  prologueBeat(0);                       // give the board something to do at once
   emit('warmup');
   return { ok: true, plan, stretches: p.count, holdSeconds: p.hold, totalSeconds: p.count * p.hold, first: STRETCHES[0].name };
+}
+
+// While you stretch, the game should not sit frozen. Each stretch advances a
+// silent prologue on the board behind the card: the torches find another
+// stretch of wall, the party walks in, the keep wakes up around you.
+const PROLOGUE = [
+  'Torchlight finds the first of the flooded steps.',
+  'Brannok shoulders the door and it gives, grinding on wet stone.',
+  'Wren lights a second torch from the first. The hall opens ahead.',
+  'Black water laps at your boots. Something has been through here.',
+  'A dropped shield, rusted through. Older than this week.',
+  'The passage bends. Further in, the water is still moving.',
+  'Wren checks her pack without being asked. She has done this before.',
+  'Somewhere below, stone shifts against stone.',
+  'The far arch resolves out of the dark.',
+  'Brannok rolls his shoulder, testing it, and nods.',
+];
+
+function prologueBeat(i) {
+  if (state.quest.status !== 'active' || state.combat.active) return;
+  const pc = state.tokens.find(t => t.kind === 'pc');
+  if (!pc) return;
+  // Widen the torchlight a step at a time, and walk the party a cell in.
+  revealAround(pc.x, pc.y, 3 + (i % 4));
+  if (i % 2 === 1) {
+    const step = [[1, 0], [0, 1], [1, 1], [0, -1]][(i >> 1) % 4];
+    const nx = pc.x + step[0], ny = pc.y + step[1];
+    if (isWalkable(nx, ny) && !state.tokens.some(t => t.x === nx && t.y === ny)) {
+      pc.x = nx; pc.y = ny; revealAround(nx, ny, 3);
+    }
+  }
+  logStory('scene', 'DM', PROLOGUE[i % PROLOGUE.length]);
+  emit('prologue');
 }
 
 function tickWarmup() {
@@ -535,6 +569,7 @@ function tickWarmup() {
     w.index++;
     if (w.index >= w.count) return void finishWarmup();
     w.remaining = w.hold;
+    prologueBeat(w.index);
   }
   emit('warmup');
 }

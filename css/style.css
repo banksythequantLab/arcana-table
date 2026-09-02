@@ -305,25 +305,37 @@ input[type=checkbox]{flex:0 0 auto;width:18px;height:18px;padding:0;accent-color
   background:radial-gradient(circle at 50% 40%, rgba(60,40,80,.55), rgba(12,8,18,.95) 70%);
   padding:20px;overflow-y:auto;
 }
+/* The card is taller than a 720p laptop. Scroll the copy INSIDE it and pin the
+   two buttons as a footer, so the call to action is on screen at every height —
+   a judge on a small laptop was landing on a card with its title cut off. */
 .intro-card{
   background:var(--paper);color:var(--ink);border:4px solid var(--ink);border-radius:20px;
-  box-shadow:0 12px 0 rgba(0,0,0,.5);padding:30px 34px;max-width:620px;width:100%;
+  box-shadow:0 12px 0 rgba(0,0,0,.5);padding:24px 30px 20px;max-width:620px;width:100%;
   animation:pop .22s ease-out;
+  display:flex;flex-direction:column;max-height:calc(100vh - 40px);
 }
+/* The soft bottom edge is the "there is more here" cue — a hard clip mid-word
+   reads as a rendering bug rather than as a scroller. */
+.intro-scroll{
+  overflow-y:auto;min-height:0;margin:-4px -8px 0;padding:4px 8px 0;
+  -webkit-mask-image:linear-gradient(#000 calc(100% - 26px), transparent);
+  mask-image:linear-gradient(#000 calc(100% - 26px), transparent);
+}
+/* Credit + buttons live outside the scroller, so both are always on screen. */
+.intro-credit{flex:0 0 auto;border-top:2px dashed #C9B98E;margin:12px 0 0;padding-top:12px}
 .intro-eyebrow{font:800 12.5px "Baloo 2",cursive;letter-spacing:.16em;text-transform:uppercase;color:#8A3A12}
 .intro-title{font:800 46px/1.05 "Baloo 2",cursive;margin:6px 0 10px;text-shadow:3px 3px 0 rgba(46,34,51,.18)}
 .intro-lede{font-size:17px;line-height:1.5;color:#4A4050;margin:0 0 16px}
-.intro-points{list-style:none;padding:0;margin:0 0 22px;display:flex;flex-direction:column;gap:11px}
+.intro-points{list-style:none;padding:0;margin:0 0 18px;display:flex;flex-direction:column;gap:11px}
 .intro-points li{font-size:14.5px;line-height:1.45;color:#4A4050;border-left:4px solid var(--gold);padding-left:11px}
 .intro-points b{color:var(--ink)}
 .intro-points code{background:#E7DCC4;border-radius:5px;padding:1px 5px;font:600 12.5px ui-monospace,monospace}
-.intro-card .btn.big{width:100%;font-size:19px;padding:14px}
-.intro-credit{
-  font-size:12.5px;line-height:1.5;color:#6B5E76;margin:0 0 20px;
-  border-top:2px dashed #C9B98E;padding-top:14px
-}
+.intro-card .btn.big{flex:1 1 240px;font-size:18px;padding:13px 10px}
+.intro-credit{font-size:12.5px;line-height:1.5;color:#6B5E76;text-align:center}
 .intro-credit b{color:#8A3A12}
-.intro-quiet{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:12px;font-size:13px;color:#6B5E76;cursor:pointer}
+.intro-go-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;flex:0 0 auto;margin-top:12px}
+.intro-go-row .btn.ghost{color:var(--ink);border-color:var(--ink)}
+.intro-quiet{margin:10px 0 0;font-size:12.5px;line-height:1.5;color:#6B5E76;text-align:center}
 .intro-quiet input{width:16px;height:16px;flex:0 0 auto;margin:0;accent-color:var(--gold)}
 
 /* starter prompts — a judge should never face a blank box */
@@ -461,15 +473,17 @@ input[type=checkbox]{flex:0 0 auto;width:18px;height:18px;padding:0;accent-color
    Ten minutes of standing still needs something moving on screen the whole
    time: the ring drains, the cue changes, the breath pacer cycles under it. */
 /* Covers the board, NOT the side panel: you must still be able to tell the DM
-   to stop while you are standing there stretching. */
+   to stop while you are standing there stretching. Kept deliberately sheer —
+   the prologue is playing out on the map behind this, and you should see it. */
 .warm-backdrop{
   position:fixed;inset:0 340px 0 0;z-index:78;display:flex;align-items:center;justify-content:center;
-  background:radial-gradient(circle at 50% 40%, rgba(40,80,70,.45), rgba(8,10,14,.94) 72%);
+  background:radial-gradient(circle at 50% 40%, rgba(28,20,38,.32), rgba(10,7,16,.62) 78%);
   padding:20px;overflow-y:auto
 }
 .warm-card{
   background:var(--paper);color:var(--ink);border:4px solid var(--ink);border-radius:20px;
-  box-shadow:0 14px 0 rgba(0,0,0,.45);max-width:560px;width:100%;padding:24px 28px 22px;text-align:center
+  box-shadow:0 14px 0 rgba(0,0,0,.55);max-width:480px;width:100%;padding:20px 24px 18px;
+  text-align:center;backdrop-filter:blur(2px)
 }
 .warm-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
 .warm-eyebrow{font:800 12.5px "Baloo 2",cursive;letter-spacing:.18em;color:#2F6B57}
@@ -519,3 +533,24 @@ input[type=checkbox]{flex:0 0 auto;width:18px;height:18px;padding:0;accent-color
   .oath-label{font-size:26px}
   .oath-clock{font-size:46px}
 }
+
+
+/* ── what is the table doing right now ────────────────────────────────────
+   The single biggest confusion in playtesting was not knowing whether it was
+   listening, thinking or talking. One line, always present, always current. */
+.voice-state{
+  display:flex;align-items:center;gap:8px;margin:0 10px 8px;padding:7px 11px;
+  border:2px solid var(--ink);border-radius:10px;background:var(--panel-2);
+  font-size:12.5px;font-weight:800;color:var(--muted);min-height:34px
+}
+.voice-state .dot{width:9px;height:9px;border-radius:50%;background:#6B5E76;flex:0 0 auto}
+.voice-state.listening{background:#3A2030;color:#FFD9D6;border-color:var(--red)}
+.voice-state.listening .dot{background:var(--red);animation:listen 1.2s ease-in-out infinite}
+.voice-state.speaking{background:#26364A;color:#CFE6FF;border-color:var(--blue)}
+.voice-state.speaking .dot{background:#8BC4FF}
+.voice-state.thinking{background:#332746;color:#DCCFF0}
+.voice-state.thinking .dot{background:var(--purple);animation:listen 1.2s ease-in-out infinite}
+.voice-state.problem{background:#3A2020;color:#FFCFCB;border-color:var(--red)}
+.voice-state .heard{font-weight:600;font-style:italic;opacity:.85;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@keyframes listen{50%{transform:scale(1.7);opacity:.55}}
