@@ -58,6 +58,32 @@ const walked = await page.evaluate(async () => {
 });
 ck('walking the plan never repeats a stretch', new Set(walked).size === walked.length, walked.join(' · '));
 
+console.log('— a hold is a hold, not a rep exercise —');
+// mode "hold" used to be validated against the REPS list, so every plank and
+// wall sit the DM offered came back "Unknown exercise" and the mechanic the
+// intro card advertises never once worked.
+for (const hold of ['plank', 'wall sit', 'squat hold']) {
+  const r = await page.evaluate(async h => {
+    const A = await import('/js/actions.js');
+    const out = A.proposeChallenge({ mode: 'hold', exercise: h, seconds: 30, reward: 'bonus+2', reason: 'test' });
+    const st = window.__st.challenge ? { ...window.__st.challenge } : null;
+    A.declineChallenge();
+    return { st, err: out?.error };
+  }, hold);
+  ck(`"${hold}" can actually be offered`, !!r.st && !r.err, r.err || `${r.st?.seconds}s ${r.st?.exercise}`);
+}
+const crossed = await page.evaluate(async () => {
+  const A = await import('/js/actions.js');
+  const bad = A.proposeChallenge({ mode: 'hold', exercise: 'push-ups', seconds: 30, reward: 'bonus+2' });
+  A.declineChallenge?.();
+  return bad?.error;
+});
+ck('a rep exercise passed as a hold is refused clearly', /not a hold/.test(crossed || ''), crossed);
+const log = await page.evaluate(async () => (await import('/js/actions.js')).getFitnessLog());
+ck('the DM is given both lists', Array.isArray(log.availableHolds) && log.availableHolds.length > 0,
+   `holds: ${log.availableHolds?.join(', ')}`);
+ck('the two lists do not overlap', !log.availableHolds.some(h => log.availableExercises.includes(h)));
+
 console.log('— the party actually moves —');
 const before = await page.evaluate(async () => (await window.arcana.call('get_board_state')).tokens
   .filter(t => t.kind === 'pc').map(t => `${t.name}@${t.x},${t.y}`));

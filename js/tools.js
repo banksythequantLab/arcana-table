@@ -201,10 +201,12 @@ export const BASE_TOOLS = [
   },
   {
     name: 'propose_challenge',
-    description: 'HEROIC EFFORT — stake a real exercise against the dice. Offer this before a roll that matters: the player does the reps, the reward auto-applies to their next d20. Always optional; scale to the stakes (boss fight → 10 push-ups for nat20; minor check → a few jumping jacks for +2). ALWAYS check get_fitness_log first and offer ONLY an exercise from its availableExercises list — that is the set this player can actually do. The call resolves when the player finishes or declines (or returns "pending" if they take longer than 90s — check back with get_fitness_log).',
+    description: 'HEROIC EFFORT — stake a real exercise against the dice. Offer this before a roll that matters: the player does the reps, the reward auto-applies to their next d20. Always optional; scale to the stakes (boss fight → 10 push-ups for nat20; minor check → a few jumping jacks for +2). ALWAYS check get_fitness_log first: offer ONLY from its availableExercises list for mode "reps", and ONLY from its availableHolds list for mode "hold" — those are the sets this player can actually do, and the two lists are not interchangeable. The call resolves when the player finishes or declines (or returns "pending" if they take longer than 90s — check back with get_fitness_log).',
     inputSchema: obj({
       mode: { type: 'string', enum: ['reps', 'hold'], description: 'reps = counted repetitions (default) · hold = a timed hold, e.g. a plank or a stretch' },
-      exercise: { type: 'string', enum: A.EXERCISES, description: 'Which exercise' },
+      // One enum for both modes; the handler checks the name against the list
+      // for the mode actually chosen and says so plainly if they are crossed.
+      exercise: { type: 'string', enum: [...A.EXERCISES, ...A.HOLDS], description: 'A rep exercise for mode "reps", or a hold for mode "hold"' },
       reps: num('Repetition count for mode "reps" (1-100). Keep it achievable: 5-25 for most people.'),
       seconds: num('Hold length in seconds for mode "hold" (5-300). 20-45s is a real hold for most people.'),
       reward: { type: 'string', enum: Object.keys(A.REWARDS), description: 'bonus+2 · bonus+5 · advantage · set10 (next d20 is a 10) · nat20 (next d20 is a natural 20)' },

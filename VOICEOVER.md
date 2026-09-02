@@ -10,7 +10,7 @@ Two voices, deliberately:
   on our own GPU stack (FreeClone + VoxCPM2 on Johnson, `POST /api/clone` with
   `derek-voice.wav` as the reference). Regenerate with `D:\arcana-vo\gen.py` /
   `gen2.py` / `gen3.py`. No other person's voice appears in the video.
-- **THE DM** — OpenAI TTS (`gpt-4o-mini-tts`, voice *onyx*), heard diegetically,
+- **THE DM** — OpenAI TTS (`gpt-4o-mini-tts`, voice *fable*), heard diegetically,
   coming out of the running product. Never re-recorded; it is captured live.
 
 Silence appears only under the title cards. Everything else is narrated.

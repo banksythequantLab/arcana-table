@@ -31,9 +31,25 @@ export const REWARDS = {
 // you cannot physically do is not a challenge, it is a wall.
 export const EXERCISES = ['push-ups', 'crunches', 'jumping jacks', 'squats', 'sit-ups', 'lunges', 'high knees', 'mountain climbers', 'burpees'];
 
+// Holds are a different list, and keeping them out of EXERCISES is what broke
+// them: mode "hold" was validated against the REPS list, so every plank and wall
+// sit the DM offered came back "Unknown exercise" — a headline mechanic, and the
+// one the intro card advertises, failing every time it was reached for.
+export const HOLDS = ['plank', 'side plank', 'high plank', 'wall sit', 'squat hold', 'dead hang', 'hollow hold', 'glute bridge'];
+
 export function allowedExercises() {
   const pool = state.settings.exercisePool;
   return Array.isArray(pool) && pool.length ? pool.filter(e => EXERCISES.includes(e)) : EXERCISES;
+}
+
+export function allowedHolds() {
+  const pool = state.settings.holdPool;
+  return Array.isArray(pool) && pool.length ? pool.filter(e => HOLDS.includes(e)) : HOLDS;
+}
+
+/** What this player may be asked for in a given mode. */
+export function allowedFor(mode) {
+  return mode === 'hold' ? allowedHolds() : allowedExercises();
 }
 
 // ── dice ─────────────────────────────────────────────────────────────────────
@@ -453,8 +469,14 @@ export function proposeChallenge({ exercise, reps, reward, reason = '', mode = '
   if (state.oath) return { error: 'The player is away keeping an Oath. Wait for them.' };
   mode = mode === 'hold' ? 'hold' : 'reps';
   exercise = String(exercise || '').toLowerCase();
-  const allowed = allowedExercises();
-  if (!EXERCISES.includes(exercise)) return { error: `Unknown exercise "${exercise}". Choose: ${allowed.join(', ')}.` };
+  // Validate against the list for THIS mode — a plank is not a rep exercise and
+  // push-ups are not a hold, and checking one against the other rejects both.
+  const known = mode === 'hold' ? HOLDS : EXERCISES;
+  const allowed = allowedFor(mode);
+  if (!known.includes(exercise)) {
+    return { error: `"${exercise}" is not a ${mode === 'hold' ? 'hold' : 'rep exercise'}. ` +
+                    `For mode "${mode}" choose: ${allowed.join(', ')}.` };
+  }
   if (!allowed.includes(exercise)) {
     return { error: `This player has not enabled "${exercise}". Offer one of: ${allowed.join(', ')}.` };
   }
@@ -885,12 +907,13 @@ export function getFitnessLog() {
     warmup: state.warmup ? currentStretch() : null,
     unspentBoosts: { ...state.boosts },
     availableExercises: allowedExercises(),
+    availableHolds: allowedHolds(),
     oathKinds: OATH_KINDS,
     coachNote: [
       'Three ways to stake effort, and they are equals — never treat the Oath as the lesser option.',
       'reps: countable, tapped or counted out loud. hold: a timed hold, the ring counts itself down.',
       'oath: something real in the room the app cannot see. It locks the table for the minutes agreed.',
-      'Offer ONLY exercises listed in availableExercises — the player chose them.',
+      'Offer ONLY from availableExercises for mode "reps", and ONLY from availableHolds for mode "hold" — the player chose them.',
       'Vary muscle groups; scale down if they are slowing. Everything here is always optional.',
     ].join(' '),
   };

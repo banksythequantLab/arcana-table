@@ -195,9 +195,11 @@ check('loot awarded', (await call('award_loot', { items: ['Dragonfang Dagger'], 
 
 // ── timed holds ──────────────────────────────────────────────────────────────
 console.log('— a timed hold —');
-const holdP = call('propose_challenge', { mode: 'hold', exercise: 'squats', seconds: 5, reward: 'bonus+2', reason: 'Sink into it while the door groans.' });
+// 'squat hold' is a HOLD; 'squats' is a rep exercise. The two lists are
+// separate now, and passing one for the other is refused on purpose.
+const holdP = call('propose_challenge', { mode: 'hold', exercise: 'squat hold', seconds: 5, reward: 'bonus+2', reason: 'Sink into it while the door groans.' });
 await page.waitForSelector('#challenge-modal:not([hidden])', { timeout: 5000 });
-check('a hold shows seconds, not reps', /5S SQUATS/i.test(await page.innerText('#chal-title')), await page.innerText('#chal-title'));
+check('a hold shows seconds, not reps', /5S SQUAT HOLD/i.test(await page.innerText('#chal-title')), await page.innerText('#chal-title'));
 await page.click('#chal-accept');
 check('a hold counts itself down — tapping does nothing', await (async () => {
   const before = await page.evaluate(() => window.__st?.challenge?.progress ?? 0);

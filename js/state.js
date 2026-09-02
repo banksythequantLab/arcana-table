@@ -214,7 +214,9 @@ function freshState() {
     downed: null,                 // {tokenId, saves, fails} — the board is frozen while this is set
     warmup: null,                 // {planId, index, seq, hold, count, remaining, paused}
     oath: null,                   // {label, kind, minutes, endsAt, reward} — the table waits
-    settings: { autoApprove: false, exercisePool: ['push-ups', 'crunches', 'jumping jacks', 'squats'] },
+    settings: { autoApprove: false,
+                exercisePool: ['push-ups', 'crunches', 'jumping jacks', 'squats'],
+                holdPool: ['plank', 'wall sit', 'squat hold', 'glute bridge'] },
   };
 }
 

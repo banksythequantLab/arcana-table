@@ -67,10 +67,14 @@ const turns = () => page.evaluate(async () =>
 await page.click('#intro-voice');                 // hands-free, the path that broke
 // The opening line is spoken immediately, so the mic is legitimately shut for a
 // moment; what matters is that hands-free is on and the ear opens once it can.
-await page.waitForFunction(async () =>
-  (await import('/js/voice.js')).voice.listening, null, { timeout: 6000 }).catch(() => {});
+// Assert the wait itself: re-reading afterwards races the next spoken line,
+// which legitimately shuts the mic again.
+const opened = await page.waitForFunction(async () =>
+  (await import('/js/voice.js')).voice.listening, null, { timeout: 8000 })
+  .then(() => true).catch(() => false);
 const v0 = await V();
-ck('hands-free turns on and opens the mic once the DM stops', v0.handsFree && v0.listening, JSON.stringify(v0));
+ck('hands-free turns on and opens the mic once the DM stops', v0.handsFree && opened,
+   `opened=${opened} ${JSON.stringify(v0)}`);
 
 console.log('— the DM speaking shuts the ear —');
 const speak = page.evaluate(async () =>

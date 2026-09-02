@@ -98,7 +98,9 @@ await arcana.call('roll_dice', { formula: 'd20', reason: 'Attack the dragon' })
 | `narrate` | DM voice into the story log | |
 | `set_scene` | Swap between 3 battle maps, set title/mood | resets fog |
 | `reveal_area` | Clear fog of war | |
-| `move_token` | Animated movement, wall-aware | PCs reveal fog as they move |
+| `move_token` | Animated movement, wall-aware | PCs light the whole path they walk |
+| `move_party` | Move the whole party in one call; companions take cells beside the leader | wall-aware · nobody stacks · lifts fog for everyone |
+| `attack` | One attack resolved end to end: to-hit, damage, fog lifted on the target | **reach enforced** — a melee swing out of range is refused, with the cell to move to |
 | `add_token` | Spawn monsters/NPCs/objects | 8 art options |
 | `remove_token` | Take a token off the board | ⚠ removing a PC waits for player approval |
 | `start_combat` / `end_combat` | Initiative on/off | **dynamically registers/unregisters** the combat tools |
@@ -123,10 +125,10 @@ Design choices worth noting:
   `registerTool(def, { signal })` — and unregistered by `controller.abort()`,
   which is how the WebMCP spec removes tools and fires `toolchange` so agents
   refresh. The test suite asserts this against the live registry: `getTools()`
-  returns 18, then 21 once combat starts, then 18 again when it ends — and 22
-  the moment a hero drops, because `death_save` exists only while someone is
+  returns 20, then 23 once combat starts, then 20 again when it ends — and 24
+  when a hero drops mid-fight, because `death_save` exists only while someone is
   bleeding out.
-- **Human-in-the-loop by construction.** Destructive calls (`remove_token`,
+- **Human-in-the-loop by construction.** Destructive calls (`remove_token` on a PC,
   PC damage via `update_hp`) suspend inside `execute()` until the player clicks
   ✓ Allow / ✗ Deny on the board. Denials return structured guidance, not errors.
 - **Public dice.** Rolls animate on-screen for both players; earned boosts are
@@ -159,16 +161,16 @@ wall. Default pool: push-ups, crunches, jumping jacks, squats.
 
 ## The built-in DM
 
-`js/dm.js` is a ~180-line agent loop, and it is deliberately unprivileged:
+`js/dm.js` is a ~190-line agent loop, and it is deliberately unprivileged:
 
 1. `getTools()` on the live registry → translated into OpenAI function specs.
 2. Conversation + tools → `worker/` (a ~200-line Cloudflare Worker) → **OpenAI**
    (`gpt-5.6-luna`, Chat Completions with function calling). The Worker holds the
    API key so no key ever reaches a browser; it is origin-locked, size-capped,
    and rate-limited to 40 requests/min per IP. The DM's spoken voice is OpenAI
-   TTS (`gpt-4o-mini-tts`, *onyx*) through the same Worker.
+   TTS (`gpt-4o-mini-tts`, *fable*) through the same Worker.
 3. Tool calls come back → executed via `executeTool()` → results fed back →
-   loop, up to 6 hops, then the DM speaks.
+   loop, up to seven passes, then the DM speaks.
 
 The DM is prompted to never narrate a roll it didn't actually make, to offer
 Heroic Effort only when a roll matters, to read `get_fitness_log` so it varies
@@ -218,8 +220,8 @@ cd test && npm install && node smoke.mjs
 93 assertions, Playwright + Chromium. Drives the full tool surface **through the
 real `document.modelContext`** — enumerating tools with `getTools()`, invoking
 them with `executeTool()`, asserting `readOnlyHint` on the read tools, and
-proving the dynamic toolsets register and unregister (16 → 19 → 16, and 20 while
-a hero is down) — plus the approval Allow *and* Deny paths, a complete
+proving the dynamic toolsets register and unregister (20 → 23 → 20, and 24 while
+a hero is down mid-fight) — plus the approval Allow *and* Deny paths, a complete
 push-ups-to-natural-20 loop, all three effort modes (reps, a self-counting hold,
 and an Oath that locks the board until its clock runs out), the guided warm-up,
 a five-beat run walked to victory, and the frozen board that only effort or a
