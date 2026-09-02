@@ -16,7 +16,7 @@ its tools are real; the built-in DM is the proof.
 
 And when a roll really matters, the agent can invoke **Heroic Effort**: it stakes
 a real exercise against the dice. Ten jumping jacks for +2. Fifteen squats for
-advantage. Five burpees and your next d20 is a **natural 20**. The agent brings
+advantage. Ten push-ups and your next d20 is a **natural 20**. The agent brings
 the dungeon; you bring the muscle.
 
 Built for [The WebMCP Challenge](https://webmcp.devpost.com/) (Devpost, 2026).
@@ -46,7 +46,7 @@ await arcana.call('get_board_state')
 await arcana.call('narrate', { text: 'A cold wind snuffs your torch…' })
 await arcana.call('add_token', { name: 'Snaggle', kind: 'monster', art: 'goblin', x: 11, y: 6, hp: 7 })
 await arcana.call('start_combat')
-await arcana.call('propose_challenge', { exercise: 'burpees', reps: 5, reward: 'nat20', reason: 'The dragon rears back!' })
+await arcana.call('propose_challenge', { exercise: 'push-ups', reps: 10, reward: 'nat20', reason: 'The dragon rears back!' })
 await arcana.call('roll_dice', { formula: 'd20', reason: 'Attack the dragon' })
 ```
 
@@ -96,12 +96,16 @@ Design choices worth noting:
 |---|---|
 | ~10 jumping jacks | `bonus+2` next roll |
 | ~15 squats | `advantage` |
-| ~10 push-ups | `set10` — next d20 lands on 10 |
-| ~20 push-ups or 5 burpees | `nat20` — the bard will sing of this |
+| ~15 crunches | `set10` — next d20 lands on 10 |
+| ~10 push-ups | `nat20` — the bard will sing of this |
 
-Reps are counted by tap/spacebar (honor system, works everywhere). Challenges
-are always optional, and the agent is instructed via tool descriptions to scale
-stakes to the fiction and read `get_fitness_log` to vary muscle groups.
+Reps are counted by tap, spacebar, or **out loud** — hands-free mode listens for
+your count or a plain "done", because you cannot press a key mid-push-up.
+
+Challenges are always optional, and the DM must call `get_fitness_log` and offer
+**only** from `availableExercises` — the pool the player chose in settings.
+Bodies differ; a challenge you physically cannot do is not a challenge, it is a
+wall. Default pool: push-ups, crunches, jumping jacks, squats.
 
 ## The built-in DM
 
@@ -135,11 +139,11 @@ npx serve .        # or: python3 -m http.server 8080
 cd test && npm install && node smoke.mjs
 ```
 
-38 assertions, Playwright + Chromium. Drives the full tool surface **through the
+44 assertions, Playwright + Chromium. Drives the full tool surface **through the
 real `document.modelContext`** — enumerating tools with `getTools()`, invoking
 them with `executeTool()`, asserting `readOnlyHint` on the read tools, and
 proving the combat toolset registers and unregisters (14 → 17 → 14) — plus the
-approval Allow *and* Deny paths and a complete burpees-to-natural-20 loop.
+approval Allow *and* Deny paths and a complete push-ups-to-natural-20 loop.
 
 ## Art pipeline
 

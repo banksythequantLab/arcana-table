@@ -149,7 +149,7 @@ export const BASE_TOOLS = [
   },
   {
     name: 'propose_challenge',
-    description: 'HEROIC EFFORT — stake a real exercise against the dice. Offer this before a roll that matters: the player does the reps, the reward auto-applies to their next d20. Always optional; scale to the stakes (boss fight → burpees for nat20; minor check → a few jumping jacks for +2). Check get_fitness_log to vary muscle groups and pace them. The call resolves when the player finishes or declines (or returns "pending" if they take longer than 90s — check back with get_fitness_log).',
+    description: 'HEROIC EFFORT — stake a real exercise against the dice. Offer this before a roll that matters: the player does the reps, the reward auto-applies to their next d20. Always optional; scale to the stakes (boss fight → 10 push-ups for nat20; minor check → a few jumping jacks for +2). ALWAYS check get_fitness_log first and offer ONLY an exercise from its availableExercises list — that is the set this player can actually do. The call resolves when the player finishes or declines (or returns "pending" if they take longer than 90s — check back with get_fitness_log).',
     inputSchema: obj({
       exercise: { type: 'string', enum: A.EXERCISES, description: 'Which exercise' },
       reps: num('Repetition count (1-100). Keep it achievable: 5-25 for most people.'),

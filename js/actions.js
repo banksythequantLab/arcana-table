@@ -22,7 +22,15 @@ export const REWARDS = {
   'nat20':     { label: 'NATURAL 20 — the bard will sing of this', apply: b => { b.setRoll = 20; } },
 };
 
-export const EXERCISES = ['push-ups', 'jumping jacks', 'squats', 'burpees', 'sit-ups', 'lunges', 'high knees', 'mountain climbers'];
+// Everything the game knows how to ask for. What it may actually ask THIS
+// player for is state.settings.exercisePool — bodies differ, and a challenge
+// you cannot physically do is not a challenge, it is a wall.
+export const EXERCISES = ['push-ups', 'crunches', 'jumping jacks', 'squats', 'sit-ups', 'lunges', 'high knees', 'mountain climbers', 'burpees'];
+
+export function allowedExercises() {
+  const pool = state.settings.exercisePool;
+  return Array.isArray(pool) && pool.length ? pool.filter(e => EXERCISES.includes(e)) : EXERCISES;
+}
 
 // ── dice ─────────────────────────────────────────────────────────────────────
 export function parseFormula(formula) {
@@ -241,7 +249,11 @@ const challengeWaiters = new Map();   // id → {resolve}
 export function proposeChallenge({ exercise, reps, reward, reason = '' }) {
   if (state.challenge) return { error: 'A challenge is already in progress — resolve it first.' };
   exercise = String(exercise || '').toLowerCase();
-  if (!EXERCISES.includes(exercise)) return { error: `Unknown exercise "${exercise}". Choose: ${EXERCISES.join(', ')}.` };
+  const allowed = allowedExercises();
+  if (!EXERCISES.includes(exercise)) return { error: `Unknown exercise "${exercise}". Choose: ${allowed.join(', ')}.` };
+  if (!allowed.includes(exercise)) {
+    return { error: `This player has not enabled "${exercise}". Offer one of: ${allowed.join(', ')}.` };
+  }
   reps = Math.max(1, Math.min(100, Math.round(reps || 10)));
   if (!REWARDS[reward]) return { error: `Unknown reward "${reward}". Choose: ${Object.keys(REWARDS).join(', ')}.` };
 
@@ -332,6 +344,7 @@ export function getFitnessLog() {
     ...state.fitness,
     activeChallenge: state.challenge ? { exercise: state.challenge.exercise, reps: state.challenge.reps, progress: state.challenge.progress, status: state.challenge.status } : null,
     unspentBoosts: { ...state.boosts },
-    coachNote: 'Vary muscle groups; scale reps down if the player is slowing. Challenges must always stay optional.',
+    availableExercises: allowedExercises(),
+    coachNote: 'Offer ONLY exercises listed in availableExercises — the player chose them. Vary muscle groups; scale reps down if the player is slowing. Challenges must always stay optional.',
   };
 }

@@ -3,7 +3,7 @@
 
 Video bed = title cards (rendered in the app's own style) + real gameplay
 footage. Audio = Derek's cloned voice-over. One slot is deliberately left
-empty with a placeholder card: the burpee shot only he can film.
+empty with a placeholder card: the push-up shot only he can film.
 """
 import subprocess, pathlib, json, sys
 
@@ -37,7 +37,7 @@ CUT = [
     ('shot', None,     VOS['vo03_webmcp'], 31.5),
     ('card', 'heroic', 3.0, None),
     ('shot', None,     VOS['vo04_heroic'], 46.0),
-    ('slate','burpees',10.0, None),          # ← his burpee footage drops in here
+    ('slate','burpees',10.0, None),          # ← his push-up footage drops in here
     ('shot', None,     VOS['vo04b_payoff'], 55.0),
     ('shot', None,     VOS['vo05_hood'], 8.0),
     ('card', 'close',  VOS['vo06_close'] + 1.5, None),
@@ -72,7 +72,7 @@ ORDER = [
     ('sil', 4.0), ('vo', 'vo01_problem'), ('vo', 'vo02_whatitis'),
     ('sil', 3.0), ('vo', 'vo03_webmcp'),
     ('sil', 3.0), ('vo', 'vo04_heroic'),
-    ('sil', 10.0),                                  # the burpee slot
+    ('sil', 10.0),                                  # the push-up slot
     ('vo', 'vo04b_payoff'), ('vo', 'vo05_hood'), ('vo', 'vo06_close'),
     ('sil', 1.5),
 ]

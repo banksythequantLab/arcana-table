@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Arcana Table — play D&D with your AI co-DM (and your push-ups)</title>
-<meta name="description" content="A WebMCP-powered tabletop where an AI agent co-runs the game — and real exercise earns heroic dice. Do the burpees, claim the natural 20.">
+<meta name="description" content="A WebMCP-powered tabletop where an AI agent co-runs the game — and real exercise earns heroic dice. Do the push-ups, claim the natural 20.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎲</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -96,8 +96,9 @@
         <label>💪 Heroic Effort</label>
         <div class="row">
           <select id="dm-exercise">
-            <option>push-ups</option><option>jumping jacks</option><option>squats</option><option>burpees</option>
+            <option>push-ups</option><option>crunches</option><option>jumping jacks</option><option>squats</option>
             <option>sit-ups</option><option>lunges</option><option>high knees</option><option>mountain climbers</option>
+            <option>burpees</option>
           </select>
           <input id="dm-reps" type="number" value="10" min="1" max="100">
         </div>
@@ -124,7 +125,7 @@
       <button id="say-btn" class="btn" type="submit" aria-label="Send">▶</button>
     </form>
     <div id="voice-row">
-      <label class="vtoggle"><input type="checkbox" id="hands-free"> 🙌 Hands-free <span class="vhint">(play mid-burpee)</span></label>
+      <label class="vtoggle"><input type="checkbox" id="hands-free"> 🙌 Hands-free <span class="vhint">(play mid-push-up)</span></label>
       <button id="mute-btn" class="vmute" type="button" aria-label="Mute the DM's voice">🔊</button>
     </div>
 

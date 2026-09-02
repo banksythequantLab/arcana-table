@@ -85,7 +85,7 @@ function freshState() {
     boosts: { bonus: 0, advantage: false, setRoll: null },  // earned via Heroic Effort
     challenge: null,              // active exercise challenge
     fitness: { totalReps: 0, byExercise: {}, challengesDone: 0, diceEarned: [] },
-    settings: { autoApprove: false },
+    settings: { autoApprove: false, exercisePool: ['push-ups', 'crunches', 'jumping jacks', 'squats'] },
   };
 }
 

@@ -142,7 +142,7 @@ check(`WebMCP registry shrank back to 14 via AbortSignal (got ${mcAfter.length})
 check('advance_turn really left the WebMCP registry', !mcAfter.includes('advance_turn'), mcAfter.join(','));
 
 console.log('— Heroic Effort —');
-const chalPromise = call('propose_challenge', { exercise: 'burpees', reps: 3, reward: 'nat20', reason: 'The dragon rears back!' });
+const chalPromise = call('propose_challenge', { exercise: 'push-ups', reps: 3, reward: 'nat20', reason: 'The dragon rears back!' });
 await page.waitForSelector('#challenge-modal:not([hidden])', { timeout: 5000 });
 await page.screenshot({ path: 'screens/challenge-offer.png' });
 await page.click('#chal-accept');
@@ -150,7 +150,7 @@ for (let i = 0; i < 3; i++) { await page.waitForTimeout(150); await page.click('
 const chal = await chalPromise;
 check('challenge completed → nat20 reward', chal.status === 'completed' && /natural 20/i.test(chal.rewardGranted), JSON.stringify(chal));
 const fit = await call('get_fitness_log');
-check('fitness log recorded 3 burpees', fit.byExercise?.burpees === 3 && fit.unspentBoosts.setRoll === 20, JSON.stringify(fit));
+check('fitness log recorded 3 push-ups', fit.byExercise?.['push-ups'] === 3 && fit.unspentBoosts.setRoll === 20, JSON.stringify(fit));
 const heroicRoll = await call('roll_dice', { formula: 'd20', reason: 'Strike the dragon!' });
 check('boosted d20 is a natural 20', heroicRoll.rolls[0] === 20 && heroicRoll.nat20 === true, JSON.stringify(heroicRoll));
 const fit2 = await call('get_fitness_log');

@@ -263,7 +263,8 @@ function bindDMPanel() {
   $('#dm-reveal').onclick = () => { state.tokens.filter(t => t.kind === 'pc').forEach(t => A.revealArea({ x: t.x, y: t.y, radius: 5 })); };
   $('#dm-challenge').onclick = () => {
     const ex = $('#dm-exercise').value, reps = parseInt($('#dm-reps').value, 10) || 10, reward = $('#dm-reward').value;
-    A.proposeChallenge({ exercise: ex, reps, reward, reason: 'The table demands proof of heroism!' });
+    const r = A.proposeChallenge({ exercise: ex, reps, reward, reason: 'The table demands proof of heroism!' });
+    if (r?.error) alert(r.error);
   };
   $('#dm-auto').onchange = e => { state.settings.autoApprove = e.target.checked; };
   $('#dm-reset').onclick = () => { if (confirm('Reset the whole table?')) { localStorage.clear(); location.reload(); } };

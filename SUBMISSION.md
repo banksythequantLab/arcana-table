@@ -36,7 +36,7 @@ seat to an agent and lets you watch.
 
 Its signature system is **Heroic Effort**: before a roll that matters, the
 agent can stake a real exercise against the dice. Ten jumping jacks for +2.
-Fifteen squats for advantage. Five burpees and your next d20 is a guaranteed
+Fifteen squats for advantage. Ten push-ups and your next d20 is a guaranteed
 **natural 20**. Challenges are always optional, the reps are counted on a big
 tap/spacebar ring with a timer, and the reward applies automatically to your
 next roll — publicly, in the on-screen dice tray.
@@ -82,10 +82,10 @@ next roll — publicly, in the on-screen dice tray.
 
 Vanilla JS single-page app, zero build step, zero backend — a canvas-rendered
 grid board (3 maps, fog of war, drag-and-drop tokens), state in localStorage,
-cel-shaded cartoon art. A 38-assertion Playwright suite drives the tools
+cel-shaded cartoon art. A 44-assertion Playwright suite drives the tools
 through the real `document.modelContext` — `getTools()`, `executeTool()`,
 `readOnlyHint` on reads, the registry growing and shrinking with combat, both
-approval outcomes, and a full burpees-to-natural-20 loop.
+approval outcomes, and a full push-ups-to-natural-20 loop.
 
 ## Challenges we ran into
 
@@ -97,7 +97,7 @@ screen — caught by screenshot testing.
 ## Accomplishments we're proud of
 
 A stranger with a WebMCP browser can play a real 10-minute dungeon with zero
-instructions — and the moment the agent offers burpees for a natural 20, every
+instructions — and the moment the agent offers push-ups for a natural 20, every
 playtester stood up.
 
 ## What's next
@@ -111,7 +111,7 @@ multiplayer parties, and AI-generated campaign art from our ComfyUI pipeline.
 
 **0:00–0:20 — The problem.** Face to camera: "Fifty million people want to
 play D&D. Almost none of them want to be the Dungeon Master. And nobody —
-nobody — wants to do burpees alone. Arcana Table fixes both."
+nobody — wants to do push-ups alone. Arcana Table fixes both."
 
 **0:20–0:40 — Meet the table.** Screen: the board, DM already speaking. "No
 setup, no flag — just this URL, and a Dungeon Master already running the game."
@@ -124,8 +124,8 @@ spawns a dragon, starts combat (call out: "combat tools just registered —
 they only exist during combat"). Agent tries to damage your character →
 approval toast appears → click ✓. "Every dangerous move waits for my
 permission." Then the money shot: agent calls propose_challenge — "The dragon
-rears back… five burpees, and your next strike is a natural twenty."
-**Do the burpees on camera.** Tap the ring, complete it, roll — NAT 20
+rears back… ten push-ups, and your next strike is a natural twenty."
+**Do the push-ups on camera.** Tap the ring, complete it, roll — NAT 20
 animation, sparks. React honestly.
 
 **1:50–2:20 — Under the hood.** Quick code peek: the `registerTool(def,
@@ -143,4 +143,4 @@ can't: a body. The agent brings the dungeon. You bring the muscle."
 whole self."
 
 **Recording checklist:** OBS at 1080p, mic on, browser at 100% zoom, fresh
-table state, agent prompt pre-typed, warm up before the burpees take.
+table state, agent prompt pre-typed, warm up before the push-ups take.

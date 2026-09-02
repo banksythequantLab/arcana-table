@@ -14,7 +14,7 @@ Total target: **2:45**. Devpost caps at 3:00.
 ## VO-01 · The problem — 0:00–0:18
 
 > Fifty million people play tabletop RPGs. Almost none of them want to be the
-> Dungeon Master. And nobody — nobody — wants to do burpees alone.
+> Dungeon Master. And nobody — nobody — wants to do push-ups alone.
 >
 > So I built a table where an AI runs the game… and your body rolls the dice.
 
@@ -56,17 +56,17 @@ Total target: **2:45**. Devpost caps at 3:00.
 > And when a roll really matters, the DM can stake something the dice can't give it.
 
 *Beat. Let the DM's own voice carry the offer — do not talk over it:*
-> **[DM, live audio]** *"The Sentinel braces for your charge. Ten squats will turn
+> **[DM, live audio]** *"The Sentinel braces for your charge. Ten push-ups will turn
 > your steel and resolve into a fierce edge — but you may decline and trust the dice."*
 
-> Ten squats. For a plus five.
+> Ten push-ups. For a guaranteed twenty.
 >
 > My hands are on the floor, so I'm not typing — I just count out loud, and the
 > table hears me.
 
 *On screen: YOU doing the reps on camera, counting aloud. Ring fills to the count.*
 
-> **[after the reps]** Nineteen, plus five. Twenty-four.
+> **[after the reps]** Natural twenty.
 
 *On screen: dice tray — d20 [19] +5⚡ = 24 — then the damage landing.*
 
@@ -103,7 +103,8 @@ Total target: **2:45**. Devpost caps at 3:00.
 
 - Read VO-01 slower than feels natural; it's the hook.
 - VO-04 is the one that wins the round. Don't perform the reps — actually do them,
-  and let yourself be out of breath on "nineteen, plus five." The breathlessness
-  IS the pitch.
+  and let yourself be out of breath on "natural twenty." The breathlessness IS the
+  pitch. Ten push-ups, not burpees — the demo should be something you can finish
+  cleanly on camera and still speak afterwards.
 - Leave 0.5s of clean air at the head and tail of each take; makes the mux easy.
 - Record dry and close-mic'd. FreeClone clones the timbre, not the room.

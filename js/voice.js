@@ -1,6 +1,6 @@
 // ── Arcana Table · speech ────────────────────────────────────────────────────
 // You talk, the DM talks back. This exists because of Heroic Effort: nobody
-// can type mid-burpee, so the table has to work with your hands on the floor.
+// can type mid-push-up, so the table has to work with your hands on the floor.
 //
 // Ears  : Web Speech API (SpeechRecognition) — on-device, free, no key.
 // Voice : OpenAI TTS through our Worker, with the browser's own synth as an
@@ -102,7 +102,7 @@ export function toggleHandsFree(cb) {
 }
 
 // ── counting reps out loud ──────────────────────────────────────────────────
-// Mid-burpee your hands are on the floor. Say the count, or "done".
+// Mid-push-up your hands are on the floor. Say the count, or "done".
 const NUMBER_WORDS = {
   one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
   eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16,

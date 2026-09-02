@@ -1,5 +1,5 @@
 // Records the demo screen bed: a real session against the live DM, captured to
-// video. Derek intercuts his own burpee footage over the Heroic Effort beat.
+// video. Derek intercuts his own push-up footage over the Heroic Effort beat.
 import { chromium } from 'playwright';
 import { createServer } from 'http';
 import { readFile } from 'fs/promises';
