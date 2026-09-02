@@ -61,7 +61,12 @@ roll.
 A session is not an open sandbox. **The Ember Crown** is a five-beat quest across
 the three maps, ending with the Cinder Wight. The DM is handed the current
 objective in every turn's context and told to drive toward it; each beat cleared
-pays a milestone, and clearing the fifth wins the run.
+pays a milestone, and clearing the fifth wins the run. A **five-beat rail sits
+under the header** the whole time — the beat you are on lit, the ones you cleared
+greyed, the final one in red — with the current objective spelled out beneath it,
+so "what am I doing and how far in am I?" is answerable at a glance without
+reading a word of the story log. Clearing the fifth beat shows a real ending
+screen that counts the reps you actually did.
 
 And you can go down. If a player character hits 0 HP, **time stops** — the board
 freezes and almost every tool refuses to act, the DM's included. There are
@@ -127,6 +132,33 @@ is the way out of death, which is the argument the whole project is making.
   state in localStorage, cel-shaded art, hand-drawn SVG tokens.
 - **Web Speech API** for hands-free play, because you cannot press a key
   mid-push-up.
+
+## Accessibility and reach
+
+Not decoration — a 9-assertion Playwright probe (`test/a11y.mjs`) runs these as
+checks, so they cannot quietly rot:
+
+- **Playable by keyboard alone.** The intro gate takes focus and dismisses on
+  Enter; every visible control has an accessible name; Tab reaches the "what do
+  you do" input; `:focus-visible` draws a gold ring that is never suppressed.
+- **The board is never the only channel.** The canvas carries a text
+  alternative, and the story log is an `aria-live="polite"` region, so every
+  scene change, roll and blow is announced. A screen-reader player follows the
+  game through the log the same way a sighted player follows the map.
+- **`prefers-reduced-motion` is honoured for real.** Torch flicker, token bob,
+  screen shake, turn pulse and the entire dice tumble collapse to nothing — the
+  d20 skips straight to its result rather than spinning. Verified by driving the
+  suite in a reduced-motion browser context, not by declaring a media query.
+- **Bodies differ, and the table adapts.** `state.settings.exercisePool` is the
+  set of exercises this player has enabled, and the DM is forbidden from asking
+  for anything outside it. Someone who cannot do push-ups today gets crunches,
+  or a timed hold, or an **Oath** — which needs no physical capability at all
+  and pays exactly the same. This is the accessibility argument the whole
+  Heroic Effort design is built around.
+- **Mobile.** Two breakpoints (860px and 560px). At phone width the quest rail
+  collapses to numbered beats, the panel fills the screen instead of leaving
+  dead space, the warm-up goes full-screen, and inputs are 16px so iOS does not
+  zoom on focus. Verified at 390×844.
 
 ## How we built it
 
@@ -194,4 +226,5 @@ python3 assemble.py   # cut + voice track + mux
 - **Live:** https://arcana-table.pages.dev
 - **Code:** https://github.com/banksythequantLab/arcana-table
 - **Tests:** `cd test && npm install && node smoke.mjs` — 93 assertions against
-  the real `document.modelContext`.
+  the real `document.modelContext`, plus `node a11y.mjs` for the 9 accessibility
+  checks above.
