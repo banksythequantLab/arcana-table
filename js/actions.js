@@ -20,11 +20,41 @@ export function logStory(type, actor, text) {
 // ── rewards vocabulary (Heroic Effort) ───────────────────────────────────────
 export const REWARDS = {
   'bonus+2':   { label: '+2 to your next roll',                 apply: b => { b.bonus += 2; } },
+  'bonus+3':   { label: '+3 to your next roll',                 apply: b => { b.bonus += 3; } },
   'bonus+5':   { label: '+5 to your next roll',                 apply: b => { b.bonus += 5; } },
+  'bonus+8':   { label: '+8 to your next roll',                 apply: b => { b.bonus += 8; } },
   'advantage': { label: 'Advantage on your next roll',          apply: b => { b.advantage = true; } },
   'set10':     { label: 'Next d20 lands on a solid 10',         apply: b => { b.setRoll = 10; } },
   'nat20':     { label: 'NATURAL 20 — the bard will sing of this', apply: b => { b.setRoll = 20; } },
 };
+
+// The price list, so effort and reward stay in proportion: five push-ups is
+// worth +2, ten is worth +5, and a natural 20 costs you something real. The DM
+// used to pick a reward with no relation to the size of the ask, which made the
+// bargain feel arbitrary in both directions.
+export const EFFORT_SCALE = [
+  { reward: 'bonus+2',   reps: 5,  seconds: 20, oathMinutes: 5  },
+  { reward: 'bonus+3',   reps: 8,  seconds: 25, oathMinutes: 8  },
+  { reward: 'bonus+5',   reps: 10, seconds: 30, oathMinutes: 10 },
+  { reward: 'advantage', reps: 12, seconds: 40, oathMinutes: 12 },
+  { reward: 'bonus+8',   reps: 15, seconds: 45, oathMinutes: 15 },
+  { reward: 'set10',     reps: 20, seconds: 60, oathMinutes: 20 },
+  { reward: 'nat20',     reps: 25, seconds: 90, oathMinutes: 25 },
+];
+
+/** What an ask of this size is worth. Used when the DM names no reward. */
+export function rewardFor(amount, kind = 'reps') {
+  const key = kind === 'oath' ? 'oathMinutes' : kind === 'hold' ? 'seconds' : 'reps';
+  let best = EFFORT_SCALE[0];
+  for (const tier of EFFORT_SCALE) if (amount >= tier[key]) best = tier;
+  return best.reward;
+}
+
+/** What this reward costs, so the DM can be told when its price is off. */
+export function priceOf(reward, kind = 'reps') {
+  const key = kind === 'oath' ? 'oathMinutes' : kind === 'hold' ? 'seconds' : 'reps';
+  return EFFORT_SCALE.find(t => t.reward === reward)?.[key] ?? null;
+}
 
 // Everything the game knows how to ask for. What it may actually ask THIS
 // player for is state.settings.exercisePool — bodies differ, and a challenge
@@ -160,7 +190,7 @@ export function moveParty({ x, y, who = 'all' }) {
 
 export function addToken({ name, kind = 'monster', art, x, y, hp = 10, maxHp }) {
   if (!name) return { error: 'Token needs a name.' };
-  const arts = ['knight', 'wizard', 'goblin', 'skeleton', 'dragon', 'wolf', 'chest', 'villager'];
+  const arts = ['knight', 'wizard', 'goblin', 'skeleton', 'dragon', 'wolf', 'ooze', 'spider', 'wraith', 'ogre', 'rat', 'chest', 'villager'];
   if (!art) art = kind === 'monster' ? 'goblin' : kind === 'object' ? 'chest' : 'villager';
   if (!arts.includes(art)) return { error: `Unknown art "${art}". Choose one of: ${arts.join(', ')}.` };
   let px = Math.max(0, Math.min(GRID_W - 1, Math.round(x ?? 10)));
@@ -464,6 +494,17 @@ export function awardLoot({ items = [], gold = 0 }) {
 let challengeSeq = 0;
 const challengeWaiters = new Map();   // id → {resolve}
 
+/** One player turn has gone by without the table asking for anything. */
+export function notePlayerTurn() {
+  state.fitness.turnsSinceOffer = (state.fitness.turnsSinceOffer || 0) + 1;
+}
+
+/** An offer was made — reps, hold or Oath. Restarts the clock. */
+function noteOffer() {
+  state.fitness.turnsSinceOffer = 0;
+  state.fitness.offersMade = (state.fitness.offersMade || 0) + 1;
+}
+
 export function proposeChallenge({ exercise, reps, reward, reason = '', mode = 'reps', seconds }) {
   if (state.challenge) return { error: 'A challenge is already in progress — resolve it first.' };
   if (state.oath) return { error: 'The player is away keeping an Oath. Wait for them.' };
@@ -486,11 +527,27 @@ export function proposeChallenge({ exercise, reps, reward, reason = '', mode = '
   } else {
     reps = Math.max(1, Math.min(100, Math.round(reps || 10)));
   }
+  // Effort and reward should stay in proportion. Name no reward and the size of
+  // the ask picks one; name one that the ask does not cover and the tool says so
+  // rather than silently handing out a natural 20 for three jumping jacks.
+  const amount = mode === 'hold' ? seconds : reps;
+  if (!reward) reward = rewardFor(amount, mode);
   if (!REWARDS[reward]) return { error: `Unknown reward "${reward}". Choose: ${Object.keys(REWARDS).join(', ')}.` };
+  const price = priceOf(reward, mode);
+  const fair = price === null || amount >= price;
 
   const id = `chal-${++challengeSeq}-${Date.now().toString(36)}`;
-  state.challenge = { id, mode, exercise, reps, seconds: mode === 'hold' ? seconds : null, reward, reason, progress: 0, status: 'offered', startedAt: null };
+  state.challenge = {
+    id, mode, exercise, reps, seconds: mode === 'hold' ? seconds : null, reward, reason,
+    progress: 0, status: 'offered', startedAt: null,
+    // Reported on whichever way this resolves, so the DM learns the going rate
+    // rather than only hearing about it if the player walks away.
+    underpriced: fair ? null
+      : `${REWARDS[reward].label} normally costs ${price} ${mode === 'hold' ? 'seconds' : 'reps'}; you asked for ${amount}. ` +
+        `Fine if the moment earns it, but ask nearer the going rate next time.`,
+  };
   const ask = mode === 'hold' ? `${seconds}s ${exercise}` : `${reps} ${exercise}`;
+  noteOffer();
   logStory('challenge', 'DM', `💪 HEROIC EFFORT: ${ask} → ${REWARDS[reward].label}. ${reason}`);
   emit('challenge');
 
@@ -499,7 +556,9 @@ export function proposeChallenge({ exercise, reps, reward, reason = '', mode = '
     setTimeout(() => {                       // agent shouldn't hang forever
       if (challengeWaiters.has(id)) {
         challengeWaiters.delete(id);
-        resolve({ status: 'pending', challengeId: id, note: 'Player is still working on it — call get_fitness_log to check back.' });
+        resolve({ status: 'pending', challengeId: id, challenge: ask, reward: REWARDS[reward].label,
+                  underpriced: state.challenge?.underpriced || undefined,
+                  note: 'Player is still working on it — call get_fitness_log to check back.' });
       }
     }, 90_000);
   });
@@ -545,6 +604,7 @@ export function completeChallenge() {
   const did = c.mode === 'hold' ? `held ${c.seconds}s of ${c.exercise}` : `completed ${c.reps} ${c.exercise} in ${secs}s`;
   logStory('challenge', 'Player', `${did} — earned: ${REWARDS[c.reward].label}!`);
   const done = { status: 'completed', challengeId: c.id, mode: c.mode, exercise: c.exercise, reps: c.reps, seconds: secs, rewardGranted: REWARDS[c.reward].label };
+  if (c.underpriced) done.underpriced = c.underpriced;
   // Reps done over a downed hero are never wasted: they clear a failed death
   // save and put them back on their feet, whatever the dice have been doing.
   if (state.downed) { done.revived = state.downed.name; done.note = 'The reps put them back up. Time moves again.'; repsRevive(); }
@@ -561,6 +621,7 @@ export function declineChallenge() {
   clearInterval(holdTimer); holdTimer = null;
   logStory('challenge', 'Player', `declined the ${c.exercise} challenge — rolling fate as it lies.`);
   const res = { status: 'declined', challengeId: c.id, note: 'Player declined — proceed with a normal roll.' };
+  if (c.underpriced) res.underpriced = c.underpriced;
   const waiter = challengeWaiters.get(c.id);
   if (waiter) { challengeWaiters.delete(c.id); waiter(res); }
   state.challenge = null;
@@ -588,6 +649,7 @@ export function proposeOath({ label, kind = 'chores', minutes, reward, reason = 
 
   const id = `oath-${++oathSeq}-${Date.now().toString(36)}`;
   state.oath = { id, label, kind, minutes, reward, reason, status: 'offered', startedAt: null, endsAt: null };
+  noteOffer();
   logStory('challenge', 'DM', `📜 OATH: ${label} — ${minutes} min → ${REWARDS[reward].label}. ${reason}`);
   emit('oath');
 
@@ -908,8 +970,13 @@ export function getFitnessLog() {
     unspentBoosts: { ...state.boosts },
     availableExercises: allowedExercises(),
     availableHolds: allowedHolds(),
+    effortScale: EFFORT_SCALE,
+    turnsSinceLastOffer: state.fitness.turnsSinceOffer || 0,
+    offerOverdue: (state.fitness.turnsSinceOffer || 0) >= 2,
     oathKinds: OATH_KINDS,
     coachNote: [
+      'PRICE LIST: effortScale maps how much you ask for to what it is worth — 5 reps or 20s for +2, 10 or 30s for +5, 15 or 45s for +8, 25 or 90s for a natural 20. Ask bigger, pay bigger. Omit the reward and the size of the ask picks one.',
+      'PACING: stake something real about every SECOND exchange. If offerOverdue is true you are already late — offer on this turn unless a hero is down or the player is mid-challenge.',
       'Three ways to stake effort, and they are equals — never treat the Oath as the lesser option.',
       'reps: countable, tapped or counted out loud. hold: a timed hold, the ring counts itself down.',
       'oath: something real in the room the app cannot see. It locks the table for the minutes agreed.',

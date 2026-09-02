@@ -160,11 +160,11 @@ export const BASE_TOOLS = [
   },
   {
     name: 'add_token',
-    description: 'Spawn a creature or object on the board. Art options: knight, wizard, goblin, skeleton, dragon, wolf, chest, villager.',
+    description: 'Spawn a creature or object on the board. Eleven creature arts plus a chest: goblin, skeleton, dragon, wolf, ooze, spider, wraith, ogre, rat, knight, wizard, villager. Pick the one that actually fits what you are describing, and vary it — a hall of identical goblins looks like a bug, not an encounter.',
     inputSchema: obj({
       name: str('Display name, e.g. "Snaggle the Goblin"'),
       kind: { type: 'string', enum: ['monster', 'npc', 'object'], description: 'What it is' },
-      art: { type: 'string', enum: ['knight', 'wizard', 'goblin', 'skeleton', 'dragon', 'wolf', 'chest', 'villager'], description: 'Token art' },
+      art: { type: 'string', enum: ['knight', 'wizard', 'goblin', 'skeleton', 'dragon', 'wolf', 'ooze', 'spider', 'wraith', 'ogre', 'rat', 'chest', 'villager'], description: 'Token art. VARY IT — do not spawn two of the same art in one scene if another fits.' },
       x: num('Grid x'), y: num('Grid y'), hp: num('Hit points (also max HP unless maxHp given)'), maxHp: num('Max hit points'),
     }, ['name']),
     handler: a => A.addToken(a),
@@ -201,7 +201,7 @@ export const BASE_TOOLS = [
   },
   {
     name: 'propose_challenge',
-    description: 'HEROIC EFFORT — stake a real exercise against the dice. Offer this before a roll that matters: the player does the reps, the reward auto-applies to their next d20. Always optional; scale to the stakes (boss fight → 10 push-ups for nat20; minor check → a few jumping jacks for +2). ALWAYS check get_fitness_log first: offer ONLY from its availableExercises list for mode "reps", and ONLY from its availableHolds list for mode "hold" — those are the sets this player can actually do, and the two lists are not interchangeable. The call resolves when the player finishes or declines (or returns "pending" if they take longer than 90s — check back with get_fitness_log).',
+    description: 'HEROIC EFFORT — stake a real exercise against the dice. Offer this before a roll that matters: the player does the reps, the reward auto-applies to their next d20. Always optional. Effort and reward scale together — five push-ups is worth +2, ten is worth +5, twenty-five buys a natural 20 — so ask bigger when you want to pay bigger. OFFER OFTEN: about every second exchange, not once a session. ALWAYS check get_fitness_log first: offer ONLY from its availableExercises list for mode "reps", and ONLY from its availableHolds list for mode "hold" — those are the sets this player can actually do, and the two lists are not interchangeable. The call resolves when the player finishes or declines (or returns "pending" if they take longer than 90s — check back with get_fitness_log).',
     inputSchema: obj({
       mode: { type: 'string', enum: ['reps', 'hold'], description: 'reps = counted repetitions (default) · hold = a timed hold, e.g. a plank or a stretch' },
       // One enum for both modes; the handler checks the name against the list
@@ -209,9 +209,9 @@ export const BASE_TOOLS = [
       exercise: { type: 'string', enum: [...A.EXERCISES, ...A.HOLDS], description: 'A rep exercise for mode "reps", or a hold for mode "hold"' },
       reps: num('Repetition count for mode "reps" (1-100). Keep it achievable: 5-25 for most people.'),
       seconds: num('Hold length in seconds for mode "hold" (5-300). 20-45s is a real hold for most people.'),
-      reward: { type: 'string', enum: Object.keys(A.REWARDS), description: 'bonus+2 · bonus+5 · advantage · set10 (next d20 is a 10) · nat20 (next d20 is a natural 20)' },
+      reward: { type: 'string', enum: Object.keys(A.REWARDS), description: 'What it buys. PRICE LIST — 5 reps/20s → bonus+2 · 8/25s → bonus+3 · 10/30s → bonus+5 · 12/40s → advantage · 15/45s → bonus+8 · 20/60s → set10 (next d20 is a 10) · 25/90s → nat20 (next d20 is a natural 20). Ask bigger, pay bigger. OMIT this and the size of your ask picks the right one.' },
       reason: str('Why fate demands sweat right now, in DM voice'),
-    }, ['exercise', 'reward']),
+    }, ['exercise']),
     handler: a => A.proposeChallenge(a),
   },
   {

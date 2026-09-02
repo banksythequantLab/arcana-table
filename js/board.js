@@ -306,6 +306,14 @@ function draw(now) {
   ctx.restore();
 }
 
+/** A stable number in [0,1) from a token's id — the same token varies the same
+ *  way every frame and every reload. */
+function hashUnit(id) {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i++) { h ^= id.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return ((h >>> 0) % 10000) / 10000;
+}
+
 function drawToken(t, px, py, now, lifted) {
   const img = TOKEN_ART[t.art] || TOKEN_ART.villager;
   const pad = cell * 0.08;
@@ -329,9 +337,40 @@ function drawToken(t, px, py, now, lifted) {
 
   const lift = lifted ? -8 : bob;
   if (img.complete) {
-    if (t.kind === 'monster') { ctx.save(); ctx.shadowColor = 'rgba(217,83,79,.55)'; ctx.shadowBlur = 10; }
-    ctx.drawImage(img, px + pad, py + pad + lift, cell - pad * 2, cell - pad * 2);
-    if (t.kind === 'monster') ctx.restore();
+    // Two goblins used to be the same goblin, pixel for pixel. Monsters get a
+    // deterministic tint, a size nudge and sometimes a mirror, all derived from
+    // their own id — so a room full of them reads as a room full of creatures
+    // rather than a row of stamps. Heroes and objects are left exactly as drawn:
+    // the player should always recognise their own party instantly.
+    const vary = t.kind === 'monster';
+    const u = vary ? hashUnit(t.id) : 0;
+    const v = vary ? hashUnit(t.id + '~') : 0;   // a second, independent axis
+    const size = cell - pad * 2;
+    ctx.save();
+    if (vary) {
+      ctx.shadowColor = 'rgba(217,83,79,.55)'; ctx.shadowBlur = 10;
+      // Hue stays on a short leash — swing it far and a red dragon comes out
+      // pink, which is variety at the cost of knowing what you are fighting.
+      // Lightness and saturation do the heavy lifting instead: at 40px a pale
+      // goblin next to a dark one reads as two creatures long before a
+      // 20-degree hue shift does.
+      const hue = Math.round((u - 0.5) * 50);
+      const light = (0.72 + v * 0.58).toFixed(2);
+      const sat = (0.66 + u * 0.72).toFixed(2);
+      if (typeof ctx.filter === 'string') {
+        ctx.filter = `hue-rotate(${hue}deg) saturate(${sat}) brightness(${light})`;
+      }
+    }
+    const grow = vary ? 1 + (v - 0.5) * 0.32 : 1;          // ±16% of stature
+    const w = size * grow, off = (size - w) / 2;
+    if (vary && u > 0.5) {                                  // half of them face the other way
+      ctx.translate(px + pad + off + w, py + pad + off + lift);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, 0, 0, w, w);
+    } else {
+      ctx.drawImage(img, px + pad + off, py + pad + off + lift, w, w);
+    }
+    ctx.restore();
   }
 
   if (t.maxHp && (t.hp < t.maxHp || t.kind !== 'object')) {

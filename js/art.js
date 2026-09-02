@@ -88,6 +88,55 @@ export const TOKEN_ART = {
     <path d="M42 52 Q50 58 58 52" fill="none"/>
     <path d="M30 92 Q32 66 50 66 Q68 66 70 92 Z" fill="#5F8F5A"/>
   `),
+  ooze: svg(`
+    <path d="M14 62 Q14 34 50 34 Q86 34 86 62 L86 74 Q78 68 70 74 Q62 80 54 74 Q46 68 38 74 Q30 80 22 74 L14 74 Z" fill="#5FBF8F"/>
+    <path d="M22 50 Q34 40 46 44 Q34 46 26 56 Z" fill="#9FE8C2" stroke="none"/>
+    <circle cx="40" cy="56" r="6" fill="#FFF7E0"/>
+    <circle cx="62" cy="56" r="6" fill="#FFF7E0"/>
+    <circle cx="41" cy="57" r="2.6" fill="${OUT}" stroke="none"/>
+    <circle cx="63" cy="57" r="2.6" fill="${OUT}" stroke="none"/>
+    <circle cx="30" cy="24" r="5" fill="#5FBF8F"/>
+    <circle cx="68" cy="20" r="3.5" fill="#5FBF8F"/>
+  `),
+  spider: svg(`
+    <path d="M30 52 L8 38 M30 60 L6 60 M30 68 L10 82 M70 52 L92 38 M70 60 L94 60 M70 68 L90 82" fill="none" stroke-width="6"/>
+    <ellipse cx="50" cy="64" rx="26" ry="22" fill="#4A3358"/>
+    <path d="M38 56 Q50 48 62 56 Q50 60 38 56 Z" fill="#7A5B90" stroke="none"/>
+    <circle cx="50" cy="36" r="16" fill="#5C4270"/>
+    <circle cx="43" cy="34" r="4" fill="#F2C14E" stroke="none"/>
+    <circle cx="57" cy="34" r="4" fill="#F2C14E" stroke="none"/>
+    <circle cx="47" cy="26" r="2.4" fill="#F2C14E" stroke="none"/>
+    <circle cx="55" cy="26" r="2.4" fill="#F2C14E" stroke="none"/>
+  `),
+  wraith: svg(`
+    <path d="M50 10 Q78 16 78 48 Q78 70 72 88 Q64 78 56 88 Q50 78 44 88 Q36 78 28 88 Q22 70 22 48 Q22 16 50 10 Z" fill="#6E7FA8"/>
+    <path d="M50 10 Q68 16 72 38 Q60 28 50 28 Z" fill="#95A6CC" stroke="none"/>
+    <path d="M30 40 Q40 34 48 42 Q38 44 30 40 Z" fill="${OUT}" stroke="none"/>
+    <path d="M70 40 Q60 34 52 42 Q62 44 70 40 Z" fill="${OUT}" stroke="none"/>
+    <circle cx="39" cy="40" r="3" fill="#8BE0D6" stroke="none"/>
+    <circle cx="61" cy="40" r="3" fill="#8BE0D6" stroke="none"/>
+    <path d="M42 62 Q50 74 58 62 Q50 66 42 62 Z" fill="${OUT}" stroke="none"/>
+  `),
+  ogre: svg(`
+    <path d="M26 34 Q26 12 50 12 Q74 12 74 34 L74 52 Q74 76 50 88 Q26 76 26 52 Z" fill="#B08A5E"/>
+    <path d="M26 34 Q26 12 50 12 Q66 12 72 26 Q52 20 32 30 Z" fill="#CBA87C" stroke="none"/>
+    <path d="M34 30 L44 38 M66 30 L56 38" fill="none" stroke-width="5"/>
+    <circle cx="40" cy="46" r="5" fill="#FFF7E0"/>
+    <circle cx="60" cy="46" r="5" fill="#FFF7E0"/>
+    <circle cx="41" cy="47" r="2.4" fill="${OUT}" stroke="none"/>
+    <circle cx="61" cy="47" r="2.4" fill="${OUT}" stroke="none"/>
+    <path d="M36 64 Q50 74 64 64 L58 64 L56 70 L50 64 L44 70 L42 64 Z" fill="#FFF7E0"/>
+    <path d="M40 58 L40 64 M60 58 L60 64" fill="none" stroke-width="4"/>
+  `),
+  rat: svg(`
+    <path d="M22 34 Q10 24 22 18 Q32 22 32 34 M78 34 Q90 24 78 18 Q68 22 68 34" fill="#8C7A6B"/>
+    <path d="M50 26 Q76 32 76 56 Q76 78 50 86 Q24 78 24 56 Q24 32 50 26 Z" fill="#A8968A"/>
+    <path d="M50 26 Q66 30 72 44 Q58 36 50 36 Z" fill="#C6B7AC" stroke="none"/>
+    <circle cx="40" cy="52" r="4" fill="#D9534F" stroke="none"/>
+    <circle cx="60" cy="52" r="4" fill="#D9534F" stroke="none"/>
+    <path d="M50 66 Q44 72 46 78 M50 66 Q56 72 54 78" fill="none" stroke-width="4"/>
+    <ellipse cx="50" cy="68" rx="5" ry="4" fill="#E0A8A8"/>
+  `),
 };
 
 // Cartoony tile palette (cel-shade: flat fill + darker edge, no gradients).

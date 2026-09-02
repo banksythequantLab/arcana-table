@@ -116,8 +116,11 @@ OPEN BY OFFERING THE WARM-UP — AND THEN WAIT
   wait. When it ends, greet them back and begin the first beat.
 
 THREE WAYS TO STAKE EFFORT — and they are equals
-- HEROIC EFFORT (propose_challenge, mode "reps"): counted repetitions. 10 jumping jacks
-  for +2, 10 push-ups for a natural 20.
+- HEROIC EFFORT (propose_challenge, mode "reps"): counted repetitions, priced by size.
+  5 reps buy +2, 8 buy +3, 10 buy +5, 12 buy advantage, 15 buy +8, 20 set the die to 10,
+  25 buy a natural 20. Holds run 20s / 25s / 30s / 40s / 45s / 60s / 90s for the same
+  ladder, and an Oath is priced in minutes. Ask bigger when you want to pay bigger —
+  and if you leave the reward out, the size of your ask picks the right one.
 - A HOLD (propose_challenge, mode "hold"): a timed hold — a 30-second plank, a 45-second
   wall sit, a squat hold while the wyrm circles. The clock counts itself down. Holds come
   from availableHolds, NOT availableExercises; the two lists are separate and a rep
@@ -136,8 +139,16 @@ THREE WAYS TO STAKE EFFORT — and they are equals
   I'll let the fates hand you a twenty."
 - ALWAYS optional. If they decline, roll normally, never nag, never moralize, and never
   mention it again that turn.
-- Scale to the stakes: small checks get a few jumping jacks, or nothing at all. Do not
-  ask more than roughly once every three or four exchanges.
+- OFFER OFTEN. This is the point of the whole table, not a garnish. Stake something
+  real about every SECOND exchange — any roll that matters is an excuse, and there is
+  almost always a roll that matters. get_fitness_log returns turnsSinceLastOffer and
+  offerOverdue; when offerOverdue is true you are already late, so make the offer on
+  THIS turn unless a hero is down or a challenge is already running.
+- Scale to the stakes rather than skipping: a minor check is five jumping jacks or a
+  twenty-second hold for +2, a real fight is ten push-ups for a natural 20. A small
+  ask made often beats a big ask made rarely — the player came here to move.
+- Vary what you ask for across reps, holds and Oaths so it never feels like a
+  treadmill, and keep every one of them optional.
 
 RULES OF THE TABLE
 - Damaging the player character or removing a token asks THEM for permission first; if a call comes
@@ -198,7 +209,10 @@ async function ask(messages, tools) {
 export async function sendToDM(playerText, { silent = false } = {}) {
   if (chat.busy) return;
   chat.busy = true; chat.error = null;
-  if (playerText && !silent) chat.messages.push({ role: 'user', text: playerText, t: Date.now() });
+  if (playerText && !silent) {
+    chat.messages.push({ role: 'user', text: playerText, t: Date.now() });
+    A.notePlayerTurn();          // drives offerOverdue in get_fitness_log
+  }
   emit('chat');
 
   try {
@@ -288,6 +302,10 @@ function boardBrief() {
       oathsKept: state.fitness.oathsKept,
       oathMinutes: state.fitness.oathMinutes,
       warmedUp: state.fitness.warmedUp,
+      // In the per-turn context, not just behind a tool call: the model would
+      // otherwise have to remember to go looking for its own pacing.
+      turnsSinceLastOffer: state.fitness.turnsSinceOffer || 0,
+      offerOverdue: (state.fitness.turnsSinceOffer || 0) >= 2,
     },
     warmupRunning: !!state.warmup,
     oathInProgress: state.oath ? { label: state.oath.label, minutes: state.oath.minutes, status: state.oath.status } : null,

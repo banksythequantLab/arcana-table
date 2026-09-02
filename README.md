@@ -101,7 +101,7 @@ await arcana.call('roll_dice', { formula: 'd20', reason: 'Attack the dragon' })
 | `move_token` | Animated movement, wall-aware | PCs light the whole path they walk |
 | `move_party` | Move the whole party in one call; companions take cells beside the leader | wall-aware · nobody stacks · lifts fog for everyone |
 | `attack` | One attack resolved end to end: to-hit, damage, fog lifted on the target | **reach enforced** — a melee swing out of range is refused, with the cell to move to |
-| `add_token` | Spawn monsters/NPCs/objects | 8 art options |
+| `add_token` | Spawn monsters/NPCs/objects | 13 arts · monsters get a per-token tint, stature and facing so two of a kind are not one picture twice |
 | `remove_token` | Take a token off the board | ⚠ removing a PC waits for player approval |
 | `start_combat` / `end_combat` | Initiative on/off | **dynamically registers/unregisters** the combat tools |
 | `advance_turn` | Next combatant | combat-only |
@@ -217,7 +217,7 @@ npx serve .        # or: python3 -m http.server 8080
 cd test && npm install && npm test
 ```
 
-**167 assertions across six suites**, Playwright + Chromium, all against the real
+**196 assertions across seven suites**, Playwright + Chromium, all against the real
 page — see `test/README.md` for what each one covers. The largest, `smoke.mjs`,
 drives the full tool surface **through the real `document.modelContext`** — enumerating tools with `getTools()`, invoking
 them with `executeTool()`, asserting `readOnlyHint` on the read tools, and

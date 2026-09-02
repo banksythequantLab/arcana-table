@@ -118,6 +118,11 @@ export const REACH = {
   skeleton: { reach: 1, range: 0 },
   wolf:     { reach: 1, range: 0 },
   dragon:   { reach: 2, range: 5 },   // long neck, longer breath
+  ooze:     { reach: 1, range: 0 },   // it has to touch you
+  spider:   { reach: 1, range: 5 },   // web, from the ceiling
+  wraith:   { reach: 1, range: 6 },   // cold at a distance
+  ogre:     { reach: 2, range: 3 },   // long arms, and it throws things
+  rat:      { reach: 1, range: 0 },
   chest:    { reach: 0, range: 0 },
 };
 export const DEFAULT_REACH = { reach: 1, range: 0 };
@@ -205,6 +210,11 @@ function freshState() {
       holdSeconds: 0,             // planks, wall sits, stretches
       oathsKept: 0, oathMinutes: 0, oathsBroken: 0,
       warmedUp: false,            // has the player stretched this session
+      // Exchanges since the DM last staked something real. The model was
+      // leaving eight or ten turns between offers however the prompt was
+      // worded, so the count is handed to it explicitly and it is told plainly
+      // when it is overdue.
+      turnsSinceOffer: 0, offersMade: 0,
     },
     quest: { beatIndex: 0, status: 'active', completed: [], startedAt: Date.now() },
     downed: null,                 // {tokenId, saves, fails} — the board is frozen while this is set
@@ -245,13 +255,46 @@ export function resetState() {
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
+/** Levenshtein, capped — we only care whether two words are close. */
+function editDistance(a, b) {
+  if (Math.abs(a.length - b.length) > 3) return 9;
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i];
+    for (let j = 1; j <= b.length; j++) {
+      row[j] = Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = row;
+  }
+  return prev[b.length];
+}
+
+// Names arrive by microphone as often as by keyboard, and speech recognition
+// does not hand back the spelling you chose — it hands back what it heard.
+// An exact-match-only lookup meant a mis-transcribed name simply failed, and
+// the DM was left talking about a hero it could not address. So: exact first,
+// then substring, then the nearest name within a small edit distance.
 export function findToken(idOrName) {
   if (!idOrName) return null;
-  const q = String(idOrName).toLowerCase();
-  return state.tokens.find(t => t.id.toLowerCase() === q)
-      || state.tokens.find(t => t.name.toLowerCase() === q)
-      || state.tokens.find(t => t.name.toLowerCase().includes(q))
-      || null;
+  const raw = String(idOrName).trim();
+  const q = raw.toLowerCase();
+  const exact = state.tokens.find(t => t.id.toLowerCase() === q)
+             || state.tokens.find(t => t.name.toLowerCase() === q)
+             || state.tokens.find(t => t.name.toLowerCase().includes(q))
+             || state.tokens.find(t => q.includes(t.name.toLowerCase()));
+  if (exact) return exact;
+
+  // Nothing matched outright — find the closest name, if it is close enough.
+  // The threshold scales with length so "Ren" still finds "Wren" but "orc"
+  // does not become "ooze".
+  let best = null, bestD = Infinity;
+  for (const t of state.tokens) {
+    const n = t.name.toLowerCase();
+    const d = Math.min(editDistance(q, n), ...n.split(/\s+/).map(w => editDistance(q, w)));
+    if (d < bestD) { bestD = d; best = t; }
+  }
+  const limit = q.length <= 4 ? 1 : q.length <= 7 ? 2 : 3;
+  return bestD <= limit ? best : null;
 }
 
 export function currentMap() {
