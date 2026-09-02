@@ -180,24 +180,82 @@ input[type=checkbox]{flex:0 0 auto;width:18px;height:18px;padding:0;accent-color
 /* dice overlay */
 .dice-overlay{
   position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  background:rgba(18,11,26,.72);z-index:50;pointer-events:none;
+  background:radial-gradient(circle at 50% 45%, rgba(40,24,58,.55), rgba(12,7,18,.88) 70%);
+  z-index:50;pointer-events:none;perspective:900px;
 }
-.die-label{font:700 20px "Baloo 2",cursive;color:var(--paper);margin-bottom:10px;text-shadow:2px 2px 0 var(--ink)}
-.die{
-  width:130px;height:130px;display:flex;align-items:center;justify-content:center;
-  background:var(--red);color:#fff;font:800 52px "Baloo 2",cursive;
-  clip-path:polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
-  filter:drop-shadow(4px 6px 0 rgba(0,0,0,.5));
-  animation:wobble .9s ease-in-out;
+.die-label{font:700 20px "Baloo 2",cursive;color:var(--paper);margin-bottom:14px;
+  text-shadow:2px 2px 0 var(--ink);text-align:center;max-width:70vw}
+
+/* the tray holds one die per rolled number */
+.die-tray{position:relative;display:flex;gap:14px;align-items:center;justify-content:center;
+  transform-style:preserve-3d}
+.die-tray.many{gap:8px}
+.die3d{width:132px;height:132px;transform-style:preserve-3d;
+  filter:drop-shadow(5px 9px 0 rgba(0,0,0,.55))}
+.die-tray.many .die3d{width:84px;height:84px}
+.die3d svg{width:100%;height:100%;overflow:visible}
+
+/* facets, lit from the upper left so the solid reads as a solid */
+.facet{stroke:var(--ink);stroke-width:2.5;stroke-linejoin:round}
+.f-front{fill:#E8564F}
+.f-a{fill:#C8403C} .f-b{fill:#A63330} .f-c{fill:#8E2B29}
+.f-d{fill:#A63330} .f-e{fill:#C8403C} .f-f{fill:#D64B45}
+.edge{fill:none;stroke:var(--ink);stroke-width:4;stroke-linejoin:round}
+.pip{fill:#FFF3DC;font:800 44px "Baloo 2",cursive;text-anchor:middle;dominant-baseline:middle;
+  paint-order:stroke;stroke:var(--ink);stroke-width:5px;stroke-linejoin:round}
+.die-tray.many .pip{font-size:38px;stroke-width:5px}
+.gem{rx:14}
+
+/* tumbling, then a hard landing */
+.dice-overlay.rolling .die3d{animation:tumble .52s linear infinite,
+  hop .26s cubic-bezier(.3,-0.4,.7,1.4) infinite alternate;
+  animation-delay:calc(var(--i) * -90ms), calc(var(--i) * -70ms)}
+.dice-overlay.landed .die3d{animation:land .5s cubic-bezier(.2,1.5,.4,1) both;
+  animation-delay:calc(var(--i) * 60ms)}
+/* Z carries the spin; X and Y only wobble. A flat SVG rotated far on X or Y
+   foreshortens to a zero-width sliver and the die simply disappears. */
+@keyframes tumble{
+  0%  {transform:rotateZ(0)      rotateX(18deg)  rotateY(-16deg)}
+  25% {transform:rotateZ(90deg)  rotateX(-14deg) rotateY(20deg)}
+  50% {transform:rotateZ(180deg) rotateX(16deg)  rotateY(14deg)}
+  75% {transform:rotateZ(270deg) rotateX(-18deg) rotateY(-20deg)}
+  100%{transform:rotateZ(360deg) rotateX(18deg)  rotateY(-16deg)}
 }
-.dice-overlay.nat20 .die{background:var(--gold);color:var(--ink)}
-.dice-overlay.nat1 .die{background:#3E3A4A}
-.die-total{font:800 30px "Baloo 2",cursive;color:var(--gold);margin-top:12px;text-shadow:2px 2px 0 var(--ink)}
-.die-boosts{color:#8BE0D6;font-weight:800;margin-top:4px}
-.spark{position:absolute;left:50%;top:45%;color:var(--gold);font-size:26px;
-  animation:spark 1.4s ease-out forwards}
-@keyframes spark{to{transform:translate(calc(var(--dx)*240px),calc(var(--dy)*240px)) rotate(360deg);opacity:0}}
-@keyframes wobble{0%{transform:rotate(-14deg) scale(.6)}50%{transform:rotate(10deg) scale(1.12)}100%{transform:rotate(0) scale(1)}}
+@keyframes hop{from{translate:0 -26px}to{translate:0 12px}}
+@keyframes land{
+  0%{transform:scale(1.35) rotateZ(-16deg)}
+  55%{transform:scale(.92) rotateZ(4deg)}
+  100%{transform:scale(1) rotateZ(0)}
+}
+
+/* the thump */
+.shock{position:absolute;left:50%;top:50%;width:20px;height:20px;margin:-10px 0 0 -10px;
+  border:4px solid var(--gold);border-radius:50%;opacity:.9;animation:shock .75s ease-out forwards}
+@keyframes shock{to{width:340px;height:340px;margin:-170px 0 0 -170px;opacity:0;border-width:1px}}
+
+/* a natural 20 turns the whole thing molten */
+.dice-overlay.nat20 .f-front{fill:#FFD86B}
+.dice-overlay.nat20 .f-a,.dice-overlay.nat20 .f-e{fill:#F2C14E}
+.dice-overlay.nat20 .f-f{fill:#FFE08A}
+.dice-overlay.nat20 .f-b,.dice-overlay.nat20 .f-d{fill:#D9A02F}
+.dice-overlay.nat20 .f-c{fill:#B8841F}
+.dice-overlay.nat20 .pip{fill:#3A2A10}
+.dice-overlay.nat20 .die3d{filter:drop-shadow(0 0 26px rgba(242,193,78,.85)) drop-shadow(5px 9px 0 rgba(0,0,0,.5))}
+.dice-overlay.nat20 .die-total{animation:thump .5s cubic-bezier(.2,1.6,.4,1) both}
+@keyframes thump{0%{transform:scale(.6);opacity:0}100%{transform:scale(1);opacity:1}}
+
+/* a natural 1 goes cold and sags */
+.dice-overlay.nat1 .facet{fill:#4A4557}
+.dice-overlay.nat1 .f-front{fill:#5C5670}
+.dice-overlay.nat1 .pip{fill:#B9AECB}
+.dice-overlay.nat1 .die3d{filter:drop-shadow(3px 5px 0 rgba(0,0,0,.55));translate:0 6px}
+
+.die-total{font:800 32px "Baloo 2",cursive;color:var(--gold);margin-top:18px;
+  text-shadow:2px 2px 0 var(--ink);min-height:1.1em}
+.die-boosts{color:#8BE0D6;font-weight:800;margin-top:4px;text-align:center}
+.spark{position:absolute;left:50%;top:45%;color:var(--gold);
+  text-shadow:0 0 12px rgba(242,193,78,.9);animation:spark 1.5s ease-out forwards}
+@keyframes spark{to{transform:translate(calc(var(--dx)*300px),calc(var(--dy)*300px)) rotate(420deg);opacity:0}}
 @keyframes pop{from{transform:scale(.85);opacity:0}}
 
 /* Heroic Effort modal */

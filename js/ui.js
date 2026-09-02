@@ -217,42 +217,102 @@ function renderAgent() {
 const summarize = a => { const s = JSON.stringify(a || {}); return s === '{}' ? '' : s.length > 60 ? s.slice(0, 57) + '…' : s; };
 
 // ── dice overlay ─────────────────────────────────────────────────────────────
-let lastDiceT = 0;
+// A real d20, not a number in a hexagon: an icosahedron drawn as shaded facets
+// that tumbles, lands with a shockwave, and goes molten gold on a natural 20.
+const CALM_UI = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+
+// Face-on projection of an icosahedron. The front face is the big upward
+// triangle in the middle — that is where the number sits.
+const HEX = [[0, -50], [43.3, -25], [43.3, 25], [0, 50], [-43.3, 25], [-43.3, -25]];
+const FRONT = [[0, -27], [23.4, 13.5], [-23.4, 13.5]];
+const pts = a => a.map(p => p.join(',')).join(' ');
+const FACETS = [
+  { p: [HEX[0], HEX[1], FRONT[1], FRONT[0]], shade: 'f-a' },
+  { p: [HEX[1], HEX[2], FRONT[1]],           shade: 'f-b' },
+  { p: [HEX[2], HEX[3], FRONT[2], FRONT[1]], shade: 'f-c' },
+  { p: [HEX[3], HEX[4], FRONT[2]],           shade: 'f-d' },
+  { p: [HEX[4], HEX[5], FRONT[0], FRONT[2]], shade: 'f-e' },
+  { p: [HEX[5], HEX[0], FRONT[0]],           shade: 'f-f' },
+];
+
+function dieSVG(sides, value, i) {
+  const body = sides === 20
+    ? FACETS.map(f => `<polygon class="facet ${f.shade}" points="${pts(f.p)}"/>`).join('') +
+      `<polygon class="facet f-front" points="${pts(FRONT)}"/>` +
+      `<polygon class="edge" points="${pts(HEX)}"/>`
+    : `<rect class="facet f-front gem" x="-40" y="-40" width="80" height="80" rx="14"/>` +
+      `<rect class="edge gem" x="-40" y="-40" width="80" height="80" rx="14"/>`;
+  return `<div class="die3d" style="--i:${i}">
+    <svg viewBox="-56 -56 112 112" aria-hidden="true">
+      ${body}
+      <text class="pip" x="0" y="${sides === 20 ? 4 : 2}">${value}</text>
+    </svg>
+  </div>`;
+}
+
+let lastDiceT = 0, dieSpin = null, dieHide = null;
 function renderDice() {
   const d = state.dice;
   if (!d || d.t === lastDiceT) return;
   lastDiceT = d.t;
-  const ov = $('#dice-overlay');
-  const die = $('#die');
-  const label = $('#die-label');
+  clearInterval(dieSpin); clearTimeout(dieHide);
+
+  const ov = $('#dice-overlay'), tray = $('#die-tray');
   ov.hidden = false;
-  ov.className = 'dice-overlay';
-  label.textContent = d.reason || d.formula;
-  let i = 0;
-  const spin = setInterval(() => { die.textContent = 1 + Math.floor(Math.random() * d.sides); }, 60);
-  setTimeout(() => {
-    clearInterval(spin);
-    die.textContent = d.rolls.length > 1 ? d.rolls.join('+') : d.rolls[0];
-    $('#die-total').textContent = `= ${d.total}` + (d.mod ? ` (${d.mod > 0 ? '+' : ''}${d.mod})` : '') + (d.bonus ? ` (+${d.bonus} heroic)` : '');
-    if (d.nat20) { ov.classList.add('nat20'); $('#die-total').textContent = '⭐ NATURAL 20!'; burst(); }
+  ov.className = 'dice-overlay rolling';
+  $('#die-label').textContent = d.reason || d.formula;
+  $('#die-total').textContent = '';
+  $('#die-boosts').textContent = '';
+  tray.classList.toggle('many', d.rolls.length > 2);
+  tray.innerHTML = d.rolls.map((r, i) => dieSVG(d.sides, r, i)).join('');
+
+  const faces = () => tray.querySelectorAll('.pip');
+  const settle = () => {
+    clearInterval(dieSpin); dieSpin = null;
+    ov.classList.remove('rolling');
+    ov.classList.add('landed');
+    faces().forEach((el, i) => { el.textContent = d.rolls[i]; });
+    ring();
+    $('#die-total').textContent = d.nat20 ? '⭐ NATURAL 20!'
+      : `= ${d.total}` + (d.mod ? ` (${d.mod > 0 ? '+' : ''}${d.mod})` : '') + (d.bonus ? ` (+${d.bonus} heroic)` : '');
+    if (d.nat20) { ov.classList.add('nat20'); burst(); }
     if (d.nat1) ov.classList.add('nat1');
     if (d.boostsUsed.length) $('#die-boosts').textContent = d.boostsUsed.join(' · ');
-    else $('#die-boosts').textContent = '';
-    setTimeout(() => { ov.hidden = true; }, d.nat20 ? 3200 : 2200);
-  }, 900);
+    dieHide = setTimeout(() => { ov.hidden = true; }, d.nat20 ? 3400 : 2300);
+  };
+
+  if (CALM_UI) return void settle();               // no tumbling for anyone who asked
+  dieSpin = setInterval(() => {
+    faces().forEach(el => { el.textContent = 1 + Math.floor(Math.random() * d.sides); });
+  }, 55);
+  setTimeout(settle, 1050);
+}
+
+// The shockwave the die makes when it stops.
+function ring() {
+  const tray = $('#die-tray');
+  if (CALM_UI) return;
+  const r = document.createElement('span');
+  r.className = 'shock';
+  tray.appendChild(r);
+  setTimeout(() => r.remove(), 900);
 }
 
 function burst() {
   const ov = $('#dice-overlay');
-  for (let i = 0; i < 24; i++) {
+  if (CALM_UI) return;
+  for (let i = 0; i < 30; i++) {
     const s = document.createElement('span');
     s.className = 'spark';
-    s.textContent = ['✦', '★', '✧'][i % 3];
-    s.style.setProperty('--dx', (Math.random() * 2 - 1).toFixed(2));
-    s.style.setProperty('--dy', (Math.random() * 2 - 1).toFixed(2));
-    s.style.animationDelay = (Math.random() * .2) + 's';
+    s.textContent = ['✦', '★', '✧', '✶'][i % 4];
+    const a = (i / 30) * Math.PI * 2 + Math.random() * 0.4;
+    const d = 0.55 + Math.random() * 0.45;
+    s.style.setProperty('--dx', (Math.cos(a) * d).toFixed(2));
+    s.style.setProperty('--dy', (Math.sin(a) * d).toFixed(2));
+    s.style.fontSize = (18 + Math.random() * 18).toFixed(0) + 'px';
+    s.style.animationDelay = (Math.random() * .18) + 's';
     ov.appendChild(s);
-    setTimeout(() => s.remove(), 1600);
+    setTimeout(() => s.remove(), 1700);
   }
 }
 
