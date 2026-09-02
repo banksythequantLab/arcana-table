@@ -118,8 +118,40 @@
         <button id="dm-combat" class="btn wide">⚔ Start combat</button>
       </div>
       <div class="dm-group heroic">
+        <label>🤸 Warm-up</label>
+        <div class="row">
+          <select id="dm-warm-plan">
+            <option value="90s">90 seconds · 6 stretches</option>
+            <option value="3min">3 minutes · 12</option>
+            <option value="5min">5 minutes · 20</option>
+            <option value="10min">10 minutes · 20 slow</option>
+          </select>
+          <button id="dm-warm" class="btn">Start</button>
+        </div>
+      </div>
+
+      <div class="dm-group heroic">
+        <label>📜 Oath — stake a real task</label>
+        <div class="row">
+          <input id="dm-oath-label" placeholder="clear the sink" size="10">
+          <input id="dm-oath-min" type="number" value="10" min="1" max="60" title="minutes">
+        </div>
+        <div class="row">
+          <select id="dm-oath-kind">
+            <option>chores</option><option>study</option><option>reading</option>
+            <option>practice</option><option>admin</option><option>tidy</option>
+          </select>
+          <button id="dm-oath" class="btn">Swear</button>
+        </div>
+      </div>
+
+      <div class="dm-group heroic">
         <label>💪 Heroic Effort</label>
         <div class="row">
+          <select id="dm-mode">
+            <option value="reps">reps</option>
+            <option value="hold">hold (seconds)</option>
+          </select>
           <select id="dm-exercise">
             <option>push-ups</option><option>crunches</option><option>jumping jacks</option><option>squats</option>
             <option>sit-ups</option><option>lunges</option><option>high knees</option><option>mountain climbers</option>
@@ -171,6 +203,50 @@
 </div>
 
 <!-- Heroic Effort modal -->
+<div id="warmup" class="warm-backdrop" hidden>
+  <div class="warm-card">
+    <div class="warm-head">
+      <span id="warm-eyebrow" class="warm-eyebrow">🤸 WARM-UP</span>
+      <span id="warm-step" class="warm-step">1 / 6</span>
+    </div>
+    <div id="warm-name" class="warm-name">Neck rolls</div>
+    <p id="warm-cue" class="warm-cue"></p>
+    <div class="warm-ring-wrap">
+      <div id="warm-ring" class="warm-ring" style="--pct:0%"><span id="warm-count">15</span></div>
+      <div id="warm-breath" class="warm-breath">Breathe in…</div>
+    </div>
+    <p id="warm-note" class="warm-note"></p>
+    <div id="warm-next" class="warm-next"></div>
+    <div class="warm-row">
+      <button id="warm-pause" class="btn ghost" type="button">Pause</button>
+      <button id="warm-skip" class="btn ghost" type="button">Skip ▸</button>
+      <button id="warm-done" class="btn" type="button">I'm done</button>
+    </div>
+  </div>
+</div>
+
+<div id="oath" class="oath-backdrop" hidden>
+  <div class="oath-card">
+    <div class="oath-eyebrow">📜 AN OATH SWORN TO THE TABLE</div>
+    <div id="oath-label" class="oath-label">Clear the sink</div>
+    <p id="oath-reason" class="oath-reason"></p>
+    <div id="oath-offer" class="oath-row">
+      <button id="oath-accept" class="btn big" type="button">I swear it 📜</button>
+      <button id="oath-decline" class="btn ghost" type="button">Not this time</button>
+    </div>
+    <div id="oath-active" class="oath-active" hidden>
+      <div id="oath-clock" class="oath-clock">10:00</div>
+      <p class="oath-copy">The table is locked and the DM is waiting.
+        Go and do it — this page will still be here.</p>
+      <div class="oath-row">
+        <button id="oath-keep" class="btn big" type="button" disabled>Done — I kept it</button>
+        <button id="oath-quit" class="btn ghost" type="button">I had to stop</button>
+      </div>
+      <p class="oath-honour">On your honour. Nothing here can check, which is rather the point.</p>
+    </div>
+  </div>
+</div>
+
 <div id="downed-banner" class="downed-banner" hidden>
   <div class="downed-inner">
     <div class="downed-eyebrow">⏳ TIME HAS STOPPED</div>
@@ -205,7 +281,7 @@
       <button id="chal-tap" class="rep-ring" style="--pct:0%" aria-label="Count one rep">
         <span id="chal-ring" class="ring-fill" style="--pct:0%"></span>
         <span id="chal-count" class="ring-count">0 / 10</span>
-        <span class="ring-hint">TAP or SPACE per rep</span>
+        <span id="ring-hint" class="ring-hint">TAP or SPACE per rep</span>
       </button>
       <div id="chal-time" class="chal-time">0s</div>
     </div>

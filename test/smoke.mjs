@@ -55,7 +55,7 @@ async function enterTable(page, { muted = true } = {}) {
   await page.waitForSelector('#intro[hidden]', { timeout: 10000 }).catch(() => {});
 }
 
-const BASE_N = 16, COMBAT_N = 19, DOWNED_N = 17;   // base · +combat · +death_save
+const BASE_N = 18, COMBAT_N = 21, DOWNED_N = 19;   // base · +combat · +death_save
 const call = (name, args) => page.evaluate(([n, a]) => window.arcana.call(n, a), [name, args]);
 let pass = 0, fail = 0;
 const check = (label, cond, extra = '') => {
@@ -192,6 +192,69 @@ const fit2 = await call('get_fitness_log');
 check('boost consumed after roll', fit2.unspentBoosts.setRoll === null);
 
 check('loot awarded', (await call('award_loot', { items: ['Dragonfang Dagger'], gold: 50 })).gold === 50);
+
+// ── timed holds ──────────────────────────────────────────────────────────────
+console.log('— a timed hold —');
+const holdP = call('propose_challenge', { mode: 'hold', exercise: 'squats', seconds: 5, reward: 'bonus+2', reason: 'Sink into it while the door groans.' });
+await page.waitForSelector('#challenge-modal:not([hidden])', { timeout: 5000 });
+check('a hold shows seconds, not reps', /5S SQUATS/i.test(await page.innerText('#chal-title')), await page.innerText('#chal-title'));
+await page.click('#chal-accept');
+check('a hold counts itself down — tapping does nothing', await (async () => {
+  const before = await page.evaluate(() => window.__st?.challenge?.progress ?? 0);
+  await page.click('#chal-tap'); await page.click('#chal-tap');
+  const after = await page.evaluate(() => window.__st?.challenge?.progress ?? 0);
+  return after - before <= 1;                       // the 1s tick may land mid-check
+})());
+const held = await holdP;                            // resolves when the clock runs out
+check('the hold completes on its own clock', held.status === 'completed' && held.mode === 'hold', JSON.stringify(held).slice(0, 120));
+check('held seconds are logged separately from reps', (await call('get_fitness_log')).holdSeconds >= 5);
+
+// ── an Oath: real-world effort the app cannot see ────────────────────────────
+console.log('— an Oath —');
+const declined = call('propose_oath', { label: 'clear the sink', kind: 'chores', minutes: 10, reward: 'nat20', reason: 'Swear it.' });
+await page.waitForSelector('#oath:not([hidden])', { timeout: 5000 });
+check('the Oath names the real task', /clear the sink/i.test(await page.innerText('#oath-label')));
+await page.click('#oath-decline');
+check('declining an Oath returns cleanly, no reward', (await declined).status === 'declined');
+check('a declined Oath is not counted as broken', (await call('get_fitness_log')).oathsBroken === 0);
+
+// a short one we can actually wait out
+const oathP = call('propose_oath', { label: 'read one page', kind: 'reading', minutes: 1, reward: 'bonus+2', reason: 'One page. Then we ride.' });
+await page.waitForSelector('#oath:not([kidden])', { timeout: 5000 }).catch(() => {});
+await page.waitForSelector('#oath-accept', { timeout: 5000 });
+await page.click('#oath-accept');
+check('an Oath locks the table', (await call('move_token', { tokenId: 'Brannok', x: 7, y: 6 })).oathActive === true);
+check('reads still work while the player is away', !!(await call('get_board_state')).tokens);
+check('the Oath cannot be claimed before the clock runs out', await page.isDisabled('#oath-keep'));
+check('the DM is told how long it has to wait', (await call('get_fitness_log')).activeOath?.secondsLeft > 0);
+// fast-forward rather than actually waiting a minute
+await page.evaluate(() => { window.__st.oath.endsAt = Date.now() - 1; });
+await page.waitForTimeout(1100);
+check('the claim button unlocks when the time is served', !(await page.isDisabled('#oath-keep')));
+await page.click('#oath-keep');
+const kept = await oathP;
+check('keeping an Oath pays the same dice reward', kept.status === 'kept' && /\+2/.test(kept.rewardGranted), JSON.stringify(kept).slice(0, 120));
+check('kept Oaths and their minutes are logged', (await call('get_fitness_log')).oathsKept === 1);
+check('the table unlocks once they are back', (await call('move_token', { tokenId: 'Brannok', x: 7, y: 6 })).ok === true);
+
+// ── the warm-up ──────────────────────────────────────────────────────────────
+console.log('— the warm-up —');
+const warm = await call('start_warmup', { plan: '90s' });
+check('90s plan is 6 stretches at 15s', warm.stretches === 6 && warm.holdSeconds === 15 && warm.totalSeconds === 90, JSON.stringify(warm));
+check('the warm-up overlay is up', await page.isVisible('#warmup'));
+check('it names the stretch and coaches it', (await page.innerText('#warm-name')).length > 2 && (await page.innerText('#warm-cue')).length > 10);
+check('a breath pacer is running', /breathe|hold|settle/i.test(await page.innerText('#warm-breath')));
+const firstName = await page.innerText('#warm-name');
+await page.click('#warm-skip');
+check('skip advances to the next stretch', (await page.innerText('#warm-name')) !== firstName);
+await page.click('#warm-pause');
+check('pause holds the clock', (await page.innerText('#warm-eyebrow')).includes('PAUSED'));
+await page.click('#warm-pause');
+check('start_warmup refuses to run two at once', !!(await call('start_warmup', { plan: '5min' })).error);
+check('bad plan rejected', !!(await call('start_warmup', { plan: 'forever' })).error);
+const warmDone = await page.evaluate(() => window.arcana.finishWarmup());
+check('finishing early still counts the time', warmDone.ok === true && warmDone.early === true);
+check('the overlay closes', await page.isHidden('#warmup'));
 
 // ── the quest: five beats, a boss, an ending ─────────────────────────────────
 console.log('— quest arc —');

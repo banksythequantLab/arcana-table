@@ -182,12 +182,32 @@ export const BASE_TOOLS = [
     name: 'propose_challenge',
     description: 'HEROIC EFFORT — stake a real exercise against the dice. Offer this before a roll that matters: the player does the reps, the reward auto-applies to their next d20. Always optional; scale to the stakes (boss fight → 10 push-ups for nat20; minor check → a few jumping jacks for +2). ALWAYS check get_fitness_log first and offer ONLY an exercise from its availableExercises list — that is the set this player can actually do. The call resolves when the player finishes or declines (or returns "pending" if they take longer than 90s — check back with get_fitness_log).',
     inputSchema: obj({
+      mode: { type: 'string', enum: ['reps', 'hold'], description: 'reps = counted repetitions (default) · hold = a timed hold, e.g. a plank or a stretch' },
       exercise: { type: 'string', enum: A.EXERCISES, description: 'Which exercise' },
-      reps: num('Repetition count (1-100). Keep it achievable: 5-25 for most people.'),
+      reps: num('Repetition count for mode "reps" (1-100). Keep it achievable: 5-25 for most people.'),
+      seconds: num('Hold length in seconds for mode "hold" (5-300). 20-45s is a real hold for most people.'),
       reward: { type: 'string', enum: Object.keys(A.REWARDS), description: 'bonus+2 · bonus+5 · advantage · set10 (next d20 is a 10) · nat20 (next d20 is a natural 20)' },
       reason: str('Why fate demands sweat right now, in DM voice'),
-    }, ['exercise', 'reps', 'reward']),
+    }, ['exercise', 'reward']),
     handler: a => A.proposeChallenge(a),
+  },
+  {
+    name: 'propose_oath',
+    description: 'OATH — the other way to pay. Stake something real in the room that this app cannot see: clearing the sink, twenty minutes of study, ten pages of reading, practising an instrument, one dreaded email. The table LOCKS for the minutes agreed — the board freezes, you wait, and the player confirms on their honour when they return. It pays exactly the same dice rewards as a Heroic Effort, and you must treat it as an equal, never a consolation prize. Reach for it when a player cannot or would rather not exercise, when they mention something they are avoiding, or simply to vary what the table asks of them. Keep the minutes honest: 5-25 for most things.',
+    inputSchema: obj({
+      label: str('The actual commitment, in their words: "clear the sink", "read 10 pages of the textbook"'),
+      kind: { type: 'string', enum: A.OATH_KINDS, description: 'chores · study · reading · practice · admin · tidy' },
+      minutes: num('How long the table waits (1-60). Match it to the real job.'),
+      reward: { type: 'string', enum: Object.keys(A.REWARDS), description: 'Same rewards as a Heroic Effort' },
+      reason: str('Why the fates accept this, in DM voice'),
+    }, ['label', 'minutes', 'reward']),
+    handler: a => A.proposeOath(a),
+  },
+  {
+    name: 'start_warmup',
+    description: 'Run the guided warm-up: standing stretches, head to ankle, each with a spoken cue and a timer that advances itself. Offer this ONCE at the very start of a run, before the first real beat — "before we begin, stand up" — and never interrupt a fight with it. Plans: 90s (6 stretches), 3min (12), 5min (20), 10min (20 at a slower hold). Finishing it grants +2 on the next roll. It needs no equipment and no floor.',
+    inputSchema: obj({ plan: { type: 'string', enum: ['90s', '3min', '5min', '10min'], description: 'How long the player has' } }),
+    handler: a => A.startWarmup(a),
   },
 ];
 
@@ -234,7 +254,9 @@ const registered = new Map();   // name → AbortController
 
 // The only writes allowed while a hero is down: say something, roll the save,
 // offer the reps, or heal them. Everything else waits.
-const FROZEN_OK = new Set(['death_save', 'propose_challenge', 'narrate', 'update_hp']);
+const FROZEN_OK = new Set(['death_save', 'propose_challenge', 'propose_oath', 'narrate', 'update_hp']);
+// An Oath locks the table just as hard: the player is out of the room.
+const OATH_OK = new Set(['narrate']);
 
 function wrap(def) {
   return {
@@ -247,6 +269,15 @@ function wrap(def) {
       try {
         // While a hero is down the board is frozen. Reads still work, and so do
         // the two things that can end it — a death save, or real reps.
+        // The player is away keeping an Oath. Nothing happens until they return.
+        if (A.oathActive() && !OATH_OK.has(def.name) && !def.annotations?.readOnlyHint) {
+          const left = Math.ceil(A.oathRemaining() / 1000);
+          updateAgent(entry, 'error', 'the player is away keeping an Oath');
+          return {
+            error: `The player is away keeping an Oath: "${state.oath.label}". ${left}s left on the clock. The table waits — do not act, do not roll, and do not fill the silence. Say one short line if you must and then wait.`,
+            oathActive: true, secondsLeft: left,
+          };
+        }
         if (A.timeStopped() && !FROZEN_OK.has(def.name) && !def.annotations?.readOnlyHint) {
           const msg = `Time has stopped: ${state.downed.name} is down (${state.downed.fails}/3 failures). Nothing else moves. Either call death_save, or — better — offer a Heroic Effort, because completed reps always put them back up.`;
           updateAgent(entry, 'error', 'frozen — a hero is down');
@@ -343,6 +374,8 @@ export async function initTools() {
       return wrap(def).execute(args);
     },
     resetQuest: () => A.resetQuest(),
+    finishWarmup: (o) => A.finishWarmup(o || { early: true }),
   };
+  window.__st = state;                 // tests reach in to fast-forward clocks
   emit('agent');
 }

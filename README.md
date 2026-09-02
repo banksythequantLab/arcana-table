@@ -14,10 +14,24 @@ exact surface an outside ChatGPT or Claude agent uses. So an external agent can
 take the co-DM seat too, through the same contract. The page doesn't just claim
 its tools are real; the built-in DM is the proof.
 
-And when a roll really matters, the agent can invoke **Heroic Effort**: it stakes
-a real exercise against the dice. Ten jumping jacks for +2. Fifteen squats for
-advantage. Ten push-ups and your next d20 is a **natural 20**. The agent brings
-the dungeon; you bring the muscle.
+And when a roll really matters, the agent can stake something real against the
+dice. **Heroic Effort** has three shapes and they all pay the same:
+
+- **Reps** — ten jumping jacks for +2, ten push-ups for a natural 20.
+- **A hold** — a 30-second plank while the wyrm circles. The clock counts itself.
+- **An Oath** — something in the room this app cannot see: clear the sink, twenty
+  minutes of study, ten pages of the textbook. The table **locks** for the time
+  agreed, the DM waits in silence, and you confirm on your honour when you get
+  back. Nothing here can verify it, which is rather the point.
+
+The Oath is not a consolation prize, and the DM is told so in as many words.
+Some players cannot do push-ups today. Some are stuck on homework. The table
+takes either.
+
+Runs open with an optional **warm-up** — twenty standing stretches, head to
+ankle, each with its own cue and a timer that advances itself. 90 seconds, 3, 5,
+or 10 minutes. Nothing needs a mat or a floor, and finishing it starts you warm:
++2 on your first roll.
 
 ## The run has an ending
 
@@ -40,7 +54,7 @@ Built for [The WebMCP Challenge](https://webmcp.devpost.com/) (Devpost, 2026).
 
 1. **Just open the live URL — in any modern browser.** The page ships the
    vendored [`@mcp-b/webmcp-polyfill`](https://github.com/WebMCP-org/npm-packages)
-   (MIT), so `document.modelContext` and all 20 tools are real even where the
+   (MIT), so `document.modelContext` and all 21 tools are real even where the
    browser hasn't implemented WebMCP yet. No flags, no setup. Where the browser
    *does* ship WebMCP natively, the native implementation wins and the badge
    says `WebMCP native` instead of `polyfill`.
@@ -49,7 +63,7 @@ Built for [The WebMCP Challenge](https://webmcp.devpost.com/) (Devpost, 2026).
 3. **Or bring your own agent.** In a WebMCP-capable agent browser, point your
    agent at the page: *"You're my co-DM. Read the board, set the scene, and run
    me through this dungeon. Offer Heroic Effort when a roll matters."* It drives
-   the identical 20 tools.
+   the identical 21 tools.
 4. **Or run it yourself.** The **🎩 DM Panel** tab does everything the tools do,
    by hand — the game never depends on a network call.
 
@@ -84,7 +98,9 @@ await arcana.call('roll_dice', { formula: 'd20', reason: 'Attack the dragon' })
 | `update_hp` | Damage / healing | combat-only · PC damage waits for approval |
 | `apply_condition` | poisoned, stunned, blessed… | combat-only |
 | `award_loot` | Items + gold | |
-| `propose_challenge` | **Heroic Effort**: stake exercise vs. dice reward | resolves when the player finishes or declines |
+| `propose_challenge` | **Heroic Effort**: reps or a timed hold vs. a dice reward | resolves when the player finishes or declines |
+| `propose_oath` | Stake a real-world task — chores, study, reading | **locks the table** for the minutes agreed |
+| `start_warmup` | Guided standing stretches: 90s / 3 / 5 / 10 min | finishing grants +2 next roll |
 | `get_quest` | The run: which of the five beats, its objective, what is done | `readOnlyHint` — the DM's destination |
 | `advance_quest` | Mark a beat achieved: pays the milestone, swaps the map, spawns the boss | clearing the last beat wins the run |
 | `death_save` | Roll for a hero at 0 HP | **only registered while someone is down** |
@@ -98,7 +114,7 @@ Design choices worth noting:
   `registerTool(def, { signal })` — and unregistered by `controller.abort()`,
   which is how the WebMCP spec removes tools and fires `toolchange` so agents
   refresh. The test suite asserts this against the live registry: `getTools()`
-  returns 16, then 19 once combat starts, then 16 again when it ends — and 20
+  returns 18, then 21 once combat starts, then 18 again when it ends — and 22
   the moment a hero drops, because `death_save` exists only while someone is
   bleeding out.
 - **Human-in-the-loop by construction.** Destructive calls (`remove_token`,
@@ -115,12 +131,17 @@ Design choices worth noting:
 | Challenge (agent-scaled) | Reward |
 |---|---|
 | ~10 jumping jacks | `bonus+2` next roll |
+| ~30s plank (a hold) | `bonus+2` |
 | ~15 squats | `advantage` |
+| 10 min of study (an Oath) | `advantage` |
 | ~15 crunches | `set10` — next d20 lands on 10 |
 | ~10 push-ups | `nat20` — the bard will sing of this |
+| 20 min on the thing you're avoiding (an Oath) | `nat20` |
 
 Reps are counted by tap, spacebar, or **out loud** — hands-free mode listens for
-your count or a plain "done", because you cannot press a key mid-push-up.
+your count or a plain "done", because you cannot press a key mid-push-up. Holds
+count themselves down; you are in a plank, not at a keyboard. Oaths run on wall
+time and unlock their claim button only when the minutes are actually served.
 
 Challenges are always optional, and the DM must call `get_fitness_log` and offer
 **only** from `availableExercises` — the pool the player chose in settings.
@@ -159,13 +180,15 @@ npx serve .        # or: python3 -m http.server 8080
 cd test && npm install && node smoke.mjs
 ```
 
-68 assertions, Playwright + Chromium. Drives the full tool surface **through the
+93 assertions, Playwright + Chromium. Drives the full tool surface **through the
 real `document.modelContext`** — enumerating tools with `getTools()`, invoking
 them with `executeTool()`, asserting `readOnlyHint` on the read tools, and
 proving the dynamic toolsets register and unregister (16 → 19 → 16, and 20 while
 a hero is down) — plus the approval Allow *and* Deny paths, a complete
-push-ups-to-natural-20 loop, a five-beat run walked to victory, and the frozen
-board that only reps or a death save can unfreeze.
+push-ups-to-natural-20 loop, all three effort modes (reps, a self-counting hold,
+and an Oath that locks the board until its clock runs out), the guided warm-up,
+a five-beat run walked to victory, and the frozen board that only effort or a
+death save can unfreeze.
 
 ## Art pipeline
 

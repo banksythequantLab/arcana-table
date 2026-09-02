@@ -2,7 +2,7 @@
 // Story log, party sheet, manual DM panel, agent log, approvals, dice overlay,
 // and the Heroic Effort challenge modal (tap / spacebar rep counter).
 
-import { state, MAPS, QUEST } from './state.js';
+import { state, MAPS, QUEST, STRETCHES, WARMUP_PLANS } from './state.js';
 import * as A from './actions.js';
 import { onChange } from './actions.js';
 import { agentState, pendingApprovals, settleApproval } from './tools.js';
@@ -19,6 +19,7 @@ const prose = s => esc(s)
   .replace(/(^|[\s(])\*([^*\n]+)\*/g, '$1<em>$2</em>');
 
 const QUEST_TITLES = QUEST.beats.map(b => b.title);
+const STRETCH_NAMES = STRETCHES.map(s => s.name);
 
 const STARTERS = [
   'Look around and tell me what I see.',
@@ -55,6 +56,8 @@ export function initUI() {
   bindTabs();
   bindDMPanel();
   bindChallengeModal();
+  bindWarmup();
+  bindOath();
   bindSay();
   bindIntro();
   onChange(render);
@@ -257,10 +260,28 @@ function burst() {
 function bindChallengeModal() {
   $('#chal-accept').onclick = () => A.acceptChallenge();
   $('#chal-decline').onclick = () => A.declineChallenge();
-  $('#chal-tap').onclick = () => A.tickChallenge(1);
+  // A hold counts itself down — tapping does nothing, and that is correct.
+  $('#chal-tap').onclick = () => { if (state.challenge?.mode !== 'hold') A.tickChallenge(1); };
   window.addEventListener('keydown', e => {
-    if (e.code === 'Space' && state.challenge?.status === 'active') { e.preventDefault(); A.tickChallenge(1); }
+    if (e.code === 'Space' && state.challenge?.status === 'active' && state.challenge.mode !== 'hold') {
+      e.preventDefault(); A.tickChallenge(1);
+    }
   });
+}
+
+function bindWarmup() {
+  $('#warm-pause').onclick = () => A.pauseWarmup();
+  $('#warm-skip').onclick = () => A.skipStretch();
+  $('#warm-done').onclick = () => A.finishWarmup({ early: true });
+}
+
+function bindOath() {
+  $('#oath-accept').onclick = () => A.acceptOath();
+  $('#oath-decline').onclick = () => A.breakOath({ declined: true });
+  $('#oath-keep').onclick = () => A.keepOath();
+  $('#oath-quit').onclick = () => A.breakOath();
+  // The Oath clock is wall-time, not state changes — it needs its own heartbeat.
+  setInterval(() => { if (A.oathActive()) renderOath(); }, 1000);
 }
 
 let chalTimer = null;
@@ -269,16 +290,19 @@ function renderChallenge() {
   const m = $('#challenge-modal');
   if (!c) { m.hidden = true; if (chalTimer) { clearInterval(chalTimer); chalTimer = null; } return; }
   m.hidden = false;
-  $('#chal-title').textContent = `${c.reps} ${c.exercise.toUpperCase()}`;
+  const hold = c.mode === 'hold';
+  $('#chal-title').textContent = hold ? `${c.seconds}s ${c.exercise.toUpperCase()}` : `${c.reps} ${c.exercise.toUpperCase()}`;
   $('#chal-reward').textContent = '→ ' + A.REWARDS[c.reward].label;
   $('#chal-reason').textContent = c.reason || '';
   const offered = c.status === 'offered';
   $('#chal-offer-row').hidden = !offered;
   $('#chal-active-row').hidden = offered;
+  $('#chal-tap').classList.toggle('holding', hold);
   if (!offered) {
-    $('#chal-count').textContent = `${c.progress} / ${c.reps}`;
+    $('#chal-count').textContent = hold ? `${c.reps - c.progress}s` : `${c.progress} / ${c.reps}`;
     const pct = (c.progress / c.reps) * 100;
     $('#chal-tap').style.setProperty('--pct', pct + '%');
+    $('#ring-hint').textContent = hold ? 'HOLD IT — the clock is running' : 'TAP or SPACE per rep';
     if (!chalTimer) chalTimer = setInterval(() => {
       if (state.challenge?.startedAt) $('#chal-time').textContent = Math.round((Date.now() - state.challenge.startedAt) / 1000) + 's';
     }, 250);
@@ -302,8 +326,27 @@ function bindDMPanel() {
   $('#dm-scene').onchange = e => A.setScene({ mapId: e.target.value, title: MAPS[e.target.value].name });
   $('#dm-reveal').onclick = () => { state.tokens.filter(t => t.kind === 'pc').forEach(t => A.revealArea({ x: t.x, y: t.y, radius: 5 })); };
   $('#dm-challenge').onclick = () => {
-    const ex = $('#dm-exercise').value, reps = parseInt($('#dm-reps').value, 10) || 10, reward = $('#dm-reward').value;
-    const r = A.proposeChallenge({ exercise: ex, reps, reward, reason: 'The table demands proof of heroism!' });
+    const mode = $('#dm-mode').value;
+    const n = parseInt($('#dm-reps').value, 10) || 10;
+    const r = A.proposeChallenge({
+      mode, exercise: $('#dm-exercise').value, reward: $('#dm-reward').value,
+      reps: mode === 'reps' ? n : undefined, seconds: mode === 'hold' ? n : undefined,
+      reason: 'The table demands proof of heroism!',
+    });
+    if (r?.error) alert(r.error);
+  };
+  $('#dm-warm').onclick = () => {
+    const r = A.startWarmup({ plan: $('#dm-warm-plan').value });
+    if (r?.error) alert(r.error);
+  };
+  $('#dm-oath').onclick = () => {
+    const r = A.proposeOath({
+      label: $('#dm-oath-label').value.trim() || 'the thing you have been avoiding',
+      kind: $('#dm-oath-kind').value,
+      minutes: parseInt($('#dm-oath-min').value, 10) || 10,
+      reward: $('#dm-reward').value,
+      reason: 'Swear it to the table, and the table pays.',
+    });
     if (r?.error) alert(r.error);
   };
   $('#dm-auto').onchange = e => { state.settings.autoApprove = e.target.checked; };
@@ -319,6 +362,49 @@ function renderDM() {
   const down = !!state.downed;
   $('#dm-save').hidden = !down;
   $('#dm-advance').disabled = down || state.quest.status !== 'active';
+}
+
+// ── the warm-up ──────────────────────────────────────────────────────────────
+// Something is always moving here: the ring drains a second at a time, the cue
+// swaps, and the breath pacer runs a 4-in / 4-out cycle underneath it.
+const BREATHS = ['Breathe in…', 'Breathe in…', 'and hold', 'Breathe out…', 'Breathe out…', 'and settle'];
+function renderWarmup() {
+  const w = A.currentStretch();
+  const el = $('#warmup');
+  el.hidden = !w;
+  if (!w) return;
+  $('#warm-eyebrow').textContent = w.paused ? '⏸ PAUSED' : '🤸 WARM-UP';
+  $('#warm-step').textContent = `${w.index + 1} / ${w.of}`;
+  $('#warm-name').textContent = w.name;
+  $('#warm-cue').textContent = w.cue;
+  $('#warm-note').textContent = w.note;
+  $('#warm-count').textContent = w.remaining;
+  $('#warm-ring').style.setProperty('--pct', `${((w.hold - w.remaining) / w.hold) * 100}%`);
+  $('#warm-breath').textContent = w.paused ? '—' : BREATHS[Math.floor((w.hold - w.remaining) / 2) % BREATHS.length];
+  const next = STRETCH_NAMES[w.index + 1];
+  $('#warm-next').textContent = w.index + 1 < w.of && next ? `next · ${next}` : 'last one';
+  $('#warm-pause').textContent = w.paused ? 'Resume' : 'Pause';
+}
+
+// ── an Oath ──────────────────────────────────────────────────────────────────
+function renderOath() {
+  const o = state.oath;
+  const el = $('#oath');
+  el.hidden = !o;
+  if (!o) return;
+  $('#oath-label').textContent = o.label;
+  $('#oath-reason').textContent = o.reason || `${o.minutes} minutes. The table will wait.`;
+  const active = o.status === 'active';
+  $('#oath-offer').hidden = active;
+  $('#oath-active').hidden = !active;
+  if (active) {
+    const ms = A.oathRemaining();
+    const s = Math.ceil(ms / 1000);
+    $('#oath-clock').textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    const keep = $('#oath-keep');
+    keep.disabled = ms > 0;
+    keep.textContent = ms > 0 ? 'Done — I kept it' : '✓ Done — I kept it';
+  }
 }
 
 // ── the quest rail ───────────────────────────────────────────────────────────
@@ -378,6 +464,8 @@ function renderQuest() {
 // ── master render ────────────────────────────────────────────────────────────
 function render() {
   renderHeader();
+  renderWarmup();
+  renderOath();
   renderQuest();
   renderLog();
   renderSay();

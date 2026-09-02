@@ -2,7 +2,10 @@
 // Every game mutation is a named action. The UI buttons call these; the WebMCP
 // tools call these. One API, two hands on the table.
 
-import { state, save, findToken, isWalkable, GRID_W, GRID_H, MAPS, QUEST, DEATH_SAVE_DC, DEATH_SAVE_FAILS } from './state.js';
+import {
+  state, save, findToken, isWalkable, GRID_W, GRID_H, MAPS, QUEST,
+  DEATH_SAVE_DC, DEATH_SAVE_FAILS, STRETCHES, WARMUP_PLANS, OATH_KINDS,
+} from './state.js';
 
 const listeners = new Set();
 export function onChange(fn) { listeners.add(fn); }
@@ -314,20 +317,28 @@ export function awardLoot({ items = [], gold = 0 }) {
 let challengeSeq = 0;
 const challengeWaiters = new Map();   // id → {resolve}
 
-export function proposeChallenge({ exercise, reps, reward, reason = '' }) {
+export function proposeChallenge({ exercise, reps, reward, reason = '', mode = 'reps', seconds }) {
   if (state.challenge) return { error: 'A challenge is already in progress — resolve it first.' };
+  if (state.oath) return { error: 'The player is away keeping an Oath. Wait for them.' };
+  mode = mode === 'hold' ? 'hold' : 'reps';
   exercise = String(exercise || '').toLowerCase();
   const allowed = allowedExercises();
   if (!EXERCISES.includes(exercise)) return { error: `Unknown exercise "${exercise}". Choose: ${allowed.join(', ')}.` };
   if (!allowed.includes(exercise)) {
     return { error: `This player has not enabled "${exercise}". Offer one of: ${allowed.join(', ')}.` };
   }
-  reps = Math.max(1, Math.min(100, Math.round(reps || 10)));
+  if (mode === 'hold') {
+    seconds = Math.max(5, Math.min(300, Math.round(seconds || 30)));
+    reps = seconds;                          // the ring fills once per second
+  } else {
+    reps = Math.max(1, Math.min(100, Math.round(reps || 10)));
+  }
   if (!REWARDS[reward]) return { error: `Unknown reward "${reward}". Choose: ${Object.keys(REWARDS).join(', ')}.` };
 
   const id = `chal-${++challengeSeq}-${Date.now().toString(36)}`;
-  state.challenge = { id, exercise, reps, reward, reason, progress: 0, status: 'offered', startedAt: null };
-  logStory('challenge', 'DM', `💪 HEROIC EFFORT: ${reps} ${exercise} → ${REWARDS[reward].label}. ${reason}`);
+  state.challenge = { id, mode, exercise, reps, seconds: mode === 'hold' ? seconds : null, reward, reason, progress: 0, status: 'offered', startedAt: null };
+  const ask = mode === 'hold' ? `${seconds}s ${exercise}` : `${reps} ${exercise}`;
+  logStory('challenge', 'DM', `💪 HEROIC EFFORT: ${ask} → ${REWARDS[reward].label}. ${reason}`);
   emit('challenge');
 
   return new Promise(resolve => {
@@ -341,10 +352,20 @@ export function proposeChallenge({ exercise, reps, reward, reason = '' }) {
   });
 }
 
+let holdTimer = null;
 export function acceptChallenge() {
   const c = state.challenge;
   if (!c || c.status !== 'offered') return { error: 'No challenge waiting.' };
   c.status = 'active'; c.startedAt = Date.now();
+  // A hold counts itself down — you cannot tap a button while you are in a plank.
+  if (c.mode === 'hold') {
+    clearInterval(holdTimer);
+    holdTimer = setInterval(() => {
+      const cur = state.challenge;
+      if (!cur || cur.status !== 'active' || cur.mode !== 'hold') { clearInterval(holdTimer); holdTimer = null; return; }
+      tickChallenge(1);
+    }, 1000);
+  }
   emit('challenge');
   return { ok: true };
 }
@@ -361,13 +382,16 @@ export function completeChallenge() {
   const c = state.challenge;
   if (!c) return { error: 'No challenge in progress.' };
   const secs = c.startedAt ? Math.round((Date.now() - c.startedAt) / 1000) : 0;
+  clearInterval(holdTimer); holdTimer = null;
   REWARDS[c.reward].apply(state.boosts);
-  state.fitness.totalReps += c.reps;
+  if (c.mode === 'hold') state.fitness.holdSeconds += c.seconds;
+  else state.fitness.totalReps += c.reps;
   state.fitness.byExercise[c.exercise] = (state.fitness.byExercise[c.exercise] || 0) + c.reps;
   state.fitness.challengesDone++;
   state.fitness.diceEarned.push(c.reward);
-  logStory('challenge', 'Player', `completed ${c.reps} ${c.exercise} in ${secs}s — earned: ${REWARDS[c.reward].label}!`);
-  const done = { status: 'completed', challengeId: c.id, exercise: c.exercise, reps: c.reps, seconds: secs, rewardGranted: REWARDS[c.reward].label };
+  const did = c.mode === 'hold' ? `held ${c.seconds}s of ${c.exercise}` : `completed ${c.reps} ${c.exercise} in ${secs}s`;
+  logStory('challenge', 'Player', `${did} — earned: ${REWARDS[c.reward].label}!`);
+  const done = { status: 'completed', challengeId: c.id, mode: c.mode, exercise: c.exercise, reps: c.reps, seconds: secs, rewardGranted: REWARDS[c.reward].label };
   // Reps done over a downed hero are never wasted: they clear a failed death
   // save and put them back on their feet, whatever the dice have been doing.
   if (state.downed) { done.revived = state.downed.name; done.note = 'The reps put them back up. Time moves again.'; repsRevive(); }
@@ -381,6 +405,7 @@ export function completeChallenge() {
 export function declineChallenge() {
   const c = state.challenge;
   if (!c) return { error: 'No challenge in progress.' };
+  clearInterval(holdTimer); holdTimer = null;
   logStory('challenge', 'Player', `declined the ${c.exercise} challenge — rolling fate as it lies.`);
   const res = { status: 'declined', challengeId: c.id, note: 'Player declined — proceed with a normal roll.' };
   const waiter = challengeWaiters.get(c.id);
@@ -388,6 +413,172 @@ export function declineChallenge() {
   state.challenge = null;
   emit('challenge');
   return res;
+}
+
+// ── Oaths: effort the app cannot see ─────────────────────────────────────────
+// Not everyone can drop and do push-ups, and not every session should be about
+// sweat. An Oath stakes something real in the room — the dishes, twenty pages,
+// twenty minutes of study — against the same dice. The app cannot verify it, so
+// it spends the one thing it can actually charge: your time. The table locks,
+// the DM waits, and you confirm on your honour when you get back.
+let oathSeq = 0;
+const oathWaiters = new Map();
+
+export function proposeOath({ label, kind = 'chores', minutes, reward, reason = '' }) {
+  if (state.oath) return { error: 'An Oath is already being kept. Wait for the player to come back.' };
+  if (state.challenge) return { error: 'A challenge is already in progress — resolve it first.' };
+  label = String(label || '').trim().slice(0, 90);
+  if (!label) return { error: 'Say what the Oath actually is, e.g. "clear the sink" or "read 10 pages".' };
+  kind = OATH_KINDS.includes(String(kind).toLowerCase()) ? String(kind).toLowerCase() : 'chores';
+  minutes = Math.max(1, Math.min(60, Math.round(minutes || 10)));
+  if (!REWARDS[reward]) return { error: `Unknown reward "${reward}". Choose: ${Object.keys(REWARDS).join(', ')}.` };
+
+  const id = `oath-${++oathSeq}-${Date.now().toString(36)}`;
+  state.oath = { id, label, kind, minutes, reward, reason, status: 'offered', startedAt: null, endsAt: null };
+  logStory('challenge', 'DM', `📜 OATH: ${label} — ${minutes} min → ${REWARDS[reward].label}. ${reason}`);
+  emit('oath');
+
+  return new Promise(resolve => {
+    oathWaiters.set(id, resolve);
+    setTimeout(() => {
+      if (oathWaiters.has(id)) {
+        oathWaiters.delete(id);
+        resolve({ status: 'pending', oathId: id, note: 'The player is away keeping it. Call get_fitness_log to check back.' });
+      }
+    }, 90_000);
+  });
+}
+
+export function acceptOath() {
+  const o = state.oath;
+  if (!o || o.status !== 'offered') return { error: 'No Oath waiting.' };
+  o.status = 'active';
+  o.startedAt = Date.now();
+  o.endsAt = o.startedAt + o.minutes * 60_000;
+  logStory('challenge', 'Player', `swore an Oath: ${o.label}. The table waits ${o.minutes} minutes.`);
+  emit('oath');
+  return { ok: true, endsAt: o.endsAt };
+}
+
+export function oathRemaining() {
+  const o = state.oath;
+  if (!o || o.status !== 'active') return 0;
+  return Math.max(0, o.endsAt - Date.now());
+}
+
+/** The player says they did it. The clock is the only witness we have. */
+export function keepOath() {
+  const o = state.oath;
+  if (!o) return { error: 'No Oath in progress.' };
+  if (o.status === 'active' && oathRemaining() > 0) {
+    return { error: `Not yet — ${Math.ceil(oathRemaining() / 1000)}s still on the clock. Go finish it.` };
+  }
+  REWARDS[o.reward].apply(state.boosts);
+  state.fitness.oathsKept++;
+  state.fitness.oathMinutes += o.minutes;
+  state.fitness.challengesDone++;
+  state.fitness.diceEarned.push(o.reward);
+  logStory('challenge', 'Player', `kept the Oath — ${o.label} (${o.minutes} min). Earned: ${REWARDS[o.reward].label}!`);
+  const done = { status: 'kept', oathId: o.id, label: o.label, kind: o.kind, minutes: o.minutes, rewardGranted: REWARDS[o.reward].label };
+  if (state.downed) { done.revived = state.downed.name; done.note = 'Keeping the Oath put them back up. Time moves again.'; repsRevive(); }
+  const w = oathWaiters.get(o.id);
+  if (w) { oathWaiters.delete(o.id); w(done); }
+  state.oath = null;
+  emit('oath');
+  return done;
+}
+
+/** Walked away, or never swore it. No reward, and no lecture either. */
+export function breakOath({ declined = false } = {}) {
+  const o = state.oath;
+  if (!o) return { error: 'No Oath in progress.' };
+  if (!declined) state.fitness.oathsBroken++;
+  logStory('challenge', 'Player',
+    declined ? `passed on the Oath — rolling fate as it lies.` : `set the Oath aside. No reward, no judgement.`);
+  const res = {
+    status: declined ? 'declined' : 'abandoned', oathId: o.id,
+    note: 'No reward was granted. Proceed with a normal roll and do not nag them about it.',
+  };
+  const w = oathWaiters.get(o.id);
+  if (w) { oathWaiters.delete(o.id); w(res); }
+  state.oath = null;
+  emit('oath');
+  return res;
+}
+
+export function oathActive() { return !!state.oath && state.oath.status === 'active'; }
+
+// ── the warm-up ──────────────────────────────────────────────────────────────
+// Ten minutes of standing still is ten minutes of nothing happening, so the
+// program drives itself: the cue changes, the ring drains, and a breath pacer
+// runs underneath. The player's only job is to follow along.
+let warmTimer = null;
+
+export function startWarmup({ plan = '90s' } = {}) {
+  if (!WARMUP_PLANS[plan]) return { error: `Unknown plan "${plan}". Choose: ${Object.keys(WARMUP_PLANS).join(', ')}.` };
+  if (state.warmup) return { error: 'A warm-up is already running.' };
+  const p = WARMUP_PLANS[plan];
+  state.warmup = { planId: plan, index: 0, hold: p.hold, count: p.count, remaining: p.hold, paused: false, startedAt: Date.now() };
+  logStory('challenge', 'DM', `🤸 Warm-up — ${p.label}, ${p.count} stretches. Stand up.`);
+  clearInterval(warmTimer);
+  warmTimer = setInterval(tickWarmup, 1000);
+  emit('warmup');
+  return { ok: true, plan, stretches: p.count, holdSeconds: p.hold, totalSeconds: p.count * p.hold, first: STRETCHES[0].name };
+}
+
+function tickWarmup() {
+  const w = state.warmup;
+  if (!w) { clearInterval(warmTimer); warmTimer = null; return; }
+  if (w.paused) return;
+  w.remaining--;
+  if (w.remaining <= 0) {
+    w.index++;
+    if (w.index >= w.count) return void finishWarmup();
+    w.remaining = w.hold;
+  }
+  emit('warmup');
+}
+
+export function skipStretch() {
+  const w = state.warmup;
+  if (!w) return { error: 'No warm-up running.' };
+  w.index++;
+  if (w.index >= w.count) return finishWarmup();
+  w.remaining = w.hold;
+  emit('warmup');
+  return { ok: true, now: STRETCHES[w.index].name };
+}
+
+export function pauseWarmup(paused) {
+  if (!state.warmup) return { error: 'No warm-up running.' };
+  state.warmup.paused = paused === undefined ? !state.warmup.paused : !!paused;
+  emit('warmup');
+  return { ok: true, paused: state.warmup.paused };
+}
+
+export function finishWarmup({ early = false } = {}) {
+  const w = state.warmup;
+  if (!w) return { error: 'No warm-up running.' };
+  clearInterval(warmTimer); warmTimer = null;
+  const done = w.index;
+  const secs = Math.round((Date.now() - w.startedAt) / 1000);
+  state.fitness.holdSeconds += secs;
+  if (!early) state.fitness.warmedUp = true;
+  state.warmup = null;
+  logStory('challenge', 'Player',
+    early ? `stopped the warm-up after ${done} stretches. Still counts.`
+          : `finished the warm-up — ${done} stretches, ${Math.round(secs / 60)} min. Loose and ready.`);
+  // Warming up is its own small reward: the first roll of the run runs warm.
+  if (!early && done >= 4) { state.boosts.bonus += 2; logStory('challenge', 'DM', 'Warm muscles, steady hands: +2 on your next roll.'); }
+  emit('warmup');
+  return { ok: true, stretchesDone: done, seconds: secs, early, bonusGranted: !early && done >= 4 ? '+2 next roll' : null };
+}
+
+export function currentStretch() {
+  const w = state.warmup;
+  if (!w) return null;
+  const s = STRETCHES[w.index] || STRETCHES[STRETCHES.length - 1];
+  return { ...s, index: w.index, of: w.count, remaining: w.remaining, hold: w.hold, paused: w.paused };
 }
 
 // ── the quest ────────────────────────────────────────────────────────────────
@@ -482,9 +673,22 @@ export function getCharacterSheet({ tokenId } = {}) {
 export function getFitnessLog() {
   return {
     ...state.fitness,
-    activeChallenge: state.challenge ? { exercise: state.challenge.exercise, reps: state.challenge.reps, progress: state.challenge.progress, status: state.challenge.status } : null,
+    activeChallenge: state.challenge
+      ? { mode: state.challenge.mode, exercise: state.challenge.exercise, reps: state.challenge.reps, seconds: state.challenge.seconds, progress: state.challenge.progress, status: state.challenge.status }
+      : null,
+    activeOath: state.oath
+      ? { label: state.oath.label, minutes: state.oath.minutes, status: state.oath.status, secondsLeft: Math.ceil(oathRemaining() / 1000) }
+      : null,
+    warmup: state.warmup ? currentStretch() : null,
     unspentBoosts: { ...state.boosts },
     availableExercises: allowedExercises(),
-    coachNote: 'Offer ONLY exercises listed in availableExercises — the player chose them. Vary muscle groups; scale reps down if the player is slowing. Challenges must always stay optional.',
+    oathKinds: OATH_KINDS,
+    coachNote: [
+      'Three ways to stake effort, and they are equals — never treat the Oath as the lesser option.',
+      'reps: countable, tapped or counted out loud. hold: a timed hold, the ring counts itself down.',
+      'oath: something real in the room the app cannot see. It locks the table for the minutes agreed.',
+      'Offer ONLY exercises listed in availableExercises — the player chose them.',
+      'Vary muscle groups; scale down if they are slowing. Everything here is always optional.',
+    ].join(' '),
   };
 }

@@ -212,7 +212,13 @@ input[type=checkbox]{flex:0 0 auto;width:18px;height:18px;padding:0;accent-color
 .chal-reward{font:800 19px "Baloo 2",cursive;color:#7A1F2B}
 .chal-reason{font-style:italic;color:#5C5165;min-height:1.2em}
 .chal-row{display:flex;gap:12px;align-items:center;justify-content:center;margin-top:14px;flex-wrap:wrap}
-.chal-row .btn.ghost{color:var(--ink);border-color:var(--ink)}
+/* .btn.ghost is drawn in --paper for dark grounds; on a parchment card that
+   makes it cream-on-cream, i.e. invisible. Every paper card needs ink. */
+.chal-row .btn.ghost,
+.warm-row .btn.ghost,
+.oath-row .btn.ghost{color:var(--ink);border-color:var(--ink)}
+/* a disabled button must look disabled, not merely refuse to work */
+.btn:disabled{opacity:.42;cursor:default;box-shadow:none}
 .rep-ring{
   position:relative;width:190px;height:190px;border-radius:50%;cursor:pointer;border:4px solid var(--ink);
   background:conic-gradient(var(--green) var(--pct,0%), #E2D6BC 0);
@@ -386,4 +392,62 @@ input[type=checkbox]{flex:0 0 auto;width:18px;height:18px;padding:0;accent-color
   .qr-objective{font-size:11.5px}
   .downed-who{font-size:26px}
   .ending-title{font-size:36px}
+}
+
+/* ── the warm-up ───────────────────────────────────────────────────────────
+   Ten minutes of standing still needs something moving on screen the whole
+   time: the ring drains, the cue changes, the breath pacer cycles under it. */
+.warm-backdrop{
+  position:fixed;inset:0;z-index:78;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle at 50% 40%, rgba(40,80,70,.45), rgba(8,10,14,.94) 72%);
+  padding:20px;overflow-y:auto
+}
+.warm-card{
+  background:var(--paper);color:var(--ink);border:4px solid var(--ink);border-radius:20px;
+  box-shadow:0 14px 0 rgba(0,0,0,.45);max-width:560px;width:100%;padding:24px 28px 22px;text-align:center
+}
+.warm-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
+.warm-eyebrow{font:800 12.5px "Baloo 2",cursive;letter-spacing:.18em;color:#2F6B57}
+.warm-step{font:800 13px "Baloo 2",cursive;color:#7A6E80}
+.warm-name{font:800 38px/1.05 "Baloo 2",cursive;margin-bottom:8px}
+.warm-cue{margin:0 0 16px;font-size:17px;line-height:1.45;color:#3F3348}
+.warm-ring-wrap{display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:14px}
+.warm-ring{
+  width:132px;height:132px;border-radius:50%;border:4px solid var(--ink);
+  display:flex;align-items:center;justify-content:center;
+  font:800 42px "Baloo 2",cursive;color:#2F6B57;
+  background:conic-gradient(#8FD3B6 var(--pct), #EFE3C8 0);
+  transition:background .35s linear
+}
+.warm-breath{font:800 14px "Baloo 2",cursive;color:#5B4F66;letter-spacing:.05em;min-height:1.2em}
+.warm-note{margin:0 0 12px;font-size:13.5px;font-style:italic;color:#6B5E76}
+.warm-next{font-size:12.5px;font-weight:800;color:#7A6E80;margin-bottom:14px;min-height:1.2em}
+.warm-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+
+/* ── an Oath ───────────────────────────────────────────────────────────────
+   The table locks for real time. Nothing here can verify the task, so the
+   honesty is stated plainly rather than papered over. */
+.oath-backdrop{
+  position:fixed;inset:0;z-index:76;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle at 50% 40%, rgba(70,55,30,.5), rgba(10,7,14,.95) 72%);
+  padding:20px;overflow-y:auto
+}
+.oath-card{
+  background:var(--paper);color:var(--ink);border:4px solid var(--ink);border-radius:20px;
+  box-shadow:0 14px 0 rgba(0,0,0,.45);max-width:520px;width:100%;padding:26px 28px 22px;text-align:center
+}
+.oath-eyebrow{font:800 12.5px "Baloo 2",cursive;letter-spacing:.18em;color:#8A6A12;margin-bottom:10px}
+.oath-label{font:800 34px/1.1 "Baloo 2",cursive;margin-bottom:8px}
+.oath-reason{margin:0 0 18px;font-size:15px;font-style:italic;color:#5B4F66;line-height:1.5}
+.oath-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.oath-clock{font:800 62px/1 "Baloo 2",cursive;color:#8A3A12;margin:6px 0 8px;font-variant-numeric:tabular-nums}
+.oath-copy{margin:0 0 16px;font-size:15px;color:#4A3F55;line-height:1.5}
+.oath-honour{margin:14px 0 0;font-size:12px;font-style:italic;color:#7A6E80}
+
+@media (max-width: 560px){
+  .warm-name{font-size:28px}
+  .warm-cue{font-size:15px}
+  .warm-ring{width:108px;height:108px;font-size:34px}
+  .oath-label{font-size:26px}
+  .oath-clock{font-size:46px}
 }

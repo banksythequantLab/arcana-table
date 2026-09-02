@@ -109,6 +109,48 @@ export const QUEST = {
 export const DEATH_SAVE_DC = 10;
 export const DEATH_SAVE_FAILS = 3;
 
+// ── the warm-up ──────────────────────────────────────────────────────────────
+// Twenty standing stretches, head to ankle. Nothing needs a mat and nothing
+// needs the floor. Every entry carries a cue (what to do) and a note (why, or
+// what to watch), because a timer with no coaching is just a countdown.
+export const STRETCHES = [
+  { name: 'Neck rolls',            cue: 'Chin to chest. Roll slowly, ear toward each shoulder.', note: 'Small circles. Never roll back through the neck.' },
+  { name: 'Neck hold · left',      cue: 'Left ear toward left shoulder. Let the arm hang.',      note: 'Breathe into the stretch, do not pull.' },
+  { name: 'Neck hold · right',     cue: 'Right ear toward right shoulder. Shoulders down.',      note: 'Same weight both sides.' },
+  { name: 'Shoulder rolls',        cue: 'Big slow circles backward. Make them bigger.',          note: 'Chest opens a little more each one.' },
+  { name: 'Cross-body · left',     cue: 'Left arm across the chest. Hug it in with the right.',  note: 'Keep the left shoulder pressed down.' },
+  { name: 'Cross-body · right',    cue: 'Right arm across. Same hold, other side.',              note: 'Shoulder down, not up by your ear.' },
+  { name: 'Triceps · left',        cue: 'Left hand behind your head, gently press the elbow.',   note: 'Stand tall. Do not arch the back.' },
+  { name: 'Triceps · right',       cue: 'Switch. Right elbow this time.',                        note: 'Ribs stay down.' },
+  { name: 'Chest opener',          cue: 'Hands clasped behind your back. Lift and open.',        note: 'This is the one that undoes a desk.' },
+  { name: 'Side bend · left',      cue: 'Right arm overhead, lean left. Reach long.',            note: 'Lengthen, do not collapse sideways.' },
+  { name: 'Side bend · right',     cue: 'Left arm overhead, lean right.',                        note: 'Feel it down the whole flank.' },
+  { name: 'Standing twist',        cue: 'Feet planted, arms loose. Swing and rotate.',           note: 'Let the arms be heavy ropes.' },
+  { name: 'Forward fold',          cue: 'Soft knees. Hinge and hang. Let the head go.',          note: 'Bend the knees as much as you need.' },
+  { name: 'Quad · left',           cue: 'Left heel to glute. Hold a wall if you need one.',      note: 'Knees together, hips forward.' },
+  { name: 'Quad · right',          cue: 'Right heel to glute. Stand tall.',                      note: 'No leaning forward.' },
+  { name: 'Hamstring · left',      cue: 'Left heel forward, toes up. Hinge over it.',            note: 'Back stays flat, chest proud.' },
+  { name: 'Hamstring · right',     cue: 'Right heel forward. Same hinge.',                       note: 'Stop where you feel it, not where it hurts.' },
+  { name: 'Calf · left',           cue: 'Left foot back, heel down, press the hips forward.',    note: 'Back leg straight.' },
+  { name: 'Calf · right',          cue: 'Right foot back. Heel pinned to the floor.',            note: 'Both feet pointing forward.' },
+  { name: 'Ankles + shake out',    cue: 'Circle each ankle, then shake everything loose.',       note: 'You are warm. That is the point.' },
+];
+
+// Same twenty stretches, sliced to whatever time the player actually has.
+export const WARMUP_PLANS = {
+  '90s':  { label: '90 seconds', count: 6,  hold: 15 },
+  '3min': { label: '3 minutes',  count: 12, hold: 15 },
+  '5min': { label: '5 minutes',  count: 20, hold: 15 },
+  '10min':{ label: '10 minutes', count: 20, hold: 30 },
+};
+
+// What the table can ask for. Reps and holds are physical; an Oath is anything
+// in the room the app cannot see — dishes, a chapter, twenty minutes of study.
+export const CHALLENGE_MODES = ['reps', 'hold', 'oath'];
+
+// Oaths a DM can reach for when a player would rather spend effort than sweat.
+export const OATH_KINDS = ['chores', 'study', 'reading', 'practice', 'admin', 'tidy'];
+
 const STORAGE_KEY = 'arcana-table-v1';
 
 function freshState() {
@@ -127,9 +169,16 @@ function freshState() {
     dice: null,                   // last roll result
     boosts: { bonus: 0, advantage: false, setRoll: null },  // earned via Heroic Effort
     challenge: null,              // active exercise challenge
-    fitness: { totalReps: 0, byExercise: {}, challengesDone: 0, diceEarned: [] },
+    fitness: {
+      totalReps: 0, byExercise: {}, challengesDone: 0, diceEarned: [],
+      holdSeconds: 0,             // planks, wall sits, stretches
+      oathsKept: 0, oathMinutes: 0, oathsBroken: 0,
+      warmedUp: false,            // has the player stretched this session
+    },
     quest: { beatIndex: 0, status: 'active', completed: [], startedAt: Date.now() },
     downed: null,                 // {tokenId, saves, fails} — the board is frozen while this is set
+    warmup: null,                 // {planId, index, seconds, remaining, paused}
+    oath: null,                   // {label, kind, minutes, endsAt, reward} — the table waits
     settings: { autoApprove: false, exercisePool: ['push-ups', 'crunches', 'jumping jacks', 'squats'] },
   };
 }
