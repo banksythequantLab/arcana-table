@@ -397,8 +397,10 @@ input[type=checkbox]{flex:0 0 auto;width:18px;height:18px;padding:0;accent-color
 /* ── the warm-up ───────────────────────────────────────────────────────────
    Ten minutes of standing still needs something moving on screen the whole
    time: the ring drains, the cue changes, the breath pacer cycles under it. */
+/* Covers the board, NOT the side panel: you must still be able to tell the DM
+   to stop while you are standing there stretching. */
 .warm-backdrop{
-  position:fixed;inset:0;z-index:78;display:flex;align-items:center;justify-content:center;
+  position:fixed;inset:0 340px 0 0;z-index:78;display:flex;align-items:center;justify-content:center;
   background:radial-gradient(circle at 50% 40%, rgba(40,80,70,.45), rgba(8,10,14,.94) 72%);
   padding:20px;overflow-y:auto
 }
@@ -444,6 +446,9 @@ input[type=checkbox]{flex:0 0 auto;width:18px;height:18px;padding:0;accent-color
 .oath-copy{margin:0 0 16px;font-size:15px;color:#4A3F55;line-height:1.5}
 .oath-honour{margin:14px 0 0;font-size:12px;font-style:italic;color:#7A6E80}
 
+@media (max-width: 860px){
+  .warm-backdrop{inset:0}          /* the panel stacks below on a phone */
+}
 @media (max-width: 560px){
   .warm-name{font-size:28px}
   .warm-cue{font-size:15px}

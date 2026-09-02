@@ -68,11 +68,10 @@ console.log('=== opening scene (DM speaks first, unprompted) ===');
 await waitForDM(1, 'open');
 
 const turns = [
-  'What are we actually here to do? Tell me the job.',
+  "Yes, let's warm up — give me the 90 second one.",
   'I wade into the flooded hall, sword drawn, looking for whatever is guarding it.',
-  'I attack it!',
+  "I attack it! And listen — my shoulder is wrecked today, I can't do push-ups. But I've got a sink full of dishes I've been ignoring.",
   'I put everything into this swing — I want this thing down now.',
-  'Good. We push on toward the vault.',
 ];
 for (const t of turns) {
   const before = await dmCount();
@@ -82,8 +81,33 @@ for (const t of turns) {
   // A Heroic Effort offer blocks the DM until a human answers it — do the reps.
   const raced = await Promise.race([
     page.waitForSelector('#challenge-modal:not([hidden])', { timeout: 90000 }).then(() => 'challenge'),
+    page.waitForSelector('#oath:not([hidden])', { timeout: 90000 }).then(() => 'oath'),
+    page.waitForSelector('#warmup:not([hidden])', { timeout: 90000 }).then(() => 'warmup'),
     page.waitForFunction(k => document.querySelectorAll('.say.dm:not(.thinking)').length >= k, before + 1, { timeout: 90000 }).then(() => 'spoke'),
   ]).catch(() => 'timeout');
+
+  if (raced === 'warmup') {
+    const st = await page.evaluate(() => ({ name: document.querySelector('#warm-name').innerText, step: document.querySelector('#warm-step').innerText, cue: document.querySelector('#warm-cue').innerText }));
+    console.log(`\n  >>> WARM-UP STARTED: ${st.step} — ${st.name}`);
+    console.log(`      "${st.cue}"`);
+    await page.screenshot({ path: 'screens/warmup-live.png' });
+    await page.waitForTimeout(2500);
+    await page.evaluate(() => window.arcana.finishWarmup());
+    await waitForDM(before + 1, 'after warm-up');
+  }
+
+  if (raced === 'oath') {
+    const o = await page.evaluate(() => ({ label: document.querySelector('#oath-label').innerText, why: document.querySelector('#oath-reason').innerText }));
+    console.log(`\n  >>> OATH OFFERED: ${o.label}`);
+    console.log(`      "${o.why}"`);
+    await page.screenshot({ path: 'screens/oath-live.png' });
+    await page.click('#oath-accept');
+    await page.evaluate(() => { window.__st.oath.endsAt = Date.now() - 1; });
+    await page.waitForTimeout(1200);
+    await page.click('#oath-keep');
+    console.log('      ...Oath kept. Reward banked.\n');
+    await waitForDM(before + 1, 'after oath');
+  }
 
   if (raced === 'challenge') {
     const offer = await page.evaluate(() => ({
