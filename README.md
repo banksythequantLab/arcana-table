@@ -8,7 +8,13 @@ moving tokens, revealing the dungeon, running combat, and rolling public dice
 through structured tools registered on `document.modelContext`. Every call
 shows in the on-screen Agent Log, and destructive ones wait for your ✓.
 
-**The DM has no special powers.** It discovers what it can do by calling
+**The DM's mind is OpenAI; its hands are WebMCP.** Every turn is an OpenAI
+chat completion with function calling, where the functions are this page's live
+WebMCP tools translated into OpenAI function specs — and the voice it answers in
+is OpenAI TTS. The model does the actual game-mastering: what to spawn, when to
+escalate, when to ask for ten push-ups and when to take the dishes instead.
+
+**But it has no special powers.** It discovers what it can do by calling
 `document.modelContext.getTools()` and acts by calling `executeTool()` — the
 exact surface an outside ChatGPT or Claude agent uses. So an external agent can
 take the co-DM seat too, through the same contract. The page doesn't just claim
@@ -153,9 +159,11 @@ wall. Default pool: push-ups, crunches, jumping jacks, squats.
 `js/dm.js` is a ~180-line agent loop, and it is deliberately unprivileged:
 
 1. `getTools()` on the live registry → translated into OpenAI function specs.
-2. Conversation + tools → `worker/` (a ~120-line Cloudflare Worker) → OpenAI.
-   The Worker holds the API key so no key ever reaches a browser; it is
-   origin-locked, size-capped, and rate-limited to 40 requests/min per IP.
+2. Conversation + tools → `worker/` (a ~200-line Cloudflare Worker) → **OpenAI**
+   (`gpt-5.6-luna`, Chat Completions with function calling). The Worker holds the
+   API key so no key ever reaches a browser; it is origin-locked, size-capped,
+   and rate-limited to 40 requests/min per IP. The DM's spoken voice is OpenAI
+   TTS (`gpt-4o-mini-tts`, *onyx*) through the same Worker.
 3. Tool calls come back → executed via `executeTool()` → results fed back →
    loop, up to 6 hops, then the DM speaks.
 

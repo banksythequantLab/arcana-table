@@ -197,8 +197,8 @@ function renderParty() {
 // ── agent log + approvals ────────────────────────────────────────────────────
 function renderAgent() {
   $('#agent-sub').textContent = chat.error
-    ? '· built-in DM offline, DM panel still works'
-    : chat.busy ? '· built-in DM is acting' : '· built-in DM + any external agent';
+    ? '· DM offline, DM panel still works'
+    : chat.busy ? '· the OpenAI DM is acting' : '· OpenAI DM + any external agent';
   const el = $('#agent-log');
   el.innerHTML = state.agentLog.slice(-40).reverse().map(l => {
     const chip = { ok: '✓', called: '…', 'awaiting-approval': '✋', denied: '✗', error: '!' }[l.status] || '•';

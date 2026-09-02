@@ -44,17 +44,20 @@ CUT = [
     #
     # Silence lives ONLY under title cards now — 11.5s of 166, down from 40.
     # Every other second has Derek talking over it.
-    ('card', 'open',   3.0, None),
+    ('card', 'open',   2.5, None),
     ('shot', None,     VOS['vo01_problem'] + VOS['vo02_whatitis'], 40.0),
-    ('card', 'webmcp', 2.5, None),
+    ('card', 'webmcp', 2.0, None),
     ('shot', None,     VOS['vo03_webmcp'], 148.0),
-    ('card', 'heroic', 2.5, None),
+    # Whose mind is actually running the table.
+    ('card', 'brain',  2.5, None),
+    ('shot', None,     VOS['vo10_brain'], 118.0),
+    ('card', 'heroic', 2.0, None),
     ('shot', None,     VOS['vo04_heroic'], 78.0),
     # His push-up footage runs under "not everyone can drop and give me ten",
     # which is the line it was always meant to illustrate.
     ('slate','burpees',10.0, None),
     ('shot', None,     (VOS['vo07_swap'] - 10.0) + VOS['vo04b_payoff'], 142.5),
-    ('card', 'oath',   2.5, None),
+    ('card', 'oath',   2.0, None),
     ('shot', None,     VOS['vo08_oath'], 96.0),      # the Oath sworn, table locked
     ('shot', None,     VOS['vo09_micro'], 106.0),    # back in play, the run continues
     ('shot', None,     VOS['vo05_hood'], 44.0),     # the agent log doing the work
@@ -99,12 +102,13 @@ run(['ffmpeg','-y','-loglevel','error','-f','concat','-safe','0','-i',str(listin
 
 # ── voice track: same order, silence under the cards ────────────────────────
 ORDER = [
-    ('sil', 3.0), ('vo', 'vo01_problem'), ('vo', 'vo02_whatitis'),
-    ('sil', 2.5), ('vo', 'vo03_webmcp'),
-    ('sil', 2.5), ('vo', 'vo04_heroic'),
+    ('sil', 2.5), ('vo', 'vo01_problem'), ('vo', 'vo02_whatitis'),
+    ('sil', 2.0), ('vo', 'vo03_webmcp'),
+    ('sil', 2.5), ('vo', 'vo10_brain'),
+    ('sil', 2.0), ('vo', 'vo04_heroic'),
     ('vo', 'vo07_swap'),                            # over the push-up slate
     ('vo', 'vo04b_payoff'),
-    ('sil', 2.5), ('vo', 'vo08_oath'),
+    ('sil', 2.0), ('vo', 'vo08_oath'),
     ('vo', 'vo09_micro'),
     ('vo', 'vo05_hood'), ('vo', 'vo06_close'),
     ('sil', 1.0),

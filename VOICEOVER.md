@@ -7,8 +7,8 @@ Two voices, deliberately:
   out of the product itself. Do not re-record these; they are captured from the
   running app so judges hear the real thing.
 
-Runtime: **2:46**. Devpost caps at 3:00. Silence appears only under the
-four title cards (13s of 166) — everywhere else Derek is talking.
+Runtime: **2:56**. Devpost caps at 3:00. Silence appears only under the
+five title cards (11s of 176) — everywhere else Derek is talking.
 
 ---
 
@@ -150,3 +150,15 @@ locked table with the clock running.*
 All three cloned on the house stack: FreeClone + VoxCPM2 on Johnson:8300,
 `POST /api/clone` with `derek-voice.wav` as the reference. Regenerate with
 `D:\arcana-vo\gen.py`.
+
+
+---
+
+## VO-10 · Whose mind it is — after the WebMCP section
+
+> And the mind behind that Dungeon Master is OpenAI. Every turn goes to GPT
+> through a small Cloudflare Worker that holds the key, so it never touches
+> your browser.
+
+*On screen: the "The DM runs on OpenAI" card, then the agent log filling with
+tool calls — including the DM hitting a wall and picking another cell.*

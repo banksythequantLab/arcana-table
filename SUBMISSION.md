@@ -79,14 +79,40 @@ next roll — publicly, in the on-screen dice tray.
   panel call the same action layer, so the app is fully playable with no agent
   at all — and the agent provably has no powers a human doesn't.
 
+## Built with
+
+- **OpenAI** — the Dungeon Master's mind and its voice. Every turn is a Chat
+  Completions call with function calling (`gpt-5.6-luna`), where the functions
+  are the page's live WebMCP tools translated into OpenAI function specs. The
+  DM's spoken lines are OpenAI TTS (`gpt-4o-mini-tts`, voice *onyx*). The model
+  is doing the actual game-mastering: choosing what to spawn, when to escalate,
+  when to ask for push-ups, and when to accept the dishes instead.
+- **WebMCP** — `document.modelContext` / `navigator.modelContext`, with the
+  vendored [`@mcp-b/webmcp-polyfill`](https://github.com/WebMCP-org/npm-packages)
+  (MIT) so the surface is real in any browser, no flag required.
+- **Cloudflare** — Workers holds the OpenAI key server-side, origin-locked and
+  rate-limited, so no key ever reaches a browser; Pages serves the static app.
+- **Vanilla JS**, zero build step — a canvas battle map (3 maps, fog of war),
+  state in localStorage, cel-shaded art, hand-drawn SVG tokens.
+- **Web Speech API** for hands-free play, because you cannot press a key
+  mid-push-up.
+
 ## How we built it
 
-Vanilla JS single-page app, zero build step, zero backend — a canvas-rendered
-grid board (3 maps, fog of war, drag-and-drop tokens), state in localStorage,
-cel-shaded cartoon art. A 44-assertion Playwright suite drives the tools
-through the real `document.modelContext` — `getTools()`, `executeTool()`,
-`readOnlyHint` on reads, the registry growing and shrinking with combat, both
-approval outcomes, and a full push-ups-to-natural-20 loop.
+Vanilla JS single-page app, zero build step, no backend beyond a ~200-line
+Cloudflare Worker that proxies OpenAI — a canvas-rendered grid board (3 maps,
+fog of war, drag-and-drop tokens), state in localStorage, cel-shaded cartoon
+art. A 93-assertion Playwright suite drives the tools through the real
+`document.modelContext` — `getTools()`, `executeTool()`, `readOnlyHint` on
+reads, the registry growing and shrinking with combat and with a downed hero,
+both approval outcomes, all three effort modes, the guided warm-up, and a
+five-beat run walked to victory.
+
+The DM loop itself is ~180 lines: read the live registry with `getTools()`,
+translate it into OpenAI function specs, send the conversation to the Worker,
+execute whatever tool calls come back through `executeTool()`, feed the results
+in, and repeat up to six hops before it must speak. That loop is the whole
+integration — OpenAI supplies the judgement, WebMCP supplies the hands.
 
 ## Challenges we ran into
 

@@ -36,6 +36,9 @@
       <li><b>🤸 Warm up first, if you like.</b> Twenty standing stretches with cues and a timer that runs itself — ninety seconds, or up to ten minutes.</li>
       <li><b>🤖 Watch the Agent Log.</b> The DM has no back door: every move is a WebMCP tool call on <code>document.modelContext</code>, the same surface your own agent would use.</li>
     </ul>
+    <p class="intro-credit">The Dungeon Master thinks and speaks with <b>OpenAI</b> —
+      GPT with function calling over the live WebMCP tools, and OpenAI TTS for its voice.
+      Its hands are <b>WebMCP</b>. The key lives in a Cloudflare Worker, never in your browser.</p>
     <button id="intro-go" class="btn big">Light the torches →</button>
     <label class="intro-quiet"><input type="checkbox" id="intro-mute"> Start muted</label>
   </div>
@@ -79,7 +82,8 @@
     </div>
 
     <div id="pane-dm" class="tabpane" hidden>
-      <p class="dm-hint">Everything an agent can do, you can do by hand. No agent required.</p>
+      <p class="dm-hint">Everything an agent can do, you can do by hand. No agent required —
+        the built-in DM runs on OpenAI, but the table does not need it.</p>
       <div class="dm-group">
         <label>Roll dice</label>
         <div class="row"><input id="dm-formula" value="d20" size="6"><button id="dm-roll" class="btn">🎲 Roll</button></div>

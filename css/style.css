@@ -318,6 +318,11 @@ input[type=checkbox]{flex:0 0 auto;width:18px;height:18px;padding:0;accent-color
 .intro-points b{color:var(--ink)}
 .intro-points code{background:#E7DCC4;border-radius:5px;padding:1px 5px;font:600 12.5px ui-monospace,monospace}
 .intro-card .btn.big{width:100%;font-size:19px;padding:14px}
+.intro-credit{
+  font-size:12.5px;line-height:1.5;color:#6B5E76;margin:0 0 20px;
+  border-top:2px dashed #C9B98E;padding-top:14px
+}
+.intro-credit b{color:#8A3A12}
 .intro-quiet{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:12px;font-size:13px;color:#6B5E76;cursor:pointer}
 .intro-quiet input{width:16px;height:16px;flex:0 0 auto;margin:0;accent-color:var(--gold)}
 
