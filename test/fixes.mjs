@@ -73,6 +73,29 @@ ck('nobody is stacked on anyone', new Set(after.map(t => `${t.x},${t.y}`)).size 
 const fog = await page.evaluate(() => window.__st.revealed.length);
 ck('the fog lifted at the destination', await page.evaluate(() =>
   window.__st.revealed.includes('16,10')), `${fog} cells revealed`);
+
+// Walking lights the corridor, not just the two ends of it. A gap in the
+// middle of a walked path reads as a rendering bug.
+const gaps = await page.evaluate(() => {
+  window.__st.revealed = [];
+  window.arcana.call('move_party', { x: 2, y: 2 });
+  const before = window.__st.tokens.find(t => t.kind === 'pc');
+  const from = { x: before.x, y: before.y };
+  window.__st.revealed = [];
+  return window.arcana.call('move_party', { x: 18, y: 12 }).then(() => {
+    const to = { x: 18, y: 12 };
+    const steps = Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y));
+    const dark = [];
+    for (let i = 0; i <= steps; i++) {
+      const x = Math.round(from.x + ((to.x - from.x) * i) / steps);
+      const y = Math.round(from.y + ((to.y - from.y) * i) / steps);
+      if (!window.__st.revealed.includes(`${x},${y}`)) dark.push(`${x},${y}`);
+    }
+    return { dark, from, to, lit: window.__st.revealed.length };
+  });
+});
+ck('every cell along a walk is lit, with no dark middle', gaps.dark.length === 0,
+   gaps.dark.length ? `dark: ${gaps.dark.join(' ')}` : `${gaps.lit} cells lit from (${gaps.from.x},${gaps.from.y}) to (${gaps.to.x},${gaps.to.y})`);
 const wall = await page.evaluate(() => window.arcana.call('move_party', { x: 0, y: 0 }));
 ck('a wall is refused, with a usable message', !!wall.error, wall.error || '');
 

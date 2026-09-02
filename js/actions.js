@@ -90,8 +90,9 @@ export function moveToken({ tokenId, x, y }) {
   x = Math.max(0, Math.min(GRID_W - 1, Math.round(x)));
   y = Math.max(0, Math.min(GRID_H - 1, Math.round(y)));
   if (!isWalkable(x, y)) return { error: `(${x},${y}) is a wall — pick an open floor cell.` };
+  const from = { x: t.x, y: t.y };
   t.x = x; t.y = y;
-  if (t.kind === 'pc') revealAround(x, y, 3);
+  if (t.kind === 'pc') revealPath(from, { x, y }, 3);
   logStory('action', t.name, `moved to (${x}, ${y})`);
   emit();
   return { ok: true, token: t.id, x, y };
@@ -130,8 +131,9 @@ export function moveParty({ x, y, who = 'all' }) {
     const spot = i === 0 ? { x, y } : nearestFree(x, y, taken);
     if (!spot) return;
     taken.add(`${spot.x},${spot.y}`);
+    const from = { x: t.x, y: t.y };
     t.x = spot.x; t.y = spot.y;
-    revealAround(spot.x, spot.y, 3);
+    revealPath(from, spot, 3);
     moved.push({ token: t.id, name: t.name, x: spot.x, y: spot.y });
   });
   if (!moved.length) return { error: `Nowhere to stand near (${x},${y}) — every cell is occupied.` };
@@ -182,6 +184,18 @@ export function revealAround(x, y, radius = 3) {
         if (!state.revealed.includes(key)) state.revealed.push(key);
       }
     }
+  }
+}
+
+/** Light every cell you actually walked through, not just the two ends of the
+ *  walk. Revealing only origin and destination left a dark corridor between two
+ *  lit rooms, which reads as a rendering bug — you carried a torch down it. */
+export function revealPath(from, to, radius = 3) {
+  const steps = Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y));
+  if (steps === 0) return revealAround(to.x, to.y, radius);
+  for (let i = 0; i <= steps; i++) {
+    revealAround(Math.round(from.x + ((to.x - from.x) * i) / steps),
+                 Math.round(from.y + ((to.y - from.y) * i) / steps), radius);
   }
 }
 
