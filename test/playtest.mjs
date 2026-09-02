@@ -1,4 +1,4 @@
-// Real playtest: the actual page, the real 17 WebMCP tools, the real system
+// Real playtest: the actual page, the real WebMCP tools, the real system
 // prompt, against the live Cloudflare Worker + gpt-5.6-luna.
 // Served on :8080 so the Worker's origin allowlist accepts us.
 import { chromium } from 'playwright';

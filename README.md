@@ -214,11 +214,12 @@ npx serve .        # or: python3 -m http.server 8080
 ## Tests
 
 ```bash
-cd test && npm install && node smoke.mjs
+cd test && npm install && npm test
 ```
 
-93 assertions, Playwright + Chromium. Drives the full tool surface **through the
-real `document.modelContext`** — enumerating tools with `getTools()`, invoking
+**167 assertions across six suites**, Playwright + Chromium, all against the real
+page — see `test/README.md` for what each one covers. The largest, `smoke.mjs`,
+drives the full tool surface **through the real `document.modelContext`** — enumerating tools with `getTools()`, invoking
 them with `executeTool()`, asserting `readOnlyHint` on the read tools, and
 proving the dynamic toolsets register and unregister (20 → 23 → 20, and 24 while
 a hero is down mid-fight) — plus the approval Allow *and* Deny paths, a complete

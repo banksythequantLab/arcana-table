@@ -179,10 +179,6 @@ export function warmupSeq(plan) {
   return p?.seq ? p.seq.slice() : STRETCHES.map((_, i) => i);
 }
 
-// What the table can ask for. Reps and holds are physical; an Oath is anything
-// in the room the app cannot see — dishes, a chapter, twenty minutes of study.
-export const CHALLENGE_MODES = ['reps', 'hold', 'oath'];
-
 // Oaths a DM can reach for when a player would rather spend effort than sweat.
 export const OATH_KINDS = ['chores', 'study', 'reading', 'practice', 'admin', 'tidy'];
 
