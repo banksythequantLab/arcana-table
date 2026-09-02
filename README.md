@@ -174,6 +174,30 @@ muscle groups and eases off, and to accept a denied approval without arguing.
 If the Worker is unconfigured or unreachable it returns a friendly message and
 the table stays fully playable from the DM panel. See `worker/README.md`.
 
+### Bring your own key
+
+The hosted Worker is rate-limited to 40 req/min per IP. To play without touching
+that quota, either use the **🎩 DM Panel**, which runs the whole game with zero
+API calls, or point the app at your own Worker:
+
+```bash
+cd worker
+wrangler secret put OPENAI_API_KEY     # your key, your account
+wrangler deploy                        # then set DM_ENDPOINT in js/config.js
+```
+
+The model lives in `wrangler.toml` under `[vars] MODEL`, so you can swap the
+DM's brain without touching code. You can confirm which model actually answered
+— the Worker returns OpenAI's own `model` field, not our config:
+
+```bash
+curl -s -X POST https://arcana-dm.dj-b02.workers.dev \
+  -H 'content-type: application/json' \
+  -H 'origin: https://arcana-table.pages.dev' \
+  -d '{"messages":[{"role":"user","content":"Reply with the single word: ready"}],"tools":[]}'
+# {"content":"ready","tool_calls":[],"finish_reason":"stop","model":"gpt-5.6-luna"}
+```
+
 ## Run locally
 
 Static files, no build step:

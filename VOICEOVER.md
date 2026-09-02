@@ -5,9 +5,11 @@ Runtime **~2:55**. Devpost caps at 3:00.
 
 Two voices, deliberately:
 
-- **DEREK** — the narration. Cloned on our own GPU stack (FreeClone + VoxCPM2 on
-  Johnson, `POST /api/clone` with `derek-voice.wav` as the reference). Regenerate
-  with `D:\arcana-vo\gen.py` / `gen2.py` / `gen3.py`.
+- **DEREK** — the narration, in his own voice and with his consent: he is the
+  sole author of this project and the speaker in the reference recording. Cloned
+  on our own GPU stack (FreeClone + VoxCPM2 on Johnson, `POST /api/clone` with
+  `derek-voice.wav` as the reference). Regenerate with `D:\arcana-vo\gen.py` /
+  `gen2.py` / `gen3.py`. No other person's voice appears in the video.
 - **THE DM** — OpenAI TTS (`gpt-4o-mini-tts`, voice *onyx*), heard diegetically,
   coming out of the running product. Never re-recorded; it is captured live.
 

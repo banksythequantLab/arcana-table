@@ -46,11 +46,31 @@ all pay identically.
 - **An Oath** — something real in the room the app cannot see: clear the sink,
   twenty minutes of study, ten pages of the textbook. The table **locks** for
   the minutes agreed, every write tool refuses, and the claim button stays
-  disabled until the clock is actually served. Nothing verifies it, and the UI
-  says so plainly — what is being spent is your time, which is real. The DM is
-  instructed in as many words that an Oath is an equal, never a consolation
-  prize, and to reach for one when a player mentions something they are
-  avoiding.
+  disabled until the clock is actually served. The DM is instructed in as many
+  words that an Oath is an equal, never a consolation prize, and to reach for
+  one when a player mentions something they are avoiding.
+
+**On the Oath having no verification.** It doesn't, deliberately, and the UI
+says so to your face: *"On your honour. Nothing here can check, which is rather
+the point."* We could have faked a check. We chose not to, for three reasons.
+
+First, the thing being spent is not a claim, it is **time**. The board freezes
+for the full duration and the claim button is disabled until the clock is
+genuinely served — you cannot click through it, and there is nothing to do in
+the meantime. Ten minutes of a locked game is a real cost whether or not the
+dishes got done.
+
+Second, verification would narrow the mechanic to the things a webcam can see.
+Push-ups are checkable; reading ten pages, practising scales, and writing the
+email you have been dreading are not. Those are exactly the commitments people
+most need a reason to keep, and a verification requirement would have excluded
+all of them.
+
+Third, this is a single-player game against your own inertia. There is no
+leaderboard and no opponent, so the only person a false claim defrauds is the
+person making it — which is the same contract every habit tracker, food diary
+and workout log already runs on. Cheating here is not an exploit; it is just
+declining to play.
 
 Runs open with an optional **guided warm-up**: twenty standing stretches, head
 to ankle, each with a cue and a coaching note, on a timer that advances itself
@@ -120,6 +140,16 @@ is the way out of death, which is the argument the whole project is making.
 - **OpenAI** — the Dungeon Master's mind and its voice. Every turn is a Chat
   Completions call with function calling (`gpt-5.6-luna`), where the functions
   are the page's live WebMCP tools translated into OpenAI function specs. The
+  Worker passes OpenAI's own `model` field straight back, so you can confirm
+  which model actually answered without taking our word for it:
+
+  ```bash
+  curl -s -X POST https://arcana-dm.dj-b02.workers.dev \
+    -H 'content-type: application/json' \
+    -H 'origin: https://arcana-table.pages.dev' \
+    -d '{"messages":[{"role":"user","content":"Reply with the single word: ready"}],"tools":[]}'
+  # {"content":"ready","tool_calls":[],"finish_reason":"stop","model":"gpt-5.6-luna"}
+  ``` The
   DM's spoken lines are OpenAI TTS (`gpt-4o-mini-tts`, voice *onyx*). The model
   is doing the actual game-mastering: choosing what to spawn, when to escalate,
   when to ask for push-ups, and when to accept the dishes instead.
@@ -202,7 +232,9 @@ multiplayer parties, and AI-generated campaign art from our ComfyUI pipeline.
 **2:55.** The full spoken script, as actually recorded, is in
 [`VOICEOVER.md`](VOICEOVER.md).
 
-Narration is Derek's voice, cloned on our own GPU stack (FreeClone + VoxCPM2).
+Narration is Derek's own voice, cloned with his consent on our own GPU stack
+(FreeClone + VoxCPM2) — he is the sole author of this project and the speaker in
+the reference recording. No other person's voice appears in the video.
 The Dungeon Master's lines are OpenAI TTS captured live from the running app —
 never re-recorded, so what you hear is the product's own voice. Silence appears
 only under the title cards.
@@ -220,6 +252,33 @@ node lower-third.mjs  # the strip over the push-up footage
 node record.mjs       # a fresh gameplay bed against the live DM
 python3 assemble.py   # cut + voice track + mux
 ```
+
+## Running it yourself / bring your own key
+
+The hosted Worker is rate-limited to 40 requests per minute per IP, which is
+roomy for one person playing and tight against abuse. If a judge hits that
+ceiling, or wants sustained play without touching our quota, there are two
+paths and neither needs anything from us:
+
+**Play with no API calls at all.** The 🎩 **DM Panel** tab runs the entire game
+by hand — dice, narration, spawning, scenes, combat, the warm-up, Oaths, Heroic
+Effort, quest beats, death saves. Tools and buttons call the same `actions.js`
+layer, so nothing is agent-only. The board never depends on a network call, and
+if the Worker is unreachable the app says so and points at the panel rather than
+dying.
+
+**Or point it at your own key**, about three commands:
+
+```bash
+cd worker
+wrangler secret put OPENAI_API_KEY     # your key, in your account, never ours
+wrangler deploy                        # note the workers.dev URL it prints
+# then set DM_ENDPOINT in js/config.js to that URL and serve the folder
+```
+
+`wrangler.toml` keeps the model in `[vars] MODEL`, so you can swap the DM's
+brain without touching code. The Worker self-heals one round of parameter
+disagreements between model families, so a different model usually just works.
 
 ## Links
 
