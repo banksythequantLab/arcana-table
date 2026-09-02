@@ -194,7 +194,7 @@ function freshState() {
     scene: { mapId: 'dungeon', title: 'The Sunken Keep', mood: 'Torchlight flickers over wet stone…' },
     tokens: [
       { id: 'pc-brannok', name: 'Brannok', kind: 'pc', art: 'knight', x: 2, y: 2, hp: 24, maxHp: 24, ac: 17, str: 16, dex: 10, con: 14, int: 8, wis: 12, cha: 13, reach: 1, range: 0, conditions: [], inventory: ['Longsword', 'Shield', 'Torch ×3'] },
-      { id: 'pc-mira', name: 'Mira', kind: 'pc', art: 'wizard', x: 3, y: 3, hp: 14, maxHp: 14, ac: 12, str: 8, dex: 14, con: 12, int: 17, wis: 13, cha: 10, reach: 1, range: 8, conditions: [], inventory: ['Spellbook', 'Dagger', 'Component pouch'] },
+      { id: 'pc-mira', name: 'Mira', kind: 'pc', art: 'wizard', x: 3, y: 3, hp: 14, maxHp: 14, ac: 12, str: 8, dex: 14, con: 12, int: 17, wis: 13, cha: 10, reach: 1, range: 8, spells: ['Fireball', 'Frostbite', 'Mage Hand'], conditions: [], inventory: ['Spellbook', 'Dagger', 'Component pouch'] },
       { id: 'npc-chest', name: 'Old Chest', kind: 'object', art: 'chest', x: 18, y: 11, hp: 10, maxHp: 10, reach: 0, range: 0, conditions: [], inventory: [] },
     ],
     revealed: [],                 // ['x,y', …] cells cleared of fog
@@ -203,6 +203,7 @@ function freshState() {
     agentLog: [],                 // tool-call entries {t, tool, args, status, note}
     party: { gold: 0, loot: [] },
     dice: null,                   // last roll result
+    spellFx: null,                // {x, y, kind, t} — the board paints the burst
     boosts: { bonus: 0, advantage: false, setRoll: null },  // earned via Heroic Effort
     challenge: null,              // active exercise challenge
     fitness: {

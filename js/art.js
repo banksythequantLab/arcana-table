@@ -44,14 +44,22 @@ export const TOKEN_ART = {
     <circle cx="63" cy="49" r="2.6" fill="${OUT}" stroke="none"/>
     <path d="M38 68 Q50 78 64 66 L58 72 L52 66 L46 73 L40 68 Z" fill="#FFF7E0"/>
   `),
+  // Was a white circle with two dots — at token size that reads as a blank
+  // egg, not a monster. Now it has a jaw, a ribcage and shoulders, so the
+  // silhouette says "skeleton" before any colour does.
   skeleton: svg(`
-    <circle cx="50" cy="46" r="28" fill="#F4EFE3"/>
-    <path d="M34 74 L66 74 L62 92 L38 92 Z" fill="#F4EFE3"/>
-    <circle cx="40" cy="42" r="7" fill="${OUT}" stroke="none"/>
-    <circle cx="60" cy="42" r="7" fill="${OUT}" stroke="none"/>
-    <circle cx="42" cy="40" r="2" fill="#8BE0D6" stroke="none"/>
-    <circle cx="62" cy="40" r="2" fill="#8BE0D6" stroke="none"/>
-    <path d="M42 62 L58 62 M46 58 L46 66 M54 58 L54 66" fill="none" stroke-width="4"/>
+    <path d="M22 60 L10 52 M78 60 L90 52" fill="none" stroke-width="6"/>
+    <path d="M30 58 L70 58 L66 66 L34 66 Z" fill="#D8CFBE"/>
+    <path d="M38 66 L62 66 L60 88 L40 88 Z" fill="#F4EFE3"/>
+    <path d="M40 72 L60 72 M40 79 L60 79" fill="none" stroke-width="4"/>
+    <path d="M50 66 L50 88" fill="none" stroke-width="3"/>
+    <path d="M28 40 Q28 14 50 14 Q72 14 72 40 L72 48 Q72 54 66 54 L34 54 Q28 54 28 48 Z" fill="#F4EFE3"/>
+    <path d="M38 54 L38 60 M50 54 L50 60 M62 54 L62 60" fill="none" stroke-width="3"/>
+    <ellipse cx="40" cy="36" rx="8" ry="9" fill="${OUT}" stroke="none"/>
+    <ellipse cx="60" cy="36" rx="8" ry="9" fill="${OUT}" stroke="none"/>
+    <circle cx="41" cy="35" r="2.6" fill="#8BE0D6" stroke="none"/>
+    <circle cx="61" cy="35" r="2.6" fill="#8BE0D6" stroke="none"/>
+    <path d="M46 46 L50 41 L54 46 Z" fill="${OUT}" stroke="none"/>
   `),
   dragon: svg(`
     <path d="M20 30 Q8 18 24 14 L34 26 M80 30 Q92 18 76 14 L66 26" fill="#B33A3A"/>

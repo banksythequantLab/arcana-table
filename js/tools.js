@@ -228,7 +228,7 @@ export const BASE_TOOLS = [
   },
   {
     name: 'start_warmup',
-    description: 'Run the guided warm-up: standing stretches, head to ankle, each with a spoken cue and a timer that advances itself. Offer this ONCE at the very start of a run, before the first real beat — "before we begin, stand up" — and never interrupt a fight with it. Plans: 90s (6 stretches), 3min (12), 5min (20), 10min (20 at a slower hold). Finishing it grants +2 on the next roll. It needs no equipment and no floor.',
+    description: 'Run the guided warm-up: standing stretches, head to ankle, each with a spoken cue and a timer that advances itself. Offer this ONCE at the very start of a run, before the first real beat — "before we begin, stand up" — and never interrupt a fight with it. AT THE START, OFFER ONLY TWO: "90s" (6 stretches) or "3min" (12) — either is a real warm-up and neither costs a player their patience. "5min" (20) and "10min" (20 at a slower hold) exist for a player who asks for them, and should not be volunteered. Finishing it grants +2 on the next roll. It needs no equipment and no floor.',
     inputSchema: obj({ plan: { type: 'string', enum: ['90s', '3min', '5min', '10min'], description: 'How long the player has' } }),
     handler: a => A.startWarmup(a),
   },
@@ -397,6 +397,8 @@ export async function initTools() {
       return wrap(def).execute(args);
     },
     resetQuest: () => A.resetQuest(),
+    // Clicking the map is a player gesture, not a tool — tests drive it here.
+    walkTo: (x, y) => import('./board.js').then(b => b.walkTo({ x, y })),
     // The warm-up runs on a wall clock, so tests need to step it by hand.
     currentStretch: () => A.currentStretch(),
     skipStretch: () => A.skipStretch(),

@@ -349,6 +349,11 @@ export function attack({ attackerId, targetId, kind = 'melee', damage, reason = 
   // In reach: you can see what you are hitting.
   revealAround(t.x, t.y, 2);
 
+  // A spell cast at distance is a FIREBALL: it bursts, and everything hostile
+  // standing next to what you aimed at catches the edge of it. That is the
+  // whole reason to keep a caster back rather than walking her into the melee.
+  const fireball = kind === 'spell' && d > 1;
+
   // Through rollDice, so a Heroic Effort boost spends itself on the swing.
   const roll = rollDice({ formula: 'd20', reason: reason || `${a.name} attacks ${t.name}` });
   const ac = t.ac ?? 12;
@@ -361,8 +366,29 @@ export function attack({ attackerId, targetId, kind = 'melee', damage, reason = 
 
   const dmg = Math.max(1, Math.round(Number(damage) || (roll.nat20 ? 12 : 6)));
   const after = updateHp({ tokenId: t.id, delta: -dmg });
+
+  let splash = [];
+  if (fireball) {
+    // Half damage, rounded down, to every other hostile within one square —
+    // and never to the party, because a fireball that kills your own knight is
+    // a different game than the one this table is running.
+    const edge = Math.max(1, Math.floor(dmg / 2));
+    splash = state.tokens
+      .filter(o => o.id !== t.id && o.kind === 'monster' && o.hp > 0 && gridDistance(o, t) <= 1)
+      .map(o => {
+        const r = updateHp({ tokenId: o.id, delta: -edge });
+        return { name: o.name, damage: edge, hp: r.hp, down: r.down };
+      });
+    state.spellFx = { x: t.x, y: t.y, kind: 'fire', t: Date.now() };
+    logStory('combat', a.name,
+      `hurls a fireball ${d} squares — it bursts over ${t.name}` +
+      (splash.length ? ` and catches ${splash.map(x => x.name).join(', ')}.` : '.'));
+  }
+
+  emit('combat');
   return { ok: true, hit: true, critical: !!roll.nat20, roll: roll.total, targetAc: ac,
-           damage: dmg, distance: d, kind, target: t.name,
+           damage: dmg, distance: d, kind, target: t.name, fireball,
+           splash: splash.length ? splash : undefined,
            targetHp: after.hp, targetDown: after.down, boosts: roll.boostsUsed };
 }
 

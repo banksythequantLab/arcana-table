@@ -95,7 +95,12 @@ ck('and they leave again when the fight ends', !(await rows()).includes('advance
 ck('no page errors', errs.length === 0, errs.slice(0, 2).join(' | '));
 // Settle the table first: a dice overlay dims the whole page, and the panel is
 // scrolled to wherever the last assertion left it.
-await page.waitForTimeout(2600);
+// Let the dice overlay finish before the screenshot; waiting on the element
+// beats guessing at an animation length on a loaded machine.
+await page.waitForFunction(() => {
+  const o = document.getElementById('dice-overlay');
+  return !o || o.hidden || !o.offsetParent;
+}, null, { timeout: 8000 }).catch(() => {});
 await page.evaluate(() => {
   document.getElementById('dice-overlay').hidden = true;
   document.querySelectorAll('.mcp-tool[open]').forEach(d => d.open = false);

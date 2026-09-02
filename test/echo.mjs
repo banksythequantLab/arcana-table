@@ -79,7 +79,8 @@ ck('hands-free turns on and opens the mic once the DM stops', v0.handsFree && op
 console.log('— the DM speaking shuts the ear —');
 const speak = page.evaluate(async () =>
   (await import('/js/voice.js')).say('The door groans open and cold air spills out across the flagstones.'));
-await page.waitForTimeout(60);
+await page.waitForFunction(async () =>
+  (await import('/js/voice.js')).voice.speaking, null, { timeout: 8000 }).catch(() => {});
 const mid = await V();
 ck('the mic is closed while the DM talks', mid.speaking && !mid.listening, JSON.stringify(mid));
 
@@ -95,23 +96,41 @@ console.log('— the tail covers the room echo —');
 await page.waitForTimeout(120);
 const inTail = await V();
 ck('the mic stays shut through the echo tail', !inTail.listening, JSON.stringify(inTail));
-await page.waitForTimeout(1200);
+const reopenedOk = await page.waitForFunction(async () =>
+  (await import('/js/voice.js')).voice.listening, null, { timeout: 10000 })
+  .then(() => true).catch(() => false);
 const reopened = await V();
-ck('and reopens once the room is quiet', reopened.listening, JSON.stringify(reopened));
+ck('and reopens once the room is quiet', reopenedOk, JSON.stringify(reopened));
 
 console.log('— a late echo of an old line is still caught —');
 const before = (await V()).ignored;
 await page.evaluate(() => window.__hear('cold air spills out across the flagstones'));
-await page.waitForTimeout(150);
+await page.waitForFunction(async n =>
+  (await import('/js/voice.js')).voice.echoesIgnored > n, before, { timeout: 6000 }).catch(() => {});
 ck('a fragment of what the DM said is refused', (await V()).ignored > before);
 ck('still no player turn from it', (await turns()).length === 0, JSON.stringify(await turns()));
 
 console.log('— but the player is still heard —');
-await page.evaluate(() => window.__hear('I kick the door the rest of the way open'));
+// This assertion is about the FILTER, not the timing: a line that is not an
+// echo must reach the DM. The reopen schedule is what the two assertions above
+// cover, so pin the mic open here rather than racing the tail — otherwise a
+// loaded machine fails this for a reason that has nothing to do with echoes.
+const LINE = 'I kick the door the rest of the way open';
+await page.evaluate(async () => {
+  const V = await import('/js/voice.js');
+  V.shutUp();                                  // stop any audio still playing
+  await new Promise(r => setTimeout(r, 800));  // let the tail expire for real
+  V.setHandsFree(true, null);
+});
 await page.waitForFunction(async () =>
-  (await import('/js/dm.js')).chat.messages.some(m => m.role === 'user'), null, { timeout: 5000 }).catch(()=>{});
-ck('a real turn goes through untouched', (await turns()).includes('I kick the door the rest of the way open'),
-   JSON.stringify(await turns()));
+  (await import('/js/voice.js')).voice.listening &&
+  !(await import('/js/voice.js')).inQuietPeriod(), null, { timeout: 10000 }).catch(() => {});
+const delivered = await page.evaluate(l => window.__hear(l), LINE);
+await page.waitForFunction(async () =>
+  (await import('/js/dm.js')).chat.messages.some(m => m.role === 'user'), null, { timeout: 6000 }).catch(() => {});
+
+ck('a real turn goes through untouched', (await turns()).includes(LINE),
+   `${delivered} · ${JSON.stringify(await turns())}`);
 
 console.log('— and the DM cannot count your reps for you —');
 await page.evaluate(async () => {

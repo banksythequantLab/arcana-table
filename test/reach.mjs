@@ -72,6 +72,30 @@ ck('adjacent, the swing lands or misses honestly', !near.error && typeof near.hi
    JSON.stringify(near).slice(0, 100));
 ck('the cell it suggested really was in reach', near.distance <= 1, `distance ${near.distance}`);
 
+console.log('— Mira throws fireballs —');
+await put('Mira', 7, 6);
+await call('add_token', { name: 'Pack A', kind: 'monster', art: 'goblin', x: 15, y: 6, hp: 12 });
+await call('add_token', { name: 'Pack B', kind: 'monster', art: 'rat',    x: 15, y: 7, hp: 12 });
+await call('add_token', { name: 'Far one', kind: 'monster', art: 'wolf',  x: 15, y: 11, hp: 12 });
+const hpOf = n => page.evaluate(n => window.__st.tokens.find(t => t.name === n)?.hp, n);
+// Aim at the middle of a cluster from eight squares away.
+let ball = await call('attack', { attackerId: 'Mira', targetId: 'Pack A', kind: 'spell', damage: 8 });
+for (let i = 0; i < 12 && !ball.hit; i++) {              // she can miss; we are testing the burst
+  await page.evaluate(() => { window.__st.tokens.find(t => t.name === 'Pack A').hp = 12;
+                              window.__st.tokens.find(t => t.name === 'Pack B').hp = 12; });
+  ball = await call('attack', { attackerId: 'Mira', targetId: 'Pack A', kind: 'spell', damage: 8 });
+}
+ck('a spell from range is a fireball', ball.fireball === true, JSON.stringify(ball).slice(0, 80));
+ck('it splashes what stands beside the target', (ball.splash || []).some(x => x.name === 'Pack B'),
+   JSON.stringify(ball.splash));
+ck('the splash is half, not full', (ball.splash || []).every(x => x.damage === 4), JSON.stringify(ball.splash));
+ck('something four squares away is untouched', await hpOf('Far one') === 12, `${await hpOf('Far one')} hp`);
+ck('the board is told to paint the burst', await page.evaluate(() => !!window.__st.spellFx));
+ck('the party is never caught in it', await page.evaluate(() =>
+  window.__st.tokens.filter(t => t.kind === 'pc').every(t => t.hp === t.maxHp)));
+const melee = await call('attack', { attackerId: 'Brannok', targetId: 'Pack A', kind: 'melee' });
+ck('a sword swing is not a fireball', melee.fireball !== true, JSON.stringify(melee).slice(0, 70));
+
 console.log('— you can see what you are fighting —');
 await page.evaluate(() => { window.__st.revealed = []; });
 await call('add_token', { name: 'Lurker', kind: 'monster', art: 'skeleton', x: 8, y: 10, hp: 9 });

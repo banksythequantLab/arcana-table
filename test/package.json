@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Headless checks for Arcana Table. `npm test` runs every suite.",
   "scripts": {
-    "test": "node smoke.mjs && node a11y.mjs && node reach.mjs && node fixes.mjs && node echo.mjs && node inspector.mjs && node variety.mjs",
+    "test": "node smoke.mjs && node a11y.mjs && node reach.mjs && node fixes.mjs && node echo.mjs && node inspector.mjs && node variety.mjs && node walk.mjs",
     "smoke": "node smoke.mjs",
     "a11y": "node a11y.mjs",
     "reach": "node reach.mjs",
@@ -14,7 +14,8 @@
     "mobile": "node mobile.mjs",
     "live": "node live.mjs",
     "playtest": "node playtest.mjs",
-    "variety": "node variety.mjs"
+    "variety": "node variety.mjs",
+    "walk": "node walk.mjs"
   },
   "license": "MIT",
   "dependencies": {

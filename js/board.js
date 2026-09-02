@@ -3,17 +3,19 @@
 // drag-to-move — and effects, so the board reacts instead of just updating.
 
 import { state, GRID_W, GRID_H, currentMap, isRevealed, isWalkable, findToken } from './state.js';
-import { moveToken, onChange, emit } from './actions.js';
+import { moveToken, moveParty, onChange, emit } from './actions.js';
 import { TOKEN_ART, TILE_COLORS } from './art.js';
 import { fx, step, draw as drawFx, damageNumber, burst, ring, kick, flash } from './fx.js';
 
 let canvas, ctx, cell = 44, offX = 0, offY = 0;
 let drag = null;
+let tap = null;            // a press on empty floor, pending a click
 let hoverCell = null;
 let anims = new Map();     // tokenId → {fx, fy, tx, ty, t0}
 let lastPos = new Map();
 let lastHp = new Map();
 let lastDiceT = 0;
+let lastSpellT = 0;
 let lastFrame = performance.now();
 
 // Someone who asked for less motion should not get a guttering torch.
@@ -74,6 +76,18 @@ function detectChanges(prime = false) {
     if (!findToken(id)) { lastPos.delete(id); lastHp.delete(id); anims.delete(id); }
   }
 
+  // A fireball should look like one: a hot burst over the target, a ring for
+  // the blast edge that catches whatever is standing next to it, and a shove.
+  const sp = state.spellFx;
+  if (sp && sp.t !== lastSpellT) {
+    lastSpellT = sp.t;
+    burst(sp.x, sp.y, 26, '#F0762E');
+    burst(sp.x, sp.y, 14, '#F2C14E');
+    ring(sp.x, sp.y, '#F0762E');
+    flash('rgba(240,118,46,.22)', 380);
+    kick(10);
+  }
+
   const d = state.dice;
   if (!prime && d && d.t !== lastDiceT) {
     lastDiceT = d.t;
@@ -129,22 +143,60 @@ function onDown(e) {
   if (!c) return;
   const t = [...state.tokens].reverse().find(t => t.x === c.x && t.y === c.y);
   if (t) { drag = { token: t, px: e.clientX, py: e.clientY }; canvas.setPointerCapture(e.pointerId); }
+  else { tap = { ...c, px: e.clientX, py: e.clientY, at: performance.now() }; }
 }
 function onMove(e) {
   hoverCell = pickCell(e);
   if (drag) { drag.px = e.clientX; drag.py = e.clientY; }
+  const c = hoverCell;
+  const onToken = c && state.tokens.some(t => t.x === c.x && t.y === c.y);
+  canvas.style.cursor = !c ? 'default'
+    : onToken ? 'grab'
+    : (isWalkable(c.x, c.y) && !state.downed && !state.challenge && !state.oath && !state.warmup) ? 'pointer'
+    : 'not-allowed';
 }
 function onUp(e) {
-  if (!drag) return;
-  const c = pickCell(e);
-  const t = drag.token;
-  drag = null;
-  if (c && (c.x !== t.x || c.y !== t.y) && isWalkable(c.x, c.y)) {
-    lastPos.set(t.id, c);
-    moveToken({ tokenId: t.id, x: c.x, y: c.y });
-    ring(c.x, c.y, '#F2C14E');
-    emit('player-move');
+  if (drag) {
+    const c = pickCell(e);
+    const t = drag.token;
+    drag = null;
+    if (c && (c.x !== t.x || c.y !== t.y) && isWalkable(c.x, c.y)) {
+      lastPos.set(t.id, c);
+      moveToken({ tokenId: t.id, x: c.x, y: c.y });
+      ring(c.x, c.y, '#F2C14E');
+      emit('player-move');
+    }
+    return;
   }
+  // A press and release on the same empty cell is a click, not a stray drag.
+  if (!tap) return;
+  const c = pickCell(e);
+  const slip = Math.hypot(e.clientX - tap.px, e.clientY - tap.py);
+  const quick = performance.now() - tap.at < 800;
+  tap = null;
+  if (c && slip < 12 && quick) walkTo(c);
+}
+
+// Click the floor and the party walks there. Dragging a token was the only way
+// to move anything, which nobody guesses — and the one thing every player tries
+// on a map is clicking where they want to go.
+export function walkTo(c) {
+  if (!isWalkable(c.x, c.y)) { ring(c.x, c.y, '#D9534F'); return { error: 'wall' }; }
+  if (state.downed) { ring(c.x, c.y, '#D9534F'); return { error: 'A hero is down — time has stopped.' }; }
+  if (state.challenge || state.oath || state.warmup) { ring(c.x, c.y, '#D9534F'); return { error: 'The table is waiting on you.' }; }
+
+  // In a fight you move whoever's turn it is; out of one the party travels
+  // together, which is what "we go over there" means at a real table.
+  const actor = state.combat.active
+    ? state.tokens.find(t => t.id === state.combat.order[state.combat.turnIndex])
+    : null;
+  const r = (actor && actor.kind === 'pc')
+    ? moveParty({ x: c.x, y: c.y, who: actor.id })
+    : moveParty({ x: c.x, y: c.y });
+  if (r?.error) { ring(c.x, c.y, '#D9534F'); return r; }
+  ring(c.x, c.y, '#F2C14E');
+  emit('player-move');                 // the DM reacts to it like any other move
+  return r;
 }
 
 // ── render loop ──────────────────────────────────────────────────────────────
@@ -253,10 +305,22 @@ function draw(now) {
   }
   ctx.restore();
 
-  // hover
+  // hover — an empty walkable cell is a destination, and should look like one
   if (hoverCell && isWalkable(hoverCell.x, hoverCell.y)) {
     const [px, py] = cellXY(hoverCell.x, hoverCell.y);
-    ctx.strokeStyle = '#F2C14E'; ctx.lineWidth = 3;
+    const empty = !state.tokens.some(t => t.x === hoverCell.x && t.y === hoverCell.y);
+    const barred = state.downed || state.challenge || state.oath || state.warmup;
+    const tint = barred ? '#D9534F' : '#F2C14E';
+    if (empty && !barred) {
+      ctx.fillStyle = 'rgba(242,193,78,.18)';
+      ctx.fillRect(px + 2, py + 2, cell - 4, cell - 4);
+      // a small footprint mark, so it reads as "walk here" rather than "selected"
+      ctx.fillStyle = 'rgba(242,193,78,.75)';
+      ctx.beginPath();
+      ctx.ellipse(px + cell / 2, py + cell * .58, cell * .12, cell * .08, 0, 0, 7);
+      ctx.fill();
+    }
+    ctx.strokeStyle = tint; ctx.lineWidth = 3;
     ctx.strokeRect(px + 2, py + 2, cell - 4, cell - 4);
   }
 
