@@ -2,7 +2,7 @@
 // Story log, party sheet, manual DM panel, agent log, approvals, dice overlay,
 // and the Heroic Effort challenge modal (tap / spacebar rep counter).
 
-import { state, MAPS, QUEST, STRETCHES, WARMUP_PLANS } from './state.js';
+import { state, QUEST } from './state.js';
 import * as A from './actions.js';
 import { onChange } from './actions.js';
 import { agentState, pendingApprovals, settleApproval } from './tools.js';
@@ -19,12 +19,20 @@ const prose = s => esc(s)
   .replace(/(^|[\s(])\*([^*\n]+)\*/g, '$1<em>$2</em>');
 
 const QUEST_TITLES = QUEST.beats.map(b => b.title);
-const STRETCH_NAMES = STRETCHES.map(s => s.name);
 
+// Short enough to sit in one scrollable row; the full sentence is what gets
+// sent, so the DM still receives a real turn rather than a fragment.
 const STARTERS = [
+  'Look around',
+  'Search the room',
+  'Draw my sword',
+  'Head through the door',
+];
+const STARTER_TURNS = [
   'Look around and tell me what I see.',
   'I search the room for anything valuable.',
   'I draw my sword and advance carefully.',
+  'We head through the door into the next room.',
 ];
 
 function bindIntro() {
@@ -61,7 +69,7 @@ function renderStarters() {
   if (!el.dataset.built) {
     el.dataset.built = '1';
     el.innerHTML = STARTERS.map((t, i) => `<button class="starter" data-i="${i}" type="button">${esc(t)}</button>`).join('');
-    el.querySelectorAll('.starter').forEach(b => b.onclick = () => speakTurn(STARTERS[+b.dataset.i]));
+    el.querySelectorAll('.starter').forEach(b => b.onclick = () => speakTurn(STARTER_TURNS[+b.dataset.i]));
   }
   el.hidden = chat.busy || chat.messages.some(m => m.role === 'user');
 }
@@ -140,7 +148,19 @@ function renderLog() {
   }).join('')
     + (chat.busy ? `<div class="say dm thinking"><b>DM</b> <span class="dots"><i></i><i></i><i></i></span></div>` : '')
     + (!chat.messages.length && !chat.busy ? `<div class="say sys">The table is set. Say what you do, and the Dungeon Master will answer.</div>` : '');
-  el.scrollTop = el.scrollHeight;
+  scrollToLatest(el);
+}
+
+/** #story-log does not scroll — the tab pane around it does. Setting scrollTop
+ *  on the log itself was a no-op, which is why the newest line kept landing
+ *  below the fold while the DM was still writing it. */
+function scrollToLatest(el) {
+  for (let n = el; n && n !== document.body; n = n.parentElement) {
+    if (n.scrollHeight > n.clientHeight + 1 && getComputedStyle(n).overflowY !== 'visible') {
+      n.scrollTop = n.scrollHeight;
+      return;
+    }
+  }
 }
 
 const speakTurn = text => {
@@ -244,7 +264,7 @@ function renderParty() {
 // ── agent log + approvals ────────────────────────────────────────────────────
 function renderAgent() {
   $('#agent-sub').textContent = chat.error
-    ? '· DM offline, DM panel still works'
+    ? '· DM offline — run the tools yourself in the DM Panel'
     : chat.busy ? '· the OpenAI DM is acting' : '· OpenAI DM + any external agent';
   const el = $('#agent-log');
   el.innerHTML = state.agentLog.slice(-40).reverse().map(l => {
@@ -424,51 +444,141 @@ function bindTabs() {
   });
 }
 
-// ── manual DM panel ──────────────────────────────────────────────────────────
+// ── the WebMCP inspector ─────────────────────────────────────────────────────
+// The DM Panel used to be a rack of hand-wired buttons, which raised a fair
+// question: what is a player supposed to do with it? This is the answer. It
+// reads the LIVE registry off document.modelContext — not our own arrays — and
+// builds a form for each tool out of that tool's own JSON Schema. Running one
+// goes through executeTool, the identical path an external agent takes, and
+// lands in the same Agent Log. Nothing here can do anything the DM cannot, and
+// nothing the DM does can skip this surface.
+
+const mcCtx = () => document.modelContext || navigator.modelContext || null;
+
+// Tools we have drawn, so a re-render does not wipe what someone half typed.
+const openTools = new Set();
+let lastSig = '';
+
 function bindDMPanel() {
-  $('#dm-roll').onclick = () => A.rollDice({ formula: $('#dm-formula').value || 'd20', reason: 'Manual roll' });
-  $('#dm-narrate').onclick = () => { const t = $('#dm-text').value.trim(); if (t) { A.narrate({ text: t }); $('#dm-text').value = ''; } };
-  $('#dm-spawn').onclick = () => A.addToken({ name: $('#dm-name').value || 'Goblin', kind: 'monster', art: $('#dm-art').value, hp: 7, x: 11, y: 6 });
-  $('#dm-combat').onclick = () => state.combat.active ? A.endCombat() : A.startCombat({});
-  $('#dm-scene').onchange = e => A.setScene({ mapId: e.target.value, title: MAPS[e.target.value].name });
-  $('#dm-reveal').onclick = () => { state.tokens.filter(t => t.kind === 'pc').forEach(t => A.revealArea({ x: t.x, y: t.y, radius: 5 })); };
-  $('#dm-challenge').onclick = () => {
-    const mode = $('#dm-mode').value;
-    const n = parseInt($('#dm-reps').value, 10) || 10;
-    const r = A.proposeChallenge({
-      mode, exercise: $('#dm-exercise').value, reward: $('#dm-reward').value,
-      reps: mode === 'reps' ? n : undefined, seconds: mode === 'hold' ? n : undefined,
-      reason: 'The table demands proof of heroism!',
-    });
-    if (r?.error) alert(r.error);
-  };
-  $('#dm-warm').onclick = () => {
-    const r = A.startWarmup({ plan: $('#dm-warm-plan').value });
-    if (r?.error) alert(r.error);
-  };
-  $('#dm-oath').onclick = () => {
-    const r = A.proposeOath({
-      label: $('#dm-oath-label').value.trim() || 'the thing you have been avoiding',
-      kind: $('#dm-oath-kind').value,
-      minutes: parseInt($('#dm-oath-min').value, 10) || 10,
-      reward: $('#dm-reward').value,
-      reason: 'Swear it to the table, and the table pays.',
-    });
-    if (r?.error) alert(r.error);
-  };
   $('#dm-auto').onchange = e => { state.settings.autoApprove = e.target.checked; };
   $('#dm-reset').onclick = () => { if (confirm('Reset the whole table?')) { localStorage.clear(); location.reload(); } };
-  $('#dm-advance').onclick = () => A.advanceQuest({ summary: 'Called by hand from the DM panel.' });
-  $('#dm-save').onclick = () => A.deathSave();
   $('#ending-again').onclick = () => { localStorage.clear(); location.reload(); };
+  renderMcp();
+}
+
+/** A control for one schema property — the schema is the source of truth. */
+function fieldFor(name, spec, required) {
+  const id = `mcp-f-${name}`;
+  const req = required ? '<span class="mcp-req" title="required">*</span>' : '';
+  const desc = spec.description ? `<span class="mcp-fd">${esc(spec.description)}</span>` : '';
+  let input;
+  if (Array.isArray(spec.enum)) {
+    input = `<select id="${id}" data-k="${esc(name)}">` +
+      (required ? '' : '<option value=""></option>') +
+      spec.enum.map(v => `<option>${esc(String(v))}</option>`).join('') + '</select>';
+  } else if (spec.type === 'number' || spec.type === 'integer') {
+    input = `<input id="${id}" data-k="${esc(name)}" type="number" step="any">`;
+  } else if (spec.type === 'boolean') {
+    input = `<input id="${id}" data-k="${esc(name)}" type="checkbox">`;
+  } else {
+    input = `<input id="${id}" data-k="${esc(name)}" type="text">`;
+  }
+  return `<label class="mcp-field"><span class="mcp-fk">${esc(name)}${req}</span>${input}${desc}</label>`;
+}
+
+/** Read a tool's form back into the object executeTool wants. */
+function argsFrom(form) {
+  const args = {};
+  form.querySelectorAll('[data-k]').forEach(el => {
+    const k = el.dataset.k;
+    if (el.type === 'checkbox') { if (el.checked) args[k] = true; return; }
+    const v = el.value.trim();
+    if (v === '') return;                       // omitted, not empty — let defaults stand
+    args[k] = el.type === 'number' ? Number(v) : v;
+  });
+  return args;
+}
+
+async function renderMcp() {
+  const box = $('#mcp-tools');
+  const status = $('#mcp-status');
+  if (!box) return;
+  const ctx = mcCtx();
+
+  if (!ctx || typeof ctx.getTools !== 'function') {
+    status.className = 'mcp-status missing';
+    status.innerHTML = '<b>No WebMCP surface in this browser.</b> The game still runs — ' +
+      'the DM drives it through the same actions directly — but there is no registry to show.';
+    box.innerHTML = '';
+    return;
+  }
+
+  const tools = await ctx.getTools();
+  const mode = agentState.mode;
+  status.className = 'mcp-status ' + mode;
+  status.innerHTML =
+    `<b>${tools.length} tools live</b> on <code>document.modelContext</code> · ` +
+    `${mode === 'native' ? 'native browser implementation' : 'vendored polyfill (MIT)'}` +
+    (state.combat.active ? ' · <b>combat toolset registered</b>' : '') +
+    (state.downed ? ' · <b>death save registered</b>' : '');
+
+  // Only redraw when the registry itself changes — otherwise typing in a form
+  // would be wiped every time the board emits.
+  const sig = tools.map(t => t.name).join(',');
+  if (sig === lastSig) return;
+  lastSig = sig;
+
+  box.innerHTML = tools.map(t => {
+    const ro = t.annotations?.readOnlyHint;
+    const props = t.inputSchema?.properties || {};
+    const required = t.inputSchema?.required || [];
+    const keys = Object.keys(props);
+    const fields = keys.length
+      ? keys.map(k => fieldFor(k, props[k], required.includes(k))).join('')
+      : '<p class="mcp-none">No arguments.</p>';
+    return `<details class="mcp-tool${ro ? ' ro' : ''}" data-tool="${esc(t.name)}"${openTools.has(t.name) ? ' open' : ''}>
+      <summary><code>${esc(t.name)}</code>${ro ? '<span class="mcp-tag ro">read-only</span>' : ''}</summary>
+      <p class="mcp-desc">${esc(t.description || '')}</p>
+      <form class="mcp-form">${fields}
+        <button class="btn mcp-run" type="submit">▶ Run through executeTool</button>
+      </form>
+      <pre class="mcp-out" hidden></pre>
+    </details>`;
+  }).join('');
+
+  box.querySelectorAll('.mcp-tool').forEach(d => {
+    d.ontoggle = () => d.open ? openTools.add(d.dataset.tool) : openTools.delete(d.dataset.tool);
+  });
+
+  box.querySelectorAll('.mcp-form').forEach(form => {
+    form.onsubmit = async e => {
+      e.preventDefault();
+      const det = form.closest('.mcp-tool');
+      const out = det.querySelector('.mcp-out');
+      const btn = form.querySelector('.mcp-run');
+      const name = det.dataset.tool;
+      out.hidden = false; out.className = 'mcp-out'; out.textContent = 'running…';
+      btn.disabled = true;
+      try {
+        const live = await ctx.getTools();
+        const tool = live.find(t => t.name === name);
+        if (!tool) throw new Error('That tool is no longer registered.');
+        // This polyfill takes the input as a JSON string; the spec says object.
+        const raw = await ctx.executeTool(tool, JSON.stringify(argsFrom(form)));
+        const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        out.className = 'mcp-out ' + (res?.error ? 'bad' : 'good');
+        out.textContent = JSON.stringify(res, null, 1);
+      } catch (err) {
+        out.className = 'mcp-out bad';
+        out.textContent = String(err?.message || err);
+      } finally { btn.disabled = false; }
+    };
+  });
 }
 
 function renderDM() {
-  $('#dm-combat').textContent = state.combat.active ? '⚔ End combat' : '⚔ Start combat';
-  $('#dm-scene').value = state.scene.mapId;
-  const down = !!state.downed;
-  $('#dm-save').hidden = !down;
-  $('#dm-advance').disabled = down || state.quest.status !== 'active';
+  $('#dm-auto').checked = state.settings.autoApprove;
+  renderMcp();
 }
 
 // ── the warm-up ──────────────────────────────────────────────────────────────
@@ -488,8 +598,9 @@ function renderWarmup() {
   $('#warm-count').textContent = w.remaining;
   $('#warm-ring').style.setProperty('--pct', `${((w.hold - w.remaining) / w.hold) * 100}%`);
   $('#warm-breath').textContent = w.paused ? '—' : BREATHS[Math.floor((w.hold - w.remaining) / 2) % BREATHS.length];
-  const next = STRETCH_NAMES[w.index + 1];
-  $('#warm-next').textContent = w.index + 1 < w.of && next ? `next · ${next}` : 'last one';
+  // w.index walks the plan's sequence, not STRETCHES — currentStretch() hands
+  // us the resolved next name, because the two are no longer the same list.
+  $('#warm-next').textContent = w.next ? `next · ${w.next}` : 'last one';
   $('#warm-pause').textContent = w.paused ? 'Resume' : 'Pause';
 }
 

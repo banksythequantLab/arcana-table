@@ -102,11 +102,11 @@ is the way out of death, which is the argument the whole project is making.
   A ~200-line Cloudflare Worker holds the OpenAI API key so none reaches a
   browser — origin-locked, size-capped, 40 req/min per IP.
 
-- **21 tools** registered through `document.modelContext` / `navigator.modelContext`
-  (18 always on, 3 more while combat runs, 1 more while a hero is bleeding out)
+- **23 tools** registered through `document.modelContext` / `navigator.modelContext`
+  (19 always on, 3 more while combat runs, 1 more while a hero is bleeding out)
   — reads (`get_board_state`, `get_character_sheet`, `get_fitness_log`, all
-  `readOnlyHint: true`), board actions (`move_token`, `add_token`, `reveal_area`,
-  `set_scene`), game flow (`roll_dice`, `narrate`, `start_combat`, `award_loot`)
+  `readOnlyHint: true`), board actions (`move_party`, `move_token`, `add_token`,
+  `reveal_area`, `set_scene`), game flow (`roll_dice`, `narrate`, `start_combat`, `award_loot`)
   the quest tools (`get_quest`, `advance_quest`), and the effort tools
   (`propose_challenge` for reps and timed holds, `propose_oath` for real-world
   commitments, `start_warmup` for the guided stretch program).
@@ -116,9 +116,9 @@ is the way out of death, which is the argument the whole project is making.
   { signal })` — and removed by `controller.abort()`, which fires `toolchange`
   so agents refresh. The same pattern registers `death_save` only while a hero
   is at 0 HP. Our tests assert it against the live registry: `getTools()` returns
-  18, then 21 during combat, then 18 again — and 22 the moment a hero drops.
+  19, then 22 during combat, then 19 again — and 20 the moment a hero drops.
 - **No flag, no setup, for anyone:** the page vendors the MIT
-  `@mcp-b/webmcp-polyfill`, so `document.modelContext` and all 21 tools are real
+  `@mcp-b/webmcp-polyfill`, so `document.modelContext` and all 23 tools are real
   in any modern browser. Judges just open the URL. Where WebMCP ships natively,
   that implementation wins and the badge honestly reads `native` vs `polyfill`.
 - **Human-in-the-loop by construction:** destructive calls (removing a token,
@@ -260,12 +260,15 @@ roomy for one person playing and tight against abuse. If a judge hits that
 ceiling, or wants sustained play without touching our quota, there are two
 paths and neither needs anything from us:
 
-**Play with no API calls at all.** The 🎩 **DM Panel** tab runs the entire game
-by hand — dice, narration, spawning, scenes, combat, the warm-up, Oaths, Heroic
-Effort, quest beats, death saves. Tools and buttons call the same `actions.js`
-layer, so nothing is agent-only. The board never depends on a network call, and
-if the Worker is unreachable the app says so and points at the panel rather than
-dying.
+**Play with no API calls at all.** The 🎩 **DM Panel** tab is a live inspector for
+the WebMCP registry, not a rack of hand-wired buttons. It reads `getTools()` off
+`document.modelContext`, renders each tool's description and `readOnlyHint`, and
+builds a form from that tool's own JSON Schema. Submitting the form calls
+`executeTool()` — the identical path the AI DM and any external agent take — and
+the call lands in the same Agent Log. So you can play the whole game by hand, but
+the more useful property is what it demonstrates: the list you are driving IS the
+list the DM holds. There is no private surface to compare it against, because the
+DM has none. Watch the rows appear and vanish when a fight starts and ends.
 
 **Or point it at your own key**, about three commands:
 

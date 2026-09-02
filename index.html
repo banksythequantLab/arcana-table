@@ -90,99 +90,20 @@
     </div>
 
     <div id="pane-dm" class="tabpane" hidden>
-      <p class="dm-hint">Everything an agent can do, you can do by hand. No agent required —
-        the built-in DM runs on OpenAI, but the table does not need it.</p>
-      <div class="dm-group">
-        <label>Roll dice</label>
-        <div class="row"><input id="dm-formula" value="d20" size="6"><button id="dm-roll" class="btn">🎲 Roll</button></div>
-      </div>
-      <div class="dm-group">
-        <label>Narrate</label>
-        <div class="row"><input id="dm-text" placeholder="The door creaks open…"><button id="dm-narrate" class="btn">📜</button></div>
-      </div>
-      <div class="dm-group">
-        <label>Spawn token</label>
-        <div class="row">
-          <input id="dm-name" placeholder="Snaggle" size="8">
-          <select id="dm-art">
-            <option>goblin</option><option>skeleton</option><option>wolf</option><option>dragon</option>
-            <option>villager</option><option>chest</option><option>knight</option><option>wizard</option>
-          </select>
-          <button id="dm-spawn" class="btn">＋</button>
-        </div>
-      </div>
-      <div class="dm-group">
-        <label>Scene</label>
-        <div class="row">
-          <select id="dm-scene">
-            <option value="dungeon">The Sunken Keep</option>
-            <option value="forest">The Whispering Glade</option>
-            <option value="crypt">The Ember Crypt</option>
-          </select>
-          <button id="dm-reveal" class="btn">🔦 Reveal</button>
-        </div>
-      </div>
-      <div class="dm-group">
-        <button id="dm-advance" class="btn wide">✦ Beat complete — advance the quest</button>
-        <button id="dm-save" class="btn wide" hidden>🎲 Roll a death save</button>
-      </div>
+      <!-- Not a control board: the live WebMCP registry, read straight from
+           document.modelContext. Every row is a tool the AI DM is holding right
+           now, and the form under it calls that same tool through executeTool —
+           the same door an external agent comes through. Nothing here is a
+           shortcut around the DM, because there is no shortcut to offer. -->
+      <p class="dm-hint">This is the DM's hands, live. Every tool below is registered on
+        <code>document.modelContext</code> right now — the AI DM holds exactly this list and
+        nothing else. Open one and run it: you are calling the same function it calls,
+        through the same <code>executeTool</code> door any external agent would use.
+        Watch the list change when a fight starts.</p>
 
-      <div class="dm-group">
-        <button id="dm-combat" class="btn wide">⚔ Start combat</button>
-      </div>
-      <div class="dm-group heroic">
-        <label>🤸 Warm-up</label>
-        <div class="row">
-          <select id="dm-warm-plan">
-            <option value="90s">90 seconds · 6 stretches</option>
-            <option value="3min">3 minutes · 12</option>
-            <option value="5min">5 minutes · 20</option>
-            <option value="10min">10 minutes · 20 slow</option>
-          </select>
-          <button id="dm-warm" class="btn">Start</button>
-        </div>
-      </div>
+      <div id="mcp-status" class="mcp-status"></div>
+      <div id="mcp-tools" class="mcp-tools"></div>
 
-      <div class="dm-group heroic">
-        <label>📜 Oath — stake a real task</label>
-        <div class="row">
-          <input id="dm-oath-label" placeholder="clear the sink" size="10">
-          <input id="dm-oath-min" type="number" value="10" min="1" max="60" title="minutes">
-        </div>
-        <div class="row">
-          <select id="dm-oath-kind">
-            <option>chores</option><option>study</option><option>reading</option>
-            <option>practice</option><option>admin</option><option>tidy</option>
-          </select>
-          <button id="dm-oath" class="btn">Swear</button>
-        </div>
-      </div>
-
-      <div class="dm-group heroic">
-        <label>💪 Heroic Effort</label>
-        <div class="row">
-          <select id="dm-mode">
-            <option value="reps">reps</option>
-            <option value="hold">hold (seconds)</option>
-          </select>
-          <select id="dm-exercise">
-            <option>push-ups</option><option>crunches</option><option>jumping jacks</option><option>squats</option>
-            <option>sit-ups</option><option>lunges</option><option>high knees</option><option>mountain climbers</option>
-            <option>burpees</option>
-          </select>
-          <input id="dm-reps" type="number" value="10" min="1" max="100">
-        </div>
-        <div class="row">
-          <select id="dm-reward">
-            <option value="bonus+2">+2 next roll</option>
-            <option value="bonus+5">+5 next roll</option>
-            <option value="advantage">Advantage</option>
-            <option value="set10">Set die to 10</option>
-            <option value="nat20">NATURAL 20</option>
-          </select>
-          <button id="dm-challenge" class="btn">Offer</button>
-        </div>
-      </div>
       <div class="dm-group">
         <label class="row check"><input type="checkbox" id="dm-auto"> Auto-approve agent actions</label>
         <button id="dm-reset" class="btn danger wide">Reset table</button>

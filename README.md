@@ -60,7 +60,7 @@ Built for [The WebMCP Challenge](https://webmcp.devpost.com/) (Devpost, 2026).
 
 1. **Just open the live URL — in any modern browser.** The page ships the
    vendored [`@mcp-b/webmcp-polyfill`](https://github.com/WebMCP-org/npm-packages)
-   (MIT), so `document.modelContext` and all 21 tools are real even where the
+   (MIT), so `document.modelContext` and all 23 tools are real even where the
    browser hasn't implemented WebMCP yet. No flags, no setup. Where the browser
    *does* ship WebMCP natively, the native implementation wins and the badge
    says `WebMCP native` instead of `polyfill`.
@@ -69,9 +69,11 @@ Built for [The WebMCP Challenge](https://webmcp.devpost.com/) (Devpost, 2026).
 3. **Or bring your own agent.** In a WebMCP-capable agent browser, point your
    agent at the page: *"You're my co-DM. Read the board, set the scene, and run
    me through this dungeon. Offer Heroic Effort when a roll matters."* It drives
-   the identical 21 tools.
-4. **Or run it yourself.** The **🎩 DM Panel** tab does everything the tools do,
-   by hand — the game never depends on a network call.
+   the identical 23 tools.
+4. **Or run it yourself.** The **🎩 DM Panel** tab is a live inspector for the
+   registry: every tool `getTools()` reports, with its schema rendered as a form
+   that calls `executeTool()`. Same door the DM uses, same Agent Log. The game
+   never depends on a network call.
 
 Console demo (works in any browser — same tool surface, no flag needed):
 
@@ -114,7 +116,8 @@ await arcana.call('roll_dice', { formula: 'd20', reason: 'Attack the dragon' })
 Design choices worth noting:
 
 - **One action API, two hands on the table.** Tools and UI buttons call the same
-  `actions.js` functions — the manual DM panel is proof the agent has no secret powers.
+  `actions.js` functions — the DM Panel inspector is proof the agent has no secret powers:
+  it drives the live registry, so there is no second surface to hide anything in.
 - **Dynamic tool registration, done the spec way.** Combat tools exist only
   while combat runs. Each tool is registered with an `AbortController` —
   `registerTool(def, { signal })` — and unregistered by `controller.abort()`,
@@ -177,7 +180,7 @@ the table stays fully playable from the DM panel. See `worker/README.md`.
 ### Bring your own key
 
 The hosted Worker is rate-limited to 40 req/min per IP. To play without touching
-that quota, either use the **🎩 DM Panel**, which runs the whole game with zero
+that quota, either use the **🎩 DM Panel** inspector, which runs the whole game with zero
 API calls, or point the app at your own Worker:
 
 ```bash
