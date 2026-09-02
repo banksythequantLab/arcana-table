@@ -11,6 +11,8 @@ HERE = pathlib.Path(__file__).parent
 VO   = HERE / 'vo'
 CARD = HERE / 'screens/cards'
 FOOT = HERE / 'screens/video/arcana-screen.mp4'
+# The animated "how it works" model, recorded by diagram.mjs.
+MODEL = HERE / 'screens/diagram/model.mp4'
 # The one shot no harness can produce: Derek actually doing the reps. When it
 # is present the slate becomes that footage under a lower-third; when it is
 # not, the placeholder card stands in so the pipeline still builds.
@@ -42,26 +44,24 @@ CUT = [
     #  ~99s the Oath offered and sworn · ~101-116s the table locked
     #  ~118-140s combat · ~145s the natural 20 on the new d20
     #
-    # Silence lives ONLY under title cards now — 11.5s of 166, down from 40.
-    # Every other second has Derek talking over it.
-    ('card', 'open',   2.5, None),
-    ('shot', None,     VOS['vo01_problem'] + VOS['vo02_whatitis'], 40.0),
-    ('card', 'webmcp', 2.0, None),
-    ('shot', None,     VOS['vo03_webmcp'], 148.0),
-    # Whose mind is actually running the table.
-    ('card', 'brain',  2.5, None),
-    ('shot', None,     VOS['vo10_brain'], 118.0),
-    ('card', 'heroic', 2.0, None),
-    ('shot', None,     VOS['vo04_heroic'], 78.0),
-    # His push-up footage runs under "not everyone can drop and give me ten",
-    # which is the line it was always meant to illustrate.
-    ('slate','burpees',10.0, None),
-    ('shot', None,     (VOS['vo07_swap'] - 10.0) + VOS['vo04b_payoff'], 142.5),
-    ('card', 'oath',   2.0, None),
-    ('shot', None,     VOS['vo08_oath'], 96.0),      # the Oath sworn, table locked
-    ('shot', None,     VOS['vo09_micro'], 106.0),    # back in play, the run continues
-    ('shot', None,     VOS['vo05_hood'], 44.0),     # the agent log doing the work
-    ('card', 'close',  VOS['vo06_close'] + 1.0, None),
+    # 'model' segments come from the architecture animation, not the bed.
+    ('card',  'open',   2.0, None),
+    ('shot',  None,     VOS['vo01_problem'] + VOS['vo02_whatitis'], 40.0),
+    ('card',  'webmcp', 4.5, None),
+    # The model earns real screen time: it is the clearest statement the project
+    # makes, and a card alone cannot make it.
+    ('model', None,     VOS['vo03a_nobackdoor'] + VOS['vo03b_contract'], 0.4),
+    ('card',  'heroic', 2.0, None),
+    ('shot',  None,     VOS['vo04_heroic'], 78.0),
+    ('slate', 'burpees',10.0, None),
+    ('shot',  None,     (VOS['vo07_swap'] - 10.0) + VOS['vo04b_payoff'], 142.5),
+    ('card',  'oath',   2.0, None),
+    ('shot',  None,     VOS['vo08_oath'], 96.0),
+    ('shot',  None,     VOS['vo09_micro'], 106.0),
+    # Back to the model, resting on the OpenAI and Worker boxes.
+    ('model', None,     VOS['vo10_brain'], 28.0),
+    ('shot',  None,     VOS['vo05_hood'], 44.0),
+    ('card',  'close',  VOS['vo06_close'] + 0.5, None),
 ]
 
 parts = []
@@ -79,6 +79,12 @@ for i, (kind, src, length, start) in enumerate(CUT):
                  '-t',f'{length:.3f}','-r',str(FPS),'-an','-c:v','libx264','-preset','veryfast',
                  '-crf','20','-pix_fmt','yuv420p',str(out)])
         src = 'pushups'
+    elif kind == 'model':
+        run(['ffmpeg','-y','-loglevel','error','-stream_loop','-1','-i',str(MODEL),
+             '-ss',f'{start:.3f}','-t',f'{length:.3f}','-r',str(FPS),'-an',
+             '-c:v','libx264','-preset','veryfast','-crf','20','-pix_fmt','yuv420p',
+             '-vf',f'scale={W}:{H}',str(out)])
+        src = 'model'
     elif kind in ('card', 'slate'):
         run(['ffmpeg','-y','-loglevel','error','-loop','1','-i',str(CARD/f'{src}.png'),
              '-t',f'{length:.3f}','-r',str(FPS),'-c:v','libx264','-preset','veryfast',
@@ -102,16 +108,16 @@ run(['ffmpeg','-y','-loglevel','error','-f','concat','-safe','0','-i',str(listin
 
 # ── voice track: same order, silence under the cards ────────────────────────
 ORDER = [
-    ('sil', 2.5), ('vo', 'vo01_problem'), ('vo', 'vo02_whatitis'),
-    ('sil', 2.0), ('vo', 'vo03_webmcp'),
-    ('sil', 2.5), ('vo', 'vo10_brain'),
+    ('sil', 2.0), ('vo', 'vo01_problem'), ('vo', 'vo02_whatitis'),
+    ('sil', 4.5), ('vo', 'vo03a_nobackdoor'), ('vo', 'vo03b_contract'),
     ('sil', 2.0), ('vo', 'vo04_heroic'),
     ('vo', 'vo07_swap'),                            # over the push-up slate
     ('vo', 'vo04b_payoff'),
     ('sil', 2.0), ('vo', 'vo08_oath'),
     ('vo', 'vo09_micro'),
+    ('vo', 'vo10_brain'),                           # over the model again
     ('vo', 'vo05_hood'), ('vo', 'vo06_close'),
-    ('sil', 1.0),
+    ('sil', 0.5),
 ]
 apieces = []
 for j, item in enumerate(ORDER):

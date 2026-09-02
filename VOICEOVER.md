@@ -1,29 +1,35 @@
 # Arcana Table — demo video voice-over
 
+**This is the shooting script as actually spoken in the submitted video.**
+Runtime **~2:55**. Devpost caps at 3:00.
+
 Two voices, deliberately:
 
-- **DEREK (cloned via FreeClone/VoxCPM2)** — the narration. Your pitch, your voice.
-- **THE DM (OpenAI TTS, "onyx", live from the app)** — heard diegetically, coming
-  out of the product itself. Do not re-record these; they are captured from the
-  running app so judges hear the real thing.
+- **DEREK** — the narration. Cloned on our own GPU stack (FreeClone + VoxCPM2 on
+  Johnson, `POST /api/clone` with `derek-voice.wav` as the reference). Regenerate
+  with `D:\arcana-vo\gen.py` / `gen2.py` / `gen3.py`.
+- **THE DM** — OpenAI TTS (`gpt-4o-mini-tts`, voice *onyx*), heard diegetically,
+  coming out of the running product. Never re-recorded; it is captured live.
 
-Runtime: **2:56**. Devpost caps at 3:00. Silence appears only under the
-five title cards (11s of 176) — everywhere else Derek is talking.
+Silence appears only under the title cards. Everything else is narrated.
 
 ---
 
-## VO-01 · The problem — 0:00–0:18
+## 1 · Title card *(2s, silent)*
+
+> **Arcana Table**
+> Play D&D with an AI co-DM — and do real push-ups for your natural 20s.
+
+---
+
+## 2 · VO-01 — The problem  ·  16.7s
 
 > Fifty million people play tabletop RPGs. Almost none of them want to be the
 > Dungeon Master. And nobody — nobody — wants to do push-ups alone.
 >
 > So I built a table where an AI runs the game… and your body rolls the dice.
 
-*On screen: cold open on the board, torchlight, tokens. No UI chrome yet.*
-
----
-
-## VO-02 · What it is — 0:18–0:40
+## 3 · VO-02 — What it is  ·  17.8s
 
 > This is Arcana Table. It's a web page. You open it, and a Dungeon Master is
 > already there, waiting. No install, no plugin, no flag to enable — just a URL.
@@ -31,111 +37,97 @@ five title cards (11s of 176) — everywhere else Derek is talking.
 > I talk to it. It talks back. And everything it says, it makes true on the board
 > in front of me.
 
-*On screen: type/speak a turn, DM replies, tokens move, fog lifts.*
-*Let one DM line play out loud in the clear — that's the product's own voice.*
+*On screen for 2 and 3: the quest rail, the DM's opening beat, the player typing,
+and the guided warm-up running.*
 
 ---
 
-## VO-03 · The WebMCP part — 0:40–1:10
+## 4 · Title card — "How it works" *(4.5s, silent)*
 
-> Here's the part I care about. That Dungeon Master has no back door.
->
-> The page publishes seventeen tools through WebMCP — `document.modelContext`.
-> The DM finds out what it can do by calling `getTools`, and it acts by calling
-> `executeTool`. Exactly the same contract your own agent would use from outside.
->
-> So this isn't a demo *claiming* its tool surface is real. It hands an agent the
+> **HOW IT WORKS**
+> **21 tools on `document.modelContext`**
+> The built-in DM calls `getTools()` and `executeTool()` — the same contract your
+> agent would use.
+
+## 5 · VO-03a — No back door  ·  9.5s
+
+> Here's the part I care about. That Dungeon Master has no back door. The page
+> publishes twenty one tools through WebMCP, on document dot modelContext.
+
+## 6 · VO-03b — The contract  ·  15.9s
+
+> The DM finds out what it can do by calling getTools, and it acts by calling
+> executeTool. That is the whole interface. It is exactly the same contract your
+> own agent would use from outside, so an outside agent can take the co-DM seat
+> through the identical two calls.
+
+## 7 · VO-03c — Watch it  ·  8.4s
+
+> So this isn't a demo claiming its tool surface is real. It hands an agent the
 > seat and lets you watch. Every call it makes scrolls right there in the log.
 
-*On screen: Agent Log filling with get_board_state, add_token, roll_dice.*
-*Cut to console: `await document.modelContext.getTools()` → 14 … then 17 in combat.*
+*On screen for 5–7: an animated architecture model, drawn beat by beat —*
+*You → the page → `document.modelContext` (all 21 tool names, with the combat and*
+*downed tools in their own colours) → the board. Then the built-in DM (OpenAI GPT)*
+*and an external agent (ChatGPT / Claude) wiring into the SAME registry through*
+*the same two labelled arrows, with a pulse travelling the `executeTool()` wire*
+*into the board. Closing line on the card: "The DM has no back door — if you can*
+*watch the log, you can see everything it is allowed to do."*
 
 ---
 
-## VO-04 · Heroic Effort — 1:10–2:00
+## 8 · Title card — Heroic Effort *(2s, silent)*
 
-> And when a roll really matters, the DM can stake something the dice can't give it.
+> **THE SIGNATURE MOVE**
+> **Heroic Effort**
+> 10 jumping jacks → +2 · 15 squats → advantage · 10 push-ups → a natural 20
 
-*Beat. Let the DM's own voice carry the offer — do not talk over it:*
-> **[DM, live audio]** *"The Sentinel braces for your charge. Ten push-ups will turn
-> your steel and resolve into a fierce edge — but you may decline and trust the dice."*
+## 9 · VO-04 — Heroic Effort  ·  13.5s
 
-> Ten push-ups. For a guaranteed twenty.
+> And when a roll really matters, the DM can stake something the dice can't give
+> it. Ten push-ups. For a guaranteed twenty.
 >
 > My hands are on the floor, so I'm not typing — I just count out loud, and the
 > table hears me.
 
-*On screen: YOU doing the reps on camera, counting aloud. Ring fills to the count.*
+*On screen: the DM's live offer, the rep ring filling.*
 
-> **[after the reps]** Natural twenty.
-
-*On screen: dice tray — d20 [19] +5⚡ = 24 — then the damage landing.*
-
-> The agent brought the dungeon. I brought the muscle.
-
----
-
-## VO-05 · Under the hood — 2:00–2:25
-
-> Combat tools only exist while combat is running — registered with an
-> AbortController, dropped when the fight ends, exactly the way the spec says to.
-> Damage to my character waits for my approval. The dice roll in the open where I
-> can see them.
->
-> One action layer. The agent and my own mouse call the same functions. It has no
-> powers I don't.
-
-*On screen: the approval toast; the tool table in the README.*
-
----
-
-## VO-06 · Close — 2:25–2:45
-
-> Agents shouldn't just fill in our forms. WebMCP lets them sit down at the table
-> with us — and lets us bring the one thing they never will.
->
-> Arcana Table. Roll with your whole self.
-
-*On screen: logo, live URL, github link. Hold.*
-
----
-
-## Recording notes
-
-- Read VO-01 slower than feels natural; it's the hook.
-- VO-04 is the one that wins the round. Don't perform the reps — actually do them,
-  and let yourself be out of breath on "natural twenty." The breathlessness IS the
-  pitch. Ten push-ups, not burpees — the demo should be something you can finish
-  cleanly on camera and still speak afterwards.
-- Leave 0.5s of clean air at the head and tail of each take; makes the mux easy.
-- Record dry and close-mic'd. FreeClone clones the timbre, not the room.
-
-
----
-
-## VO-07 · Swapping goals for muscle — over the push-up footage
+## 10 · VO-07 — Swapping goals for muscle  ·  11.3s
 
 > Now, not everyone can drop and give me ten. Some days your shoulder is shot.
 > And some days the thing standing between you and the boss fight isn't a boss
 > fight. It's a sink full of dishes.
 
-*On screen: Derek's own push-up footage, then back to the board.*
-*This is the line that footage was always for.*
+*On screen: Derek's own push-up footage, under a lower third reading*
+*"💪 HEROIC EFFORT · NOT A CUTSCENE / 10 push-ups. / The table waits. Finish them*
+*and the next d20 is a natural 20." with a NAT 20 PENDING badge.*
+
+## 11 · VO-04b — The payoff  ·  7.4s
+
+> Natural twenty. The agent brought the dungeon. I brought the muscle.
+
+*On screen: the d20 landing gold — a drawn icosahedron, shockwave, spark burst.*
 
 ---
 
-## VO-08 · The Oath
+## 12 · Title card — the other way to pay *(2s, silent)*
+
+> **THE OTHER WAY TO PAY**
+> **Can't do push-ups today?**
+> Swear an Oath instead — the dishes, ten pages, twenty minutes of study. The
+> table locks until you're back, and it pays exactly the same.
+
+## 13 · VO-08 — The Oath  ·  10.6s
 
 > So the table takes that too. Swear an Oath. Ten minutes on the thing you have
 > been avoiding. The board locks, the Dungeon Master waits, and you come back to
 > the exact same natural twenty.
 
-*On screen: the Oath card — "clear the sink full of dishes" — sworn, then the
-locked table with the clock running.*
+*On screen: the DM offering "clear the sink full of dishes — 10 min → NATURAL 20",*
+*sworn, then the locked table with the clock running and the honour line:*
+*"On your honour. Nothing here can check, which is rather the point."*
 
----
-
-## VO-09 · Micro-bursts
+## 14 · VO-09 — Micro-bursts  ·  18.8s
 
 > Which is better than either one. You are not doing chores any more. You are
 > spending five minutes to buy a dice roll. Clean the house in micro bursts
@@ -143,22 +135,38 @@ locked table with the clock running.*
 > Swap goals for muscle, or muscle for goals. The table only asks that you spend
 > something real.
 
-*On screen: back in play after the Oath — combat resumes, the quest rail advances.*
+*On screen: the Oath clock running out, the reward banked, play resuming.*
 
 ---
 
-All three cloned on the house stack: FreeClone + VoxCPM2 on Johnson:8300,
-`POST /api/clone` with `derek-voice.wav` as the reference. Regenerate with
-`D:\arcana-vo\gen.py`.
-
-
----
-
-## VO-10 · Whose mind it is — after the WebMCP section
+## 15 · VO-10 — Whose mind it is  ·  9.4s
 
 > And the mind behind that Dungeon Master is OpenAI. Every turn goes to GPT
-> through a small Cloudflare Worker that holds the key, so it never touches
-> your browser.
+> through a small Cloudflare Worker that holds the key, so it never touches your
+> browser.
 
-*On screen: the "The DM runs on OpenAI" card, then the agent log filling with
-tool calls — including the DM hitting a wall and picking another cell.*
+*On screen: back to the architecture model, resting on the OpenAI and Cloudflare
+Worker boxes.*
+
+## 16 · VO-05 — Under the hood  ·  20.7s
+
+> Every one of those moves is a real tool call. Watch the log: `add_token`,
+> `roll_dice`, `update_hp`, `advance_quest`. The registry itself changes shape as
+> you play — combat starts and three more tools register; a hero drops and
+> `death_save` appears, then aborts away when they get back up. That's the WebMCP
+> spec's own `AbortController` pattern, not a trick.
+
+*On screen: the Agent Log filling, the tool count climbing 18 → 21 → 22, including
+the DM hitting a wall and picking another cell.*
+
+---
+
+## 17 · Closing card  ·  VO-06, 10.5s
+
+> Arcana Table. An AI Dungeon Master with no special powers, twenty one WebMCP
+> tools, and a mechanic that only pays if you actually get up.
+>
+> Roll with your whole self.
+
+> **Roll with your whole self.**
+> arcana-table.pages.dev · github.com/banksythequantLab/arcana-table

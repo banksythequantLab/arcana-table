@@ -35,32 +35,63 @@ demonstration: the page doesn't assert its tool surface is real, it hands the
 seat to an agent and lets you watch.
 
 Its signature system is **Heroic Effort**: before a roll that matters, the
-agent can stake a real exercise against the dice. Ten jumping jacks for +2.
-Fifteen squats for advantage. Ten push-ups and your next d20 is a guaranteed
-**natural 20**. Challenges are always optional, the reps are counted on a big
-tap/spacebar ring with a timer, and the reward applies automatically to your
-next roll — publicly, in the on-screen dice tray.
+agent can stake something real against the dice, and it has three shapes that
+all pay identically.
+
+- **Reps** — ten jumping jacks for +2, ten push-ups for a guaranteed **natural
+  20**. Counted on a big tap/spacebar ring, or out loud in hands-free mode,
+  because you cannot press a key mid-push-up.
+- **A hold** — a thirty-second plank while the wyrm circles. The ring counts
+  itself down; there is nothing to tap.
+- **An Oath** — something real in the room the app cannot see: clear the sink,
+  twenty minutes of study, ten pages of the textbook. The table **locks** for
+  the minutes agreed, every write tool refuses, and the claim button stays
+  disabled until the clock is actually served. Nothing verifies it, and the UI
+  says so plainly — what is being spent is your time, which is real. The DM is
+  instructed in as many words that an Oath is an equal, never a consolation
+  prize, and to reach for one when a player mentions something they are
+  avoiding.
+
+Runs open with an optional **guided warm-up**: twenty standing stretches, head
+to ankle, each with a cue and a coaching note, on a timer that advances itself
+with a breathing pacer underneath. Ninety seconds, three, five or ten minutes —
+nothing needs a mat or the floor. Finishing it starts you warm: +2 on your first
+roll.
+
+A session is not an open sandbox. **The Ember Crown** is a five-beat quest across
+the three maps, ending with the Cinder Wight. The DM is handed the current
+objective in every turn's context and told to drive toward it; each beat cleared
+pays a milestone, and clearing the fifth wins the run.
+
+And you can go down. If a player character hits 0 HP, **time stops** — the board
+freezes and almost every tool refuses to act, the DM's included. There are
+exactly two ways out: a d20 death save, three failures of which ends the run, or
+a Heroic Effort, which **always** works. No roll, no chance. In this game effort
+is the way out of death, which is the argument the whole project is making.
 
 ## How WebMCP powers it
 
 - **The built-in DM is a WebMCP client, not a shortcut.** `js/dm.js` reads the
   live registry with `getTools()`, translates it to function specs, and invokes
   everything through `executeTool()`. It cannot touch game state any other way.
-  A ~120-line Cloudflare Worker holds the API key so none reaches a browser —
-  origin-locked, size-capped, 40 req/min per IP.
+  A ~200-line Cloudflare Worker holds the OpenAI API key so none reaches a
+  browser — origin-locked, size-capped, 40 req/min per IP.
 
 - **21 tools** registered through `document.modelContext` / `navigator.modelContext`
   (18 always on, 3 more while combat runs, 1 more while a hero is bleeding out)
   — reads (`get_board_state`, `get_character_sheet`, `get_fitness_log`, all
   `readOnlyHint: true`), board actions (`move_token`, `add_token`, `reveal_area`,
   `set_scene`), game flow (`roll_dice`, `narrate`, `start_combat`, `award_loot`)
-  and the Heroic Effort pair (`propose_challenge`, `resolve_challenge`).
+  the quest tools (`get_quest`, `advance_quest`), and the effort tools
+  (`propose_challenge` for reps and timed holds, `propose_oath` for real-world
+  commitments, `start_warmup` for the guided stretch program).
 - **Dynamic registration, the way the spec prescribes:** combat tools
   (`advance_turn`, `update_hp`, `apply_condition`) exist only while combat runs.
   Every tool is registered with an `AbortController` — `registerTool(def,
   { signal })` — and removed by `controller.abort()`, which fires `toolchange`
-  so agents refresh. Our tests assert it against the live registry: `getTools()`
-  returns 14, 17 during combat, 14 after.
+  so agents refresh. The same pattern registers `death_save` only while a hero
+  is at 0 HP. Our tests assert it against the live registry: `getTools()` returns
+  18, then 21 during combat, then 18 again — and 22 the moment a hero drops.
 - **No flag, no setup, for anyone:** the page vendors the MIT
   `@mcp-b/webmcp-polyfill`, so `document.modelContext` and all 21 tools are real
   in any modern browser. Judges just open the URL. Where WebMCP ships natively,
@@ -134,40 +165,33 @@ multiplayer parties, and AI-generated campaign art from our ComfyUI pipeline.
 
 ---
 
-# Demo video script (< 3:00, with audio)
+# Demo video
 
-**0:00–0:20 — The problem.** Face to camera: "Fifty million people want to
-play D&D. Almost none of them want to be the Dungeon Master. And nobody —
-nobody — wants to do push-ups alone. Arcana Table fixes both."
+**2:55.** The full spoken script, as actually recorded, is in
+[`VOICEOVER.md`](VOICEOVER.md).
 
-**0:20–0:40 — Meet the table.** Screen: the board, DM already speaking. "No
-setup, no flag — just this URL, and a Dungeon Master already running the game."
-Type a line, let it answer and move a token. "Seventeen tools, registered right
-in the browser. And that DM has no back door — it's calling the same
-`document.modelContext` your agent would." Point at the Agent Log lighting up.
+Narration is Derek's voice, cloned on our own GPU stack (FreeClone + VoxCPM2).
+The Dungeon Master's lines are OpenAI TTS captured live from the running app —
+never re-recorded, so what you hear is the product's own voice. Silence appears
+only under the title cards.
 
-**0:40–1:50 — Live play (the core).** Agent narrates, reveals the crypt,
-spawns a dragon, starts combat (call out: "combat tools just registered —
-they only exist during combat"). Agent tries to damage your character →
-approval toast appears → click ✓. "Every dangerous move waits for my
-permission." Then the money shot: agent calls propose_challenge — "The dragon
-rears back… ten push-ups, and your next strike is a natural twenty."
-**Do the push-ups on camera.** Tap the ring, complete it, roll — NAT 20
-animation, sparks. React honestly.
+The one shot that could not be generated is in there too: ten real push-ups,
+filmed, cut in under the line *"not everyone can drop and give me ten."*
 
-**1:50–2:20 — Under the hood.** Quick code peek: the `registerTool(def,
-{ signal })` call, `readOnlyHint`, `controller.abort()` removing the combat
-tools, the approval gate inside `execute()`. Show `await
-document.modelContext.getTools()` in the console returning 14, then 17 mid-
-combat, then 14 again. "One action API — the agent and my mouse call the same
-functions. It has no powers I don't."
+Rebuild it with:
 
-**2:20–2:50 — Why it matters.** "Agents shouldn't just fill forms. WebMCP
-lets them sit at the table with us — and lets us bring the one thing they
-can't: a body. The agent brings the dungeon. You bring the muscle."
+```bash
+cd test
+node cards.mjs        # title cards, rendered in the app's own CSS
+node diagram.mjs      # the animated architecture model
+node lower-third.mjs  # the strip over the push-up footage
+node record.mjs       # a fresh gameplay bed against the live DM
+python3 assemble.py   # cut + voice track + mux
+```
 
-**2:50–3:00 — Close.** Logo, live URL, GitHub. "Arcana Table. Roll with your
-whole self."
+## Links
 
-**Recording checklist:** OBS at 1080p, mic on, browser at 100% zoom, fresh
-table state, agent prompt pre-typed, warm up before the push-ups take.
+- **Live:** https://arcana-table.pages.dev
+- **Code:** https://github.com/banksythequantLab/arcana-table
+- **Tests:** `cd test && npm install && node smoke.mjs` — 93 assertions against
+  the real `document.modelContext`.
