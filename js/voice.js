@@ -20,12 +20,54 @@ export const voice = {
   partial: '',
   error: null,
   muted: false,
+  echoesIgnored: 0,   // the DM's own voice, caught and dropped
 };
 
 let recog = null;
 let onFinal = null;
 let audio = null;
 let restartTimer = null;
+
+// ── not listening to ourselves ──────────────────────────────────────────────
+// The mic and the speakers are in the same room, so hands-free had the DM
+// hearing its own voice, transcribing it, and playing it back as the player's
+// turn. Worse, mid-challenge it heard the DM say "ten push-ups" and counted ten
+// reps. Three layers, because any one of them alone leaks:
+//   1. the ear is shut before a word is spoken, and stays shut while speaking;
+//   2. a tail after the audio ends, for the room echo that arrives late;
+//   3. a check on what was actually heard — browser echo cancellation is not
+//      perfect, and half a sentence of the DM's own line still gets through.
+const ECHO_TAIL_MS = 700;
+let quietUntil = 0;              // no transcript is trusted before this moment
+const spokenLines = [];          // the DM's recent lines, normalised
+
+const norm = t => String(t).toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+function rememberSpoken(text) {
+  const n = norm(text);
+  if (n) spokenLines.push(n);
+  while (spokenLines.length > 4) spokenLines.shift();
+}
+
+/** Did we just say this? Substring catches a clean capture; the four-word run
+ *  catches the usual case, where only part of the line survives the speakers. */
+function isEcho(heard) {
+  const h = norm(heard);
+  if (!h) return true;
+  const words = h.split(' ');
+  return spokenLines.some(line => {
+    if (line.includes(h)) return true;
+    for (let i = 0; i + 4 <= words.length; i++) {
+      if (line.includes(words.slice(i, i + 4).join(' '))) return true;
+    }
+    return false;
+  });
+}
+
+/** True while the DM is talking, or while the room is still ringing with it. */
+export function inQuietPeriod() {
+  return voice.speaking || Date.now() < quietUntil;
+}
 
 // ── ears ────────────────────────────────────────────────────────────────────
 function build() {
@@ -42,11 +84,19 @@ function build() {
       const t = e.results[i][0].transcript;
       if (e.results[i].isFinal) final += t; else interim += t;
     }
-    voice.partial = interim || final;
+    // Never show the DM's own words back as "heard".
+    voice.partial = inQuietPeriod() ? '' : (interim || final);
     emit('voice');
     if (final.trim()) {
       voice.partial = '';
       const heard = final.trim();
+      // This gate runs BEFORE handleChallengeSpeech on purpose: the DM saying
+      // "ten push-ups" must never be counted as the player doing ten.
+      if (inQuietPeriod() || isEcho(heard)) {
+        voice.echoesIgnored++;
+        emit('voice');
+        return;
+      }
       if (!handleChallengeSpeech(heard) && onFinal) onFinal(heard);
     }
   };
@@ -64,10 +114,12 @@ function build() {
   r.onend = () => {
     voice.listening = false;
     emit('voice');
-    // Hands-free: keep the ear open between turns, unless the DM is talking.
-    if (voice.handsFree && !voice.speaking) {
+    // Hands-free: keep the ear open between turns, but never while the DM is
+    // talking or while its last line is still hanging in the room.
+    if (voice.handsFree) {
       clearTimeout(restartTimer);
-      restartTimer = setTimeout(() => startListening(onFinal), 350);
+      const wait = Math.max(350, quietUntil - Date.now());
+      restartTimer = setTimeout(() => { if (!inQuietPeriod()) startListening(onFinal); }, wait);
     }
   };
   return r;
@@ -77,6 +129,14 @@ export function startListening(cb) {
   if (!SR) { voice.error = 'This browser has no speech recognition — type instead.'; emit('voice'); return; }
   if (voice.listening) return;
   onFinal = cb || onFinal;
+  // Asked to listen mid-sentence (the player flips hands-free on while the DM
+  // is talking): wait it out rather than opening the mic into the speakers.
+  if (inQuietPeriod()) {
+    clearTimeout(restartTimer);
+    restartTimer = setTimeout(() => { if (!inQuietPeriod()) startListening(onFinal); },
+                              Math.max(120, quietUntil - Date.now()));
+    return;
+  }
   recog = recog || build();
   voice.error = null;
   try {
@@ -157,10 +217,17 @@ export async function say(text) {
   if (voice.muted || !text) return;
   const line = String(text).replace(/\*+/g, '').slice(0, 900);
 
-  // Never talk over the player's own mic.
+  // Shut the ear BEFORE a word leaves the speakers. Order matters: abort()
+  // fires onend asynchronously, and that handler decides whether to reopen the
+  // mic by reading voice.speaking — so the flag has to be true first, or the
+  // ear reopens straight into the DM's opening syllable.
   const wasHandsFree = voice.handsFree;
-  if (voice.listening) { try { recog.abort(); } catch { /* fine */ } }
   voice.speaking = true;
+  quietUntil = Infinity;              // nothing heard from here is the player
+  rememberSpoken(line);
+  clearTimeout(restartTimer);
+  if (voice.listening) { try { recog.abort(); } catch { /* fine */ } }
+  voice.listening = false;
   emit('voice');
 
   try {
@@ -176,10 +243,16 @@ export async function say(text) {
   } catch {
     await browserSpeak(line);          // the DM is never mute
   } finally {
+    // The audio element has stopped, but the room has not: a short tail keeps
+    // the last words (and their echo) out of the next transcript.
     voice.speaking = false;
+    quietUntil = Date.now() + ECHO_TAIL_MS;
     voice.handsFree = wasHandsFree;
     emit('voice');
-    if (wasHandsFree) setTimeout(() => startListening(onFinal), 250);
+    if (wasHandsFree) {
+      clearTimeout(restartTimer);
+      restartTimer = setTimeout(() => { if (!inQuietPeriod()) startListening(onFinal); }, ECHO_TAIL_MS);
+    }
   }
 }
 
@@ -222,5 +295,7 @@ export function shutUp() {
   if (audio) { try { audio.pause(); } catch { /* fine */ } }
   try { window.speechSynthesis?.cancel(); } catch { /* fine */ }
   voice.speaking = false;
+  // Cutting the DM off mid-word still leaves that word in the room.
+  quietUntil = Date.now() + ECHO_TAIL_MS;
   emit('voice');
 }
