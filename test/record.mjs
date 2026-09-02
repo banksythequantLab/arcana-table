@@ -49,13 +49,14 @@ await page.waitForFunction(() => window.arcana);
 await page.evaluate(() => localStorage.clear());
 await page.reload();
 await page.waitForFunction(() => window.arcana);
-await enterTable(page, { muted: false });
+await enterTable(page, { muted: true, hold: 5000 });
 
 // The intro gate is the first thing a player meets — dismiss it as they would.
-async function enterTable(page, { muted = true } = {}) {
+async function enterTable(page, { muted = true, hold = 0 } = {}) {
   const gate = await page.$('#intro:not([hidden])');
   if (!gate) return;
-  if (muted) await page.check('#intro-mute').catch(() => {});
+  if (muted) await page.$eval('#intro-mute', el => { el.checked = true; }).catch(() => {});
+  await page.waitForTimeout(hold);        // let the card read on camera
   await page.click('#intro-go');
   await page.waitForSelector('#intro[hidden]', { timeout: 10000 }).catch(() => {});
 }

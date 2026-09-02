@@ -150,7 +150,7 @@ function handleChallengeSpeech(heard) {
 // ── voice ───────────────────────────────────────────────────────────────────
 export async function say(text) {
   if (voice.muted || !text) return;
-  const line = String(text).replace(/\*\*/g, '').slice(0, 900);
+  const line = String(text).replace(/\*+/g, '').slice(0, 900);
 
   // Never talk over the player's own mic.
   const wasHandsFree = voice.handsFree;

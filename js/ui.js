@@ -12,6 +12,12 @@ import { voice, startListening, stopListening, toggleHandsFree, shutUp, unlockAu
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+// The DM writes in light markdown. Escape first, then honour **bold** and
+// *italic* only — anything else stays literal text.
+const prose = s => esc(s)
+  .replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>')
+  .replace(/(^|[\s(])\*([^*\n]+)\*/g, '$1<i>$2</i>');
+
 const STARTERS = [
   'Look around and tell me what I see.',
   'I search the room for anything valuable.',
@@ -111,7 +117,7 @@ function renderLog() {
     const m = x.m;
     if (m.role === 'user') return `<div class="say you"><b>You</b> ${esc(m.text)}</div>`;
     if (m.role === 'system') return `<div class="say sys">${esc(m.text)}</div>`;
-    return `<div class="say dm"><b>DM</b> ${esc(m.text)}</div>`;
+    return `<div class="say dm"><b>DM</b> ${prose(m.text)}</div>`;
   }).join('')
     + (chat.busy ? `<div class="say dm thinking"><b>DM</b> <span class="dots"><i></i><i></i><i></i></span></div>` : '')
     + (!chat.messages.length && !chat.busy ? `<div class="say sys">The table is set. Say what you do, and the Dungeon Master will answer.</div>` : '');
