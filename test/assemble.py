@@ -39,23 +39,26 @@ print('vo:', json.dumps(VOS, indent=1), '\nfootage:', round(FOOT_LEN,1), 's')
 CUT = [
     # footage_start values are tuned to the current screens/video bed:
     #  ~22s intro card · ~40s quest rail + opening · ~62-75s the warm-up
-    #  ~100s the Oath offered · ~104s the table locked · ~110s combat
-    #  ~130s the 10-squat offer · ~140s the reps · ~144s the natural 20
-    ('card', 'open',   4.0, None),
-    ('shot', None,     VOS['vo01_problem'] + VOS['vo02_whatitis'], 22.0),
-    ('card', 'webmcp', 3.0, None),
+    #  ~98s the Oath offered · ~104s the table locked · ~110s combat
+    #  ~130s the 10-squat offer · ~140s the reps · ~145s the natural 20
+    #
+    # Silence lives ONLY under title cards now — 11.5s of 166, down from 40.
+    # Every other second has Derek talking over it.
+    ('card', 'open',   3.0, None),
+    ('shot', None,     VOS['vo01_problem'] + VOS['vo02_whatitis'], 40.0),
+    ('card', 'webmcp', 2.5, None),
     ('shot', None,     VOS['vo03_webmcp'], 106.0),
-    ('card', 'heroic', 3.0, None),
+    ('card', 'heroic', 2.5, None),
     ('shot', None,     VOS['vo04_heroic'], 127.0),
-    ('slate','burpees',10.0, None),          # ← his push-up footage drops in here
-    ('shot', None,     VOS['vo04b_payoff'], 143.2),
-    # A silent stretch: the VO predates Oaths and the warm-up, so the footage
-    # and one card carry them instead of pretending the narration covers it.
-    ('card', 'oath',   4.5, None),
-    ('shot', None,     8.0,  98.0),          # the Oath sworn, the table locked
-    ('shot', None,     6.0,  63.0),          # the warm-up, chat still live beside it
-    ('shot', None,     VOS['vo05_hood'], 110.0),
-    ('card', 'close',  VOS['vo06_close'] + 1.5, None),
+    # His push-up footage runs under "not everyone can drop and give me ten",
+    # which is the line it was always meant to illustrate.
+    ('slate','burpees',10.0, None),
+    ('shot', None,     (VOS['vo07_swap'] - 10.0) + VOS['vo04b_payoff'], 143.2),
+    ('card', 'oath',   2.5, None),
+    ('shot', None,     VOS['vo08_oath'], 98.0),      # the Oath sworn, table locked
+    ('shot', None,     VOS['vo09_micro'], 108.0),    # back in play, the run continues
+    ('shot', None,     VOS['vo05_hood'], 126.0),     # the agent log doing the work
+    ('card', 'close',  VOS['vo06_close'] + 1.0, None),
 ]
 
 parts = []
@@ -96,14 +99,15 @@ run(['ffmpeg','-y','-loglevel','error','-f','concat','-safe','0','-i',str(listin
 
 # ── voice track: same order, silence under the cards ────────────────────────
 ORDER = [
-    ('sil', 4.0), ('vo', 'vo01_problem'), ('vo', 'vo02_whatitis'),
-    ('sil', 3.0), ('vo', 'vo03_webmcp'),
-    ('sil', 3.0), ('vo', 'vo04_heroic'),
-    ('sil', 10.0),                                  # the push-up slot
+    ('sil', 3.0), ('vo', 'vo01_problem'), ('vo', 'vo02_whatitis'),
+    ('sil', 2.5), ('vo', 'vo03_webmcp'),
+    ('sil', 2.5), ('vo', 'vo04_heroic'),
+    ('vo', 'vo07_swap'),                            # over the push-up slate
     ('vo', 'vo04b_payoff'),
-    ('sil', 18.5),                                  # the Oath card + its two shots
+    ('sil', 2.5), ('vo', 'vo08_oath'),
+    ('vo', 'vo09_micro'),
     ('vo', 'vo05_hood'), ('vo', 'vo06_close'),
-    ('sil', 1.5),
+    ('sil', 1.0),
 ]
 apieces = []
 for j, item in enumerate(ORDER):

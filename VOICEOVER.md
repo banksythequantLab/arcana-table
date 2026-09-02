@@ -7,7 +7,8 @@ Two voices, deliberately:
   out of the product itself. Do not re-record these; they are captured from the
   running app so judges hear the real thing.
 
-Total target: **2:45**. Devpost caps at 3:00.
+Runtime: **2:46**. Devpost caps at 3:00. Silence appears only under the
+four title cards (13s of 166) — everywhere else Derek is talking.
 
 ---
 
@@ -108,3 +109,44 @@ Total target: **2:45**. Devpost caps at 3:00.
   cleanly on camera and still speak afterwards.
 - Leave 0.5s of clean air at the head and tail of each take; makes the mux easy.
 - Record dry and close-mic'd. FreeClone clones the timbre, not the room.
+
+
+---
+
+## VO-07 · Swapping goals for muscle — over the push-up footage
+
+> Now, not everyone can drop and give me ten. Some days your shoulder is shot.
+> And some days the thing standing between you and the boss fight isn't a boss
+> fight. It's a sink full of dishes.
+
+*On screen: Derek's own push-up footage, then back to the board.*
+*This is the line that footage was always for.*
+
+---
+
+## VO-08 · The Oath
+
+> So the table takes that too. Swear an Oath. Ten minutes on the thing you have
+> been avoiding. The board locks, the Dungeon Master waits, and you come back to
+> the exact same natural twenty.
+
+*On screen: the Oath card — "clear the sink full of dishes" — sworn, then the
+locked table with the clock running.*
+
+---
+
+## VO-09 · Micro-bursts
+
+> Which is better than either one. You are not doing chores any more. You are
+> spending five minutes to buy a dice roll. Clean the house in micro bursts
+> between fights, and by the time the Crown is yours, the kitchen is done too.
+> Swap goals for muscle, or muscle for goals. The table only asks that you spend
+> something real.
+
+*On screen: back in play after the Oath — combat resumes, the quest rail advances.*
+
+---
+
+All three cloned on the house stack: FreeClone + VoxCPM2 on Johnson:8300,
+`POST /api/clone` with `derek-voice.wav` as the reference. Regenerate with
+`D:\arcana-vo\gen.py`.
