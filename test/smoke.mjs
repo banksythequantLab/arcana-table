@@ -50,8 +50,8 @@ await enterTable(page);
 async function enterTable(page, { muted = true } = {}) {
   const gate = await page.$('#intro:not([hidden])');
   if (!gate) return;
-  if (muted) await page.$eval('#intro-mute', el => { el.checked = true; }).catch(() => {});
-  await page.click('#intro-go');
+  // Enter by typing, not hands-free: a headless run has no microphone.
+  await page.click(muted ? '#intro-type' : '#intro-voice');
   await page.waitForSelector('#intro[hidden]', { timeout: 10000 }).catch(() => {});
 }
 

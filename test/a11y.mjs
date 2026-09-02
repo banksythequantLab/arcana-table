@@ -20,8 +20,8 @@ const ck=(l,c,x='')=>{ c?(pass++,console.log('  ✓ '+l)):(fail++,console.log(' 
 // 1. the intro gate is reachable and dismissible by keyboard alone
 await page.keyboard.press('Tab');
 const first = await page.evaluate(()=>document.activeElement?.id);
-ck('keyboard focus lands inside the intro gate', ['intro-go','intro-mute'].includes(first), first);
-await page.evaluate(()=>document.getElementById('intro-go').focus());
+ck('keyboard focus lands inside the intro gate', ['intro-voice','intro-type'].includes(first), first);
+await page.evaluate(()=>document.getElementById('intro-type').focus());
 await page.keyboard.press('Enter');
 await page.waitForTimeout(600);
 ck('the gate can be dismissed with the keyboard', await page.isHidden('#intro'));
@@ -61,8 +61,7 @@ const p2 = await calm.newPage();
 await p2.route(/arcana-dm.*workers\.dev/, r => r.fulfill({status:200,contentType:'application/json',body:'{"content":"ok","tool_calls":[]}'}));
 await p2.goto(`http://localhost:${port}/`);
 await p2.waitForFunction(()=>window.arcana);
-await p2.$eval('#intro-mute', el=>{el.checked=true;});
-await p2.click('#intro-go');
+await p2.click('#intro-type');
 await p2.waitForTimeout(500);
 await p2.evaluate(()=>window.arcana.call('roll_dice',{formula:'d20',reason:'calm test'}));
 await p2.waitForTimeout(250);

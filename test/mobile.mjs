@@ -15,7 +15,7 @@ await page.route('**/arcana-dm*/**', r=>r.abort());
 await page.goto('http://localhost:8080/');
 await page.waitForFunction(()=>window.arcana);
 await page.screenshot({path:'screens/m_intro.png'});
-await page.click('#intro-go');
+await page.click('#intro-type');
 await page.waitForTimeout(900);
 await page.screenshot({path:'screens/m_table.png'});
 const m = await page.evaluate(()=>{

@@ -52,8 +52,7 @@ await enterTable(page);
 async function enterTable(page, { muted = true } = {}) {
   const gate = await page.$('#intro:not([hidden])');
   if (!gate) return;
-  if (muted) await page.check('#intro-mute').catch(() => {});
-  await page.click('#intro-go');
+  await page.click(muted ? '#intro-type' : '#intro-voice');
   await page.waitForSelector('#intro[hidden]', { timeout: 10000 }).catch(() => {});
 }
 

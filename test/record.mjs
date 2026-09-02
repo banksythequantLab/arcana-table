@@ -55,9 +55,8 @@ await enterTable(page, { muted: true, hold: 5000 });
 async function enterTable(page, { muted = true, hold = 0 } = {}) {
   const gate = await page.$('#intro:not([hidden])');
   if (!gate) return;
-  if (muted) await page.$eval('#intro-mute', el => { el.checked = true; }).catch(() => {});
-  await page.waitForTimeout(hold);        // let the card read on camera
-  await page.click('#intro-go');
+  if (muted) await page.waitForTimeout(hold);        // let the card read on camera
+  await page.click(muted ? '#intro-type' : '#intro-voice');
   await page.waitForSelector('#intro[hidden]', { timeout: 10000 }).catch(() => {});
 }
 

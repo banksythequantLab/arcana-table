@@ -32,7 +32,7 @@ const probe = async label => {
 };
 await probe('before gate:');
 await page.screenshot({path:'screens/intro.png'});
-await page.click('#intro-go');
+await page.click('#intro-type');
 await page.waitForTimeout(700);
 await probe('after gate: ');
 await page.screenshot({path:'screens/after_gate.png'});
