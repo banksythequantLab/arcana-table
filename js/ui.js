@@ -6,17 +6,48 @@ import { state, MAPS } from './state.js';
 import * as A from './actions.js';
 import { onChange } from './actions.js';
 import { agentState, pendingApprovals, settleApproval } from './tools.js';
-import { chat, sendToDM } from './dm.js';
-import { voice, startListening, stopListening, toggleHandsFree, shutUp } from './voice.js';
+import { chat, sendToDM, openScene } from './dm.js';
+import { voice, startListening, stopListening, toggleHandsFree, shutUp, unlockAudio } from './voice.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+const STARTERS = [
+  'Look around and tell me what I see.',
+  'I search the room for anything valuable.',
+  'I draw my sword and advance carefully.',
+];
+
+function bindIntro() {
+  const intro = $('#intro');
+  if (!intro) return;
+  $('#intro-go').onclick = async () => {
+    voice.muted = $('#intro-mute').checked;
+    // This click is the browser's required gesture — spend it on the DM's voice.
+    if (!voice.muted) await unlockAudio();
+    intro.hidden = true;
+    render();
+    openScene();                       // now its first line will actually be heard
+  };
+}
+
+function renderStarters() {
+  const el = $('#starters');
+  const show = !chat.busy && chat.messages.filter(m => m.role === 'user').length === 0;
+  el.hidden = !show;
+  if (!show) { el.innerHTML = ''; return; }
+  if (el.dataset.built) return;
+  el.dataset.built = '1';
+  el.innerHTML = STARTERS.map((t, i) => `<button class="starter" data-i="${i}" type="button">${esc(t)}</button>`).join('');
+  el.querySelectorAll('.starter').forEach(b => b.onclick = () => speakTurn(STARTERS[+b.dataset.i]));
+}
 
 export function initUI() {
   bindTabs();
   bindDMPanel();
   bindChallengeModal();
   bindSay();
+  bindIntro();
   onChange(render);
   render('all');
   state.tokens.filter(t => t.kind === 'pc').forEach(t => A.revealAround(t.x, t.y, 3));
@@ -280,6 +311,7 @@ function render() {
   renderHeader();
   renderLog();
   renderSay();
+  renderStarters();
   renderParty();
   renderAgent();
   renderDice();

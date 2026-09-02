@@ -46,6 +46,16 @@ await page.waitForFunction(() => window.arcana);
 await page.evaluate(() => { localStorage.clear(); });
 await page.reload();
 await page.waitForFunction(() => window.arcana);
+await enterTable(page);
+
+// The intro gate is the first thing a player meets — dismiss it as they would.
+async function enterTable(page, { muted = true } = {}) {
+  const gate = await page.$('#intro:not([hidden])');
+  if (!gate) return;
+  if (muted) await page.check('#intro-mute').catch(() => {});
+  await page.click('#intro-go');
+  await page.waitForSelector('#intro[hidden]', { timeout: 10000 }).catch(() => {});
+}
 
 const dmCount = () => page.evaluate(() => document.querySelectorAll('.say.dm:not(.thinking)').length);
 const waitForDM = async (n, label) => {

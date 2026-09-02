@@ -168,11 +168,25 @@ export async function sendToDM(playerText, { silent = false } = {}) {
     }
   } catch (e) {
     chat.error = String(e.message || e);
-    chat.messages.push({ role: 'system', text: `⚠ ${chat.error}`, t: Date.now() });
+    chat.messages.push({ role: 'system', text: humanError(chat.error), t: Date.now() });
   } finally {
     chat.busy = false;
     emit('chat');
   }
+}
+
+// A judge who hits a network hiccup should still know what to do next.
+function humanError(raw) {
+  const e = String(raw);
+  if (/Failed to fetch|NetworkError|502|Could not reach/i.test(e))
+    return '⚠ Cannot reach the Dungeon Master right now. The table still works — open the 🎩 DM Panel to roll, narrate and fight by hand.';
+  if (/429|too many|busy/i.test(e))
+    return '⚠ The table is busy — too many requests just now. Give it a minute, or keep playing from the 🎩 DM Panel.';
+  if (/credit|quota|billing/i.test(e))
+    return '⚠ The DM has run out of credit. Everything else still works — the 🎩 DM Panel runs the whole game by hand.';
+  if (/not configured|503/i.test(e))
+    return '⚠ The DM is not configured on this deployment. The 🎩 DM Panel still runs the table.';
+  return `⚠ ${e} — the 🎩 DM Panel still runs the table.`;
 }
 
 function boardBrief() {

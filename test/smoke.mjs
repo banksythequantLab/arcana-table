@@ -28,8 +28,32 @@ page.on('console', m => {
   if (m.type() === 'error' && !/net::|Failed to load resource/.test(m.text())) errors.push('console: ' + m.text());
 });
 
+// Mock the DM brain from the very first byte: the opening beat fires the moment
+// the table opens, and a real network call would hang the sandbox.
+// The "model" asks for a tool call, we assert the board actually changed, then it speaks.
+let sawTools = null, hop = 0;
+// Until the DM section swaps this out, the brain just talks — the tool-surface
+// tests below own the board and must not have monsters wandering into them.
+let brain = () => ({ content: 'You stand at the mouth of the crypt. What do you do?', tool_calls: [] });
+await page.route(/arcana-dm.*workers\.dev\/speak/, r =>
+  r.fulfill({ status: 200, contentType: 'audio/mpeg', body: '' }));
+await page.route(/arcana-dm.*workers\.dev\/?$/, async route => {
+  sawTools = route.request().postDataJSON().tools;
+  await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(brain(++hop)) });
+});
+
 await page.goto(`http://localhost:${port}/`);
 await page.waitForFunction(() => window.arcana && typeof window.arcana.call === 'function');
+await enterTable(page);
+
+// The intro gate is the first thing a player meets — dismiss it as they would.
+async function enterTable(page, { muted = true } = {}) {
+  const gate = await page.$('#intro:not([hidden])');
+  if (!gate) return;
+  if (muted) await page.$eval('#intro-mute', el => { el.checked = true; }).catch(() => {});
+  await page.click('#intro-go');
+  await page.waitForSelector('#intro[hidden]', { timeout: 10000 }).catch(() => {});
+}
 
 const call = (name, args) => page.evaluate(([n, a]) => window.arcana.call(n, a), [name, args]);
 let pass = 0, fail = 0;
@@ -162,21 +186,16 @@ check('loot awarded', (await call('award_loot', { items: ['Dragonfang Dagger'], 
 // Mock the brain so the loop is tested without spending a token: the "model"
 // asks for a tool call, we assert the board actually changed, then it speaks.
 console.log('— built-in DM (mocked brain, real tools) —');
-let sawTools = null, hop = 0;
-await page.route('**/arcana-dm*/**', r => r.fulfill({ status: 200, body: '{}' }));
-await page.route(/arcana-dm.*workers\.dev/, async route => {
-  const body = route.request().postDataJSON();
-  sawTools = body.tools;
-  hop++;
-  const reply = hop === 1
-    ? { content: 'The wyrm uncoils from the dark.', tool_calls: [{ id: 'c1', type: 'function', function: { name: 'add_token', arguments: JSON.stringify({ name: 'Ember Wyrm', kind: 'monster', art: 'dragon', x: 9, y: 7, hp: 40 }) } }] }
-    : { content: 'It fixes one molten eye on you. What do you do?', tool_calls: [] };
-  await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(reply) });
-});
+brain = n => n === 1
+  ? { content: 'The wyrm uncoils from the dark.', tool_calls: [{ id: 'c1', type: 'function', function: { name: 'add_token', arguments: JSON.stringify({ name: 'Ember Wyrm', kind: 'monster', art: 'dragon', x: 9, y: 7, hp: 40 }) } }] }
+  : { content: 'It fixes one molten eye on you. What do you do?', tool_calls: [] };
 
+// The opening beat has already spoken — measure from here.
+const dmBase = await page.evaluate(() => document.querySelectorAll('.say.dm').length);
+hop = 0; sawTools = null;
 await page.fill('#say', 'I push open the iron door and step through.');
 await page.click('#say-btn');
-await page.waitForFunction(() => document.querySelectorAll('.say.dm').length >= 2, { timeout: 20000 });
+await page.waitForFunction(n => document.querySelectorAll('.say.dm').length >= n + 2, dmBase, { timeout: 20000 });
 
 check('DM was offered the live WebMCP tool list', Array.isArray(sawTools) && sawTools.length >= 14, `got ${sawTools?.length}`);
 check('tool specs carry name + JSON-schema parameters',

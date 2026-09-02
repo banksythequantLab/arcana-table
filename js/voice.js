@@ -200,6 +200,19 @@ function browserSpeak(text) {
   });
 }
 
+/** Browsers refuse audio until the player interacts. Call this from a real
+ *  click so the DM's very first line is actually heard. */
+export async function unlockAudio() {
+  try {
+    const a = new Audio();
+    a.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQxAADB8AhSmxhIIEVCSiJrDCQBTcu3UrAIwUdkRgQbFAZC1CQEwTJ9mjRvBA4UOLD8nKVOWfh+UlK3z/177OXrfOdKl7pyn3Xf//WreyTRUoAWgBgkOAd9gRsGA0EAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+    a.volume = 0;
+    await a.play();
+    a.pause();
+    return true;
+  } catch { return false; }
+}
+
 export function shutUp() {
   if (audio) { try { audio.pause(); } catch { /* fine */ } }
   try { window.speechSynthesis?.cancel(); } catch { /* fine */ }

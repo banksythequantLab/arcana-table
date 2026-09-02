@@ -11,8 +11,9 @@ async function boot() {
 
   // The built-in DM is just another agent: it reads getTools() and calls
   // executeTool(), so it opens the scene through the same public surface.
+  // The opening beat waits for the intro dismissal — otherwise the browser
+  // blocks its audio and the DM's first line is silent.
   watchBoardForPlayerMoves();
-  openScene();
   console.log('%c🎲 Arcana Table ready.', 'font-weight:bold');
   console.log('Agent tools:', window.arcana.tools().join(', '));
   console.log('Try: await arcana.call("roll_dice", {formula:"d20", reason:"perception check"})');

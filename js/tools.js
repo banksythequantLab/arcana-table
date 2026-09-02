@@ -48,9 +48,19 @@ export function settleApproval(id, approved, timedOut = false) {
 }
 
 // ── agent log ────────────────────────────────────────────────────────────────
-function logAgent(tool, args, status, note = '') {
-  state.agentLog.push({ t: Date.now(), tool, args, status, note });
+// One row per tool call, updated in place as it moves called → approval → done.
+// (Pushing a row per state change made the log read as if every tool ran twice.)
+function beginAgent(tool, args) {
+  const entry = { t: Date.now(), tool, args, status: 'called', note: '' };
+  state.agentLog.push(entry);
   if (state.agentLog.length > 120) state.agentLog.shift();
+  emit('agentLog');
+  return entry;
+}
+function updateAgent(entry, status, note = '') {
+  if (!entry) return;
+  entry.status = status;
+  entry.note = note;
   emit('agentLog');
 }
 
@@ -197,21 +207,21 @@ function wrap(def) {
     inputSchema: def.inputSchema,
     annotations: def.annotations || { readOnlyHint: false },
     execute: async (input) => {
-      logAgent(def.name, input, 'called');
+      const entry = beginAgent(def.name, input);
       try {
         if (def.approval) {
           const ask = def.approval(input || {});
           if (ask) {
-            logAgent(def.name, input, 'awaiting-approval', ask);
+            updateAgent(entry, 'awaiting-approval', ask);
             const ok = await requestApproval(ask);
-            if (!ok) { logAgent(def.name, input, 'denied'); return { denied: true, note: 'The player declined this action. Respect it and narrate around it.' }; }
+            if (!ok) { updateAgent(entry, 'denied'); return { denied: true, note: 'The player declined this action. Respect it and narrate around it.' }; }
           }
         }
         const result = await def.handler(input || {});
-        logAgent(def.name, input, result?.error ? 'error' : 'ok', result?.error || '');
+        updateAgent(entry, result?.error ? 'error' : 'ok', result?.error || '');
         return result;
       } catch (e) {
-        logAgent(def.name, input, 'error', String(e?.message || e));
+        updateAgent(entry, 'error', String(e?.message || e));
         return { error: String(e?.message || e) };
       }
     },

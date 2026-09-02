@@ -16,6 +16,9 @@ let lastHp = new Map();
 let lastDiceT = 0;
 let lastFrame = performance.now();
 
+// Someone who asked for less motion should not get a guttering torch.
+const CALM = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+
 // Deterministic per-cell jitter so stone looks laid, not printed.
 const hash = (x, y) => {
   const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
@@ -159,7 +162,7 @@ function draw(now) {
   const rows = currentMap().rows;
 
   ctx.save();
-  if (fx.shake) {
+  if (fx.shake && !CALM) {
     ctx.translate((Math.random() - 0.5) * fx.shake, (Math.random() - 0.5) * fx.shake);
   }
 
@@ -232,7 +235,7 @@ function draw(now) {
   // what turns a grey grid into a dungeon.
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  const flicker = 1 + Math.sin(now / 170) * 0.045 + Math.sin(now / 61) * 0.025;
+  const flicker = CALM ? 1 : 1 + Math.sin(now / 170) * 0.045 + Math.sin(now / 61) * 0.025;
   const lights = [];
   state.tokens.filter(t => t.kind === 'pc').forEach(t => lights.push({ x: t.x, y: t.y, r: 4.2, c: [255, 184, 98], i: 0.40 }));
   for (let y = 0; y < GRID_H; y++) for (let x = 0; x < GRID_W; x++) {
@@ -308,7 +311,7 @@ function drawToken(t, px, py, now, lifted) {
   const pad = cell * 0.08;
   const isTurn = state.combat.active && state.combat.order[state.combat.turnIndex] === t.id;
   const seed = t.id.charCodeAt(0) + t.id.length;
-  const bob = t.hp === 0 ? 0 : Math.sin(now / 700 + seed) * cell * 0.022;
+  const bob = (CALM || t.hp === 0) ? 0 : Math.sin(now / 700 + seed) * cell * 0.022;
 
   ctx.fillStyle = 'rgba(0,0,0,.42)';
   ctx.beginPath();
@@ -316,7 +319,7 @@ function drawToken(t, px, py, now, lifted) {
   ctx.fill();
 
   if (isTurn) {
-    const pulse = 2.5 * Math.sin(now / 220);
+    const pulse = CALM ? 0 : 2.5 * Math.sin(now / 220);
     ctx.save();
     ctx.shadowColor = '#F2C14E'; ctx.shadowBlur = 16;
     ctx.strokeStyle = '#F2C14E'; ctx.lineWidth = 4;

@@ -7,3 +7,5 @@ test/vo/
 test/screens/
 media/*.mp4
 media/voiceover/
+.wrangler/
+.commitmsg
