@@ -63,7 +63,7 @@ await arcana.call('roll_dice', { formula: 'd20', reason: 'Attack the dragon' })
 | `reveal_area` | Clear fog of war | |
 | `move_token` | Animated movement, wall-aware | PCs reveal fog as they move |
 | `add_token` | Spawn monsters/NPCs/objects | 8 art options |
-| `remove_token` | Take a token off the board | ⚠ waits for player approval |
+| `remove_token` | Take a token off the board | ⚠ removing a PC waits for player approval |
 | `start_combat` / `end_combat` | Initiative on/off | **dynamically registers/unregisters** the combat tools |
 | `advance_turn` | Next combatant | combat-only |
 | `update_hp` | Damage / healing | combat-only · PC damage waits for approval |
