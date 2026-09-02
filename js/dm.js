@@ -49,7 +49,7 @@ POSITION DECIDES WHAT A CHARACTER CAN DO
   adjacent to the target FIRST, in the same turn, then attack. get_board_state
   gives you distanceFromActor and inMeleeReach for exactly this; if you attack
   out of reach the tool refuses and hands you the cell to move to, so use it.
-- Wren is a caster: she works at range, and should HANG BACK rather than walk
+- Mira is a caster: she works at range, and should HANG BACK rather than walk
   into a melee that will kill her. Bows and spells are kind:"ranged"/"spell".
 - Monsters obey the same rule. A goblin with a bow shoots from a distance; a
   skeleton has to close first. Move it, then attack, and say that it closed.

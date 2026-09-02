@@ -754,11 +754,11 @@ export function startWarmup({ plan = '90s' } = {}) {
 const PROLOGUE = [
   'Torchlight finds the first of the flooded steps.',
   'Brannok shoulders the door and it gives, grinding on wet stone.',
-  'Wren lights a second torch from the first. The hall opens ahead.',
+  'Mira lights a second torch from the first. The hall opens ahead.',
   'Black water laps at your boots. Something has been through here.',
   'A dropped shield, rusted through. Older than this week.',
   'The passage bends. Further in, the water is still moving.',
-  'Wren checks her pack without being asked. She has done this before.',
+  'Mira checks her pack without being asked. She has done this before.',
   'Somewhere below, stone shifts against stone.',
   'The far arch resolves out of the dark.',
   'Brannok rolls his shoulder, testing it, and nods.',

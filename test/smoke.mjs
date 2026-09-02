@@ -281,13 +281,13 @@ check('boss is really on the board', (await call('get_board_state')).tokens.some
 // ── going down: time stops, and reps are the way out ────────────────────────
 console.log('— a hero goes down —');
 await call('start_combat');
-// Wren is a PC, so the killing blow needs the player's ✓ like any other.
-const dropP = call('update_hp', { tokenId: 'Wren', delta: -99 });
+// Mira is a PC, so the killing blow needs the player's ✓ like any other.
+const dropP = call('update_hp', { tokenId: 'Mira', delta: -99 });
 await page.waitForSelector('.approval', { timeout: 5000 });
 await page.click('.approval .ok');
 await dropP;
 const dq = await call('get_quest');
-check('a downed PC stops time', dq.timeStopped === true && dq.downed?.name === 'Wren', JSON.stringify(dq.downed));
+check('a downed PC stops time', dq.timeStopped === true && dq.downed?.name === 'Mira', JSON.stringify(dq.downed));
 check('death_save registers as a live WebMCP tool while down', (await mcNames()).includes('death_save'));
 check(`registry grows to ${DOWNED_N + 3} with combat + death_save (got ${(await mcNames()).length})`,
   (await mcNames()).length === COMBAT_N + 1, (await mcNames()).join(','));
@@ -302,10 +302,10 @@ await page.waitForSelector('#challenge-modal:not([hidden])', { timeout: 5000 });
 await page.click('#chal-accept');
 for (let i = 0; i < 3; i++) { await page.waitForTimeout(60); await page.click('#chal-tap'); }
 const revived = await chalP;
-check('completed reps revive the downed hero', revived.revived === 'Wren', JSON.stringify(revived).slice(0, 140));
+check('completed reps revive the downed hero', revived.revived === 'Mira', JSON.stringify(revived).slice(0, 140));
 check('time is moving again', (await call('get_quest')).timeStopped === false);
 check('death_save left the registry on the way back up', !(await mcNames()).includes('death_save'));
-check('the revived hero is actually standing', (await call('get_board_state')).tokens.find(t => t.name === 'Wren').hp > 0);
+check('the revived hero is actually standing', (await call('get_board_state')).tokens.find(t => t.name === 'Mira').hp > 0);
 await call('end_combat');
 
 // ── winning ─────────────────────────────────────────────────────────────────

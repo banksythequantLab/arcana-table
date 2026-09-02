@@ -39,7 +39,7 @@ const put = (id, x, y) => page.evaluate(([id, x, y]) => {
 // A goblin far across the open floor.
 await call('add_token', { name: 'Snaggle', kind: 'monster', art: 'goblin', x: 15, y: 6, hp: 7 });
 await put('Brannok', 5, 6);
-await put('Wren', 4, 6);
+await put('Mira', 4, 6);
 
 console.log('— a sword does not reach across the room —');
 const far = await call('attack', { attackerId: 'Brannok', targetId: 'Snaggle', kind: 'melee' });
@@ -51,17 +51,17 @@ const hpAfterMiss = await page.evaluate(() => window.__st.tokens.find(t => t.nam
 ck('nothing was damaged by the refused attack', hpAfterMiss === 7, `hp ${hpAfterMiss}`);
 
 console.log('— but a spell does —');
-// Wren at (7,6) is 8 squares out: past the goblin's bow, inside her own range.
-await put('Wren', 7, 6);
-const spell = await call('attack', { attackerId: 'Wren', targetId: 'Snaggle', kind: 'spell', damage: 3 });
-ck('Wren can cast from 8 squares away', !spell.error && spell.distance === 8, JSON.stringify(spell).slice(0, 90));
+// Mira at (7,6) is 8 squares out: past the goblin's bow, inside her own range.
+await put('Mira', 7, 6);
+const spell = await call('attack', { attackerId: 'Mira', targetId: 'Snaggle', kind: 'spell', damage: 3 });
+ck('Mira can cast from 8 squares away', !spell.error && spell.distance === 8, JSON.stringify(spell).slice(0, 90));
 ck('she outranges the goblin that is shooting at her', 8 > (await call('get_board_state'))
   .tokens.find(t => t.name === 'Snaggle').range);
-await put('Wren', 3, 6);
-const tooFar = await call('attack', { attackerId: 'Wren', targetId: 'Snaggle', kind: 'spell' });
+await put('Mira', 3, 6);
+const tooFar = await call('attack', { attackerId: 'Mira', targetId: 'Snaggle', kind: 'spell' });
 ck('but range binds the caster too — 12 squares is refused', !!tooFar.error && tooFar.tooFar === true,
    tooFar.error?.slice(0, 70));
-await put('Wren', 7, 6);
+await put('Mira', 7, 6);
 const knight = await call('attack', { attackerId: 'Brannok', targetId: 'Snaggle', kind: 'ranged' });
 ck('a knight has no ranged attack, and is told so', !!knight.error && /no ranged attack/.test(knight.error));
 
@@ -76,7 +76,7 @@ console.log('— you can see what you are fighting —');
 await page.evaluate(() => { window.__st.revealed = []; });
 await call('add_token', { name: 'Lurker', kind: 'monster', art: 'skeleton', x: 8, y: 10, hp: 9 });
 const hidden = await page.evaluate(() => (window.arcana.call('get_board_state')));
-await call('attack', { attackerId: 'Wren', targetId: 'Lurker', kind: 'spell', damage: 2 });
+await call('attack', { attackerId: 'Mira', targetId: 'Lurker', kind: 'spell', damage: 2 });
 ck('attacking lifts the fog around the target', await page.evaluate(() =>
   window.__st.revealed.includes('8,10')));
 await page.evaluate(() => { window.__st.revealed = []; });

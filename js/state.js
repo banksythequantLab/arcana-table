@@ -194,7 +194,7 @@ function freshState() {
     scene: { mapId: 'dungeon', title: 'The Sunken Keep', mood: 'Torchlight flickers over wet stone…' },
     tokens: [
       { id: 'pc-brannok', name: 'Brannok', kind: 'pc', art: 'knight', x: 2, y: 2, hp: 24, maxHp: 24, ac: 17, str: 16, dex: 10, con: 14, int: 8, wis: 12, cha: 13, reach: 1, range: 0, conditions: [], inventory: ['Longsword', 'Shield', 'Torch ×3'] },
-      { id: 'pc-wren', name: 'Wren', kind: 'pc', art: 'wizard', x: 3, y: 3, hp: 14, maxHp: 14, ac: 12, str: 8, dex: 14, con: 12, int: 17, wis: 13, cha: 10, reach: 1, range: 8, conditions: [], inventory: ['Spellbook', 'Dagger', 'Component pouch'] },
+      { id: 'pc-mira', name: 'Mira', kind: 'pc', art: 'wizard', x: 3, y: 3, hp: 14, maxHp: 14, ac: 12, str: 8, dex: 14, con: 12, int: 17, wis: 13, cha: 10, reach: 1, range: 8, conditions: [], inventory: ['Spellbook', 'Dagger', 'Component pouch'] },
       { id: 'npc-chest', name: 'Old Chest', kind: 'object', art: 'chest', x: 18, y: 11, hp: 10, maxHp: 10, reach: 0, range: 0, conditions: [], inventory: [] },
     ],
     revealed: [],                 // ['x,y', …] cells cleared of fog
@@ -285,7 +285,7 @@ export function findToken(idOrName) {
   if (exact) return exact;
 
   // Nothing matched outright — find the closest name, if it is close enough.
-  // The threshold scales with length so "Ren" still finds "Wren" but "orc"
+  // The threshold scales with length so "meera" still finds "Mira" but "orc"
   // does not become "ooze".
   let best = null, bestD = Infinity;
   for (const t of state.tokens) {

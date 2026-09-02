@@ -122,7 +122,7 @@ ck('a natural 20 for three reps is flagged as underpriced', /normally costs/.tes
    (cheap?.underpriced || '(not flagged)').slice(0, 72));
 
 console.log('— a name the microphone got wrong still finds its hero —');
-for (const [heard, want] of [['ren','Wren'], ['when','Wren'], ['bran','Brannok'], ['brannock','Brannok'], ['BRANNOK','Brannok']]) {
+for (const [heard, want] of [['meera','Mira'], ['mera','Mira'], ['bran','Brannok'], ['brannock','Brannok'], ['BRANNOK','Brannok']]) {
   const got = await page.evaluate(async h => {
     const { findToken } = await import('/js/state.js');
     return findToken(h)?.name || null;
