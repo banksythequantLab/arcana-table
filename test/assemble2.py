@@ -69,9 +69,15 @@ def at(key, fallback, lead=0.0):
 # shortened by the card's length so (card + shot) == the narration exactly.
 # (kind, source, length, footage_start)
 v = VOS
+# The first voice you hear is the DM's, alone: its opening line runs over the
+# title card and the warm-up card appearing, and Derek comes in after it has
+# had the floor. Before this the DM only ever spoke under the narration, ducked,
+# and nobody got to hear what the product actually sounds like.
+SOLO = 12.0
+SOLO2 = 10.0
 CUT = [
     ('card',  'open',   2.0,                                   None),
-    ('shot',  None,     v['vo01_problem'] + v['vo02_whatitis'] - 2.0, at('table', 5.0, 0.4)),
+    ('shot',  None,     v['vo01_problem'] + v['vo02_whatitis'] - 2.0 + SOLO, at('warm_offer', 37.0, 0.9)),
     ('card',  'webmcp', 4.5,                                   None),
     ('model', None,     v['vo03a_nobackdoor'] + v['vo03b_contract'] - 4.5, 0.4),
     ('card',  'heroic', 2.0,                                   None),
@@ -80,14 +86,13 @@ CUT = [
     ('shot',  None,     (v['vo07_swap'] - 10.0) + v['vo04b_payoff'], at('nat20', 160.0, 1.6)),
     ('card',  'oath',   2.0,                                   None),
     ('shot',  None,     v['vo08_oath'] - 2.0,                  at('oath_offer', 200.0, 0.6)),
-    # vo09 is split: the Oath answered (the DM's own line, "the dishes are
-    # sworn — and the oath answers") and then the task list for "micro bursts".
-    ('shot',  None,     8.0,                                   at('oath_kept', 238.0, -12.5)),
-    ('shot',  None,     v['vo09_micro'] - 8.0,                 at('tasklist', 230.0, 1.0)),
+    # The DM's second solo: the Oath answered, in its own voice — "the dishes are
+    # cleared, and the oath answers". Narration is silent for this shot.
+    ('shot',  None,     SOLO2,                                 at('oath_kept', 278.8, 1.4)),
     ('model', None,     v['vo10_brain'],                       28.0),
-    # Starts on the DM's "water surges around your boots" line and runs through
-    # combat starting and the log filling.
-    ('shot',  None,     v['vo05_hood'],                        at('hall', 66.0, 0.9)),
+    # "Under the hood", cut at a real pause after the tool names: the last third
+    # of the narration was the wordiest, and this is where it rambled.
+    ('shot',  None,     v['vo05_hood_trim'],                   at('hall', 66.0, 0.9)),
     ('card',  'close',  v['vo06_close'] + 0.5,                 None),
 ]
 
@@ -136,12 +141,18 @@ run(['ffmpeg','-y','-loglevel','error','-f','concat','-safe','0','-i',str(listin
 
 # ── Derek's narration: continuous, starting on each card ─────────────────────
 ORDER = ['vo01_problem','vo02_whatitis','vo03a_nobackdoor','vo03b_contract','vo04_heroic',
-         'vo07_swap','vo04b_payoff','vo08_oath','vo09_micro','vo10_brain','vo05_hood','vo06_close']
+         'vo07_swap','vo04b_payoff','vo08_oath',None,'vo10_brain','vo05_hood_trim','vo06_close']
 apieces = []
+lead = BUILD / 'a_lead.wav'
+run(['ffmpeg','-y','-loglevel','error','-f','lavfi','-i','anullsrc=channel_layout=stereo:sample_rate=48000','-t',f'{SOLO:.3f}',str(lead)])
+apieces.append(lead)
 for j, name in enumerate(ORDER):
     out = BUILD / f'a{j:02d}.wav'
-    run(['ffmpeg','-y','-loglevel','error','-i',str(VO/f'{name}.wav'),
-         '-ar','48000','-ac','2','-af','loudnorm=I=-17:TP=-1.5:LRA=11',str(out)])
+    if name is None:      # the DM's solo after the Oath
+        run(['ffmpeg','-y','-loglevel','error','-f','lavfi','-i','anullsrc=channel_layout=stereo:sample_rate=48000','-t',f'{SOLO2:.3f}',str(out)])
+    else:
+        run(['ffmpeg','-y','-loglevel','error','-i',str(VO/f'{name}.wav'),
+             '-ar','48000','-ac','2','-af','loudnorm=I=-17:TP=-1.5:LRA=11',str(out)])
     apieces.append(out)
 tail = BUILD / 'a_tail.wav'
 run(['ffmpeg','-y','-loglevel','error','-f','lavfi','-i','anullsrc=channel_layout=stereo:sample_rate=48000','-t','0.5',str(tail)])
@@ -152,8 +163,19 @@ narration = BUILD / 'narration.wav'
 run(['ffmpeg','-y','-loglevel','error','-f','concat','-safe','0','-i',str(alist),'-c','copy',str(narration)])
 
 # ── the DM's voice, at the seconds its words appeared on screen ──────────────
+# Lines that would play under the wrong picture. 03 is the DM narrating a miss,
+# and it begins a tenth of a second before the cut into the Oath card.
+SKIP_DM = {'dm/03.mp3'}
+# The Oath-answered line is spoken a few seconds after the card closes, while
+# the DM's turn is still running tools. Pin it to the shot of the card closing
+# instead — that is the picture its words describe.
+solo2_video = sum(l for (k, s, l, st) in CUT[:10])          # video time of CUT[10]
+PIN_DM = {'dm/04.mp3': solo2_video + 0.9}
 placed = []
 for c in dmclips:
+    if c['file'] in SKIP_DM: continue
+    if c['file'] in PIN_DM:
+        placed.append((PIN_DM[c['file']], BED / c['file'], c['text'])); continue
     for (vt, ft, ln) in timeline:
         if ft <= c['t'] < ft + ln:
             placed.append((vt + (c['t'] - ft), BED / c['file'], c['text']))
@@ -181,8 +203,8 @@ mixed = BUILD / 'mix.wav'
 run(['ffmpeg','-y','-loglevel','error','-i',str(dmtrack),'-i',str(narration),
      '-filter_complex',
      # DM at a touch under full, compressed by the narration; narration on top.
-     '[0:a]volume=1.0[dm];[1:a]asplit=2[nar][key];'
-     '[dm][key]sidechaincompress=threshold=0.03:ratio=3:attack=60:release=700:makeup=1[dmduck];'
+     '[0:a]volume=1.15[dm];[1:a]asplit=2[nar][key];'
+     '[dm][key]sidechaincompress=threshold=0.05:ratio=2.2:attack=80:release=800:makeup=1[dmduck];'
      '[dmduck][nar]amix=inputs=2:normalize=0:dropout_transition=0,alimiter=limit=0.95[out]',
      '-map','[out]','-ar','48000','-ac','2',str(mixed)])
 
