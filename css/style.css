@@ -543,6 +543,9 @@ input[type=checkbox]{flex:0 0 auto;width:18px;height:18px;padding:0;accent-color
 .ending-title{font:800 52px/1 "Baloo 2",cursive;margin:0 0 10px}
 .ending-sub{margin:0 0 20px;font-size:16px;color:#5B4F66;line-height:1.5}
 .ending-stats{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:24px}
+.ending-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:6px}
+.ending-row .btn.ghost{color:var(--ink);border-color:var(--ink)}
+.ending-quiet{font-size:13px;font-style:italic;color:#6B5E76;margin:10px 0 4px}
 .estat{
   background:#FFF6E2;border:2.5px solid var(--ink);border-radius:12px;padding:9px 14px;min-width:96px
 }

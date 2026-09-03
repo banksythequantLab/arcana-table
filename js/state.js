@@ -5,6 +5,8 @@
 export const MAPS = {
   dungeon: {
     name: 'The Sunken Keep',
+    mood: 'Torchlight flickers over wet stone…',
+    entry: { x: 2, y: 2 },
     // legend: # wall · . floor · , rubble · ~ water · D door · L lava
     rows: [
       '######################',
@@ -25,6 +27,8 @@ export const MAPS = {
   },
   forest: {
     name: 'The Whispering Glade',
+    mood: 'Wind in the high branches. Something is watching the road.',
+    entry: { x: 2, y: 2 },
     rows: [
       '######.......#########',
       '##.......,.......#####',
@@ -44,6 +48,8 @@ export const MAPS = {
   },
   crypt: {
     name: 'The Ember Crypt',
+    mood: 'Heat rolls up the stairs. The Crown is burning somewhere below.',
+    entry: { x: 2, y: 12 },
     rows: [
       '######################',
       '#.....#........#.....#',
@@ -77,13 +83,13 @@ export const QUEST = {
     {
       id: 'breach', mapId: 'dungeon', title: 'Breach the flooded hall',
       objective: 'Get the party through the flooded entry hall of the Sunken Keep. Something drowned guards it — fight or outwit it.',
-      reward: { items: ['Keep Warden\'s Key'], gold: 40 },
+      reward: { items: ['Rusted Keep Key'], gold: 40 },
       boon: 'bonus+3',
       honorific: 'Keep-Breakers',
     },
     {
       id: 'vault', mapId: 'dungeon', title: 'Open the drowned vault',
-      objective: 'The old chest in the far chamber is the Warden\'s vault. Reach it, open it, survive what is guarding it.',
+      objective: 'The old chest in the far chamber is the keep\'s drowned vault. Reach it, open it, survive whatever drowned thing guards it.',
       reward: { items: ['Emberward Charm', 'Flask of Deep Water'], gold: 90 },
       boon: 'bonus+5',
       honorific: 'Vaultwise',
@@ -266,6 +272,7 @@ function freshState() {
     },
     quest: { beatIndex: 0, status: 'active', completed: [], startedAt: Date.now() },
     downed: null,                 // {tokenId, saves, fails} — the board is frozen while this is set
+    left: false,                  // the player left the kingdom at the end — the table sleeps
     warmupOffer: null,            // {reason, plans} — the card asking which plan
     warmup: null,                 // {planId, index, seq, hold, count, remaining, paused}
     tasks: null,                  // {items:[{label,bonus,done}]} — pick your own price

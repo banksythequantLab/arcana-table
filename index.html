@@ -233,7 +233,26 @@
     <h2 id="ending-title" class="ending-title">Victory</h2>
     <p id="ending-sub" class="ending-sub"></p>
     <div id="ending-stats" class="ending-stats"></div>
-    <button id="ending-again" class="btn big" type="button">Run it again →</button>
+    <div class="ending-row">
+      <button id="ending-again" class="btn big" type="button">Run it again →</button>
+      <button id="ending-leave" class="btn ghost big" type="button">Leave the kingdom</button>
+    </div>
+  </div>
+</div>
+
+<!-- Leaving is a real choice, not a reload. The DM stops talking and listening,
+     the table is saved as it stands, and the page rests. -->
+<div id="farewell" class="ending-backdrop" hidden>
+  <div class="ending-card">
+    <div class="ending-eyebrow">THE TABLE SLEEPS</div>
+    <h2 class="ending-title">You leave the kingdom.</h2>
+    <p id="farewell-sub" class="ending-sub">The marshes are cool behind you. The Dungeon Master has put down the dice.</p>
+    <div id="farewell-stats" class="ending-stats"></div>
+    <p class="ending-quiet">Close the tab whenever you like — nothing here is waiting on you.
+      Or sit back down: a new run starts fresh.</p>
+    <div class="ending-row">
+      <button id="farewell-again" class="btn ghost big" type="button">Sit back down — new run →</button>
+    </div>
   </div>
 </div>
 

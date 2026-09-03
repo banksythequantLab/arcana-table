@@ -540,6 +540,22 @@ function bindDMPanel() {
   $('#dm-auto').onchange = e => { state.settings.autoApprove = e.target.checked; };
   $('#dm-reset').onclick = () => { if (confirm('Reset the whole table?')) { localStorage.clear(); location.reload(); } };
   $('#ending-again').onclick = () => { localStorage.clear(); location.reload(); };
+  $('#farewell-again').onclick = () => { localStorage.clear(); location.reload(); };
+  // Leaving is the other honest ending: the DM stops speaking and listening,
+  // the table is saved exactly as it stands, and nothing is waiting on you.
+  $('#ending-leave').onclick = () => {
+    shutUp();
+    setHandsFree(false);
+    stopListening();
+    voice.muted = true;
+    chat.enabled = false;
+    A.logStory('quest', 'You', 'leave the kingdom. The table sleeps.');
+    $('#farewell-stats').innerHTML = $('#ending-stats').innerHTML;
+    $('#ending').hidden = true;
+    $('#farewell').hidden = false;
+    state.left = true;
+    A.emit('quest');
+  };
   renderMcp();
 }
 
@@ -799,7 +815,8 @@ function renderQuest() {
 
   // the run is over
   const end = $('#ending');
-  end.hidden = q.status === 'active';
+  end.hidden = q.status === 'active' || !!state.left;
+  $('#farewell').hidden = !state.left;
   if (!end.hidden) {
     const won = q.status === 'won';
     $('#ending-eyebrow').textContent = won ? 'THE EMBER CROWN' : 'THE RUN ENDS';

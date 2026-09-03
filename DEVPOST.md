@@ -14,7 +14,7 @@ The first version of this was just a board that exposed some WebMCP tools and wa
 
 ## What it does
 
-You open the URL and you're playing. The DM (GPT with function calling, talking through OpenAI TTS) sets the scene. You type or say what you do. It answers on a cartoon battle map: narrates, moves the tokens, lifts the fog, drops monsters in, runs initiative, rolls dice where you can see them. Click the map and your party walks there. There's a five-beat quest called The Ember Crown so a session has an ending. Each beat you clear levels the party up, hands out loot, and heals everyone. The last one is a boss called the Cinder Wight.
+You open the URL and you're playing. The DM (GPT with function calling, talking through OpenAI TTS) sets the scene. You type or say what you do. It answers on a cartoon battle map: narrates, moves the tokens, lifts the fog, drops monsters in, runs initiative, rolls dice where you can see them. Click the map and your party walks there (in a fight, a click is one square, for whoever's turn it is). There's a five-beat quest called The Ember Crown so a session has an ending. Each beat you clear levels the party up, hands out loot, and heals everyone. The last one is a boss called the Cinder Wight.
 
 The thing I actually care about is Heroic Effort. When a roll matters, the DM offers you a deal. Ten push-ups gets you +5 on the roll. Twenty-five gets you a natural 20. You count them on a big tap ring, or out loud if you're in hands-free mode because your hands are on the floor. There are timed holds too (a 30-second plank counts itself down), and a task list where it puts up three small things at once and you tick off whichever ones you did. Two out of three still pays.
 
@@ -30,7 +30,7 @@ There are 25 tools on `document.modelContext`. 21 are always there. Three more (
 
 The DM loop is about 180 lines. It calls `getTools()`, turns the result into OpenAI function specs, sends the conversation to the Worker, runs whatever tool calls come back through `executeTool()`, feeds the results back in, and repeats up to seven times before it has to say something. There's no other path for it to change the game. The DM Panel tab in the app shows you the same registry live, every tool with a form built from its JSON schema, and running one goes through the same `executeTool()` and shows up in the same log.
 
-There's a Playwright test suite, 466 assertions in eleven files, that drives everything through the real `document.modelContext` in headless Chromium. It checks the registry growing and shrinking with combat, both approval paths, all the effort modes, a full five-beat run, and it samples pixels off the canvas. That last part exists because I once shipped a scope bug that made every monster disappear from the board and all 196 tests at the time still passed.
+There's a Playwright test suite, 486 assertions in eleven files, that drives everything through the real `document.modelContext` in headless Chromium. It checks the registry growing and shrinking with combat, both approval paths, all the effort modes, a full five-beat run, and it samples pixels off the canvas. That last part exists because I once shipped a scope bug that made every monster disappear from the board and all 196 tests at the time still passed.
 
 I used Claude (in Cowork) as a pair programmer for most of the build. A lot of the test suite and the refactoring described below came out of that.
 

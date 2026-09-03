@@ -71,6 +71,43 @@ await page.waitForTimeout(300);
 ck('mid-challenge the board does not move under you', JSON.stringify(await pcs()) === JSON.stringify(mid));
 await page.evaluate(async () => (await import('/js/actions.js')).declineChallenge());
 
+console.log('— in a fight, a click is one square —');
+// "Clicking on the screen should not move people while the fight is going on,
+// except for one step." Out of combat a click is travel; in combat it is one
+// square toward where you pointed, for whoever's turn it is — and on a
+// monster's turn, nobody.
+await page.evaluate(async () => {
+  const A = await import('/js/actions.js');
+  const b = window.__st.tokens.find(t => t.name === 'Brannok'), m = window.__st.tokens.find(t => t.name === 'Mira');
+  b.x = 5; b.y = 6; m.x = 4; m.y = 6;
+  A.addToken({ name: 'Blocker', kind: 'monster', art: 'goblin', x: 14, y: 6, hp: 500 });
+  A.startCombat({});
+  // Force Brannok to the top of the order for a deterministic check.
+  window.__st.combat.order = [b.id, m.id, ...window.__st.combat.order.filter(id => id !== b.id && id !== m.id)];
+  window.__st.combat.turnIndex = 0;
+});
+const farClick = await page.evaluate(() => window.arcana.walkTo(12, 6));
+const bAfter = await page.evaluate(() => { const b = window.__st.tokens.find(t => t.name === 'Brannok'); return { x: b.x, y: b.y }; });
+ck('a click seven squares away moves the active hero ONE square', bAfter.x === 6 && bAfter.y === 6, `${JSON.stringify(bAfter)} · ${JSON.stringify(farClick).slice(0, 80)}`);
+ck('and reports it as a step toward the click', farClick.step === true && farClick.toward?.x === 12);
+const mAfter = await page.evaluate(() => { const m = window.__st.tokens.find(t => t.name === 'Mira'); return { x: m.x, y: m.y }; });
+ck('the rest of the party did not come along', mAfter.x === 4 && mAfter.y === 6, JSON.stringify(mAfter));
+const diag = await page.evaluate(() => window.arcana.walkTo(9, 9));
+const bDiag = await page.evaluate(() => { const b = window.__st.tokens.find(t => t.name === 'Brannok'); return { x: b.x, y: b.y }; });
+ck('a diagonal click steps diagonally', bDiag.x === 7 && bDiag.y === 7, JSON.stringify(bDiag));
+// A monster's turn: the click does nothing to anyone.
+await page.evaluate(() => { const o = window.__st.combat.order; window.__st.combat.turnIndex = o.findIndex(id => window.__st.tokens.find(t => t.id === id)?.kind === 'monster'); });
+const pcsBefore = await page.evaluate(() => window.__st.tokens.filter(t => t.kind === "pc").map(t => `${t.x},${t.y}`).join("|"));
+const notYours = await page.evaluate(() => window.arcana.walkTo(3, 3));
+const pcsAfter = await page.evaluate(() => window.__st.tokens.filter(t => t.kind === "pc").map(t => `${t.x},${t.y}`).join("|"));
+ck("on a monster's turn a click moves nobody", !!notYours.error && pcsBefore === pcsAfter, notYours.error || '');
+ck('and it says whose turn it is', /turn/i.test(notYours.error || ''));
+await page.evaluate(async () => (await import('/js/actions.js')).endCombat());
+const travel = await page.evaluate(() => window.arcana.walkTo(10, 6));
+const bTravel = await page.evaluate(() => { const b = window.__st.tokens.find(t => t.name === 'Brannok'); return { x: b.x, y: b.y }; });
+ck('out of the fight, a click is travel again', !travel.error && !travel.step && Math.abs(bTravel.x - 10) <= 1 && Math.abs(bTravel.y - 6) <= 1, JSON.stringify(bTravel));
+await page.evaluate(() => { window.__st.tokens = window.__st.tokens.filter(t => t.name !== 'Blocker'); });
+
 console.log('— dragging a token still works —');
 const from = await cellPoint(9, 5), to = await cellPoint(11, 6);
 await page.mouse.move(from.x, from.y); await page.mouse.down();

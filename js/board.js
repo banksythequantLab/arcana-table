@@ -230,18 +230,43 @@ export function walkTo(c) {
   if (state.downed) { ring(c.x, c.y, '#D9534F'); return { error: 'A hero is down — time has stopped.' }; }
   if (state.challenge || state.oath || state.warmup) { ring(c.x, c.y, '#D9534F'); return { error: 'The table is waiting on you.' }; }
 
-  // In a fight you move whoever's turn it is; out of one the party travels
-  // together, which is what "we go over there" means at a real table.
-  const actor = state.combat.active
-    ? state.tokens.find(t => t.id === state.combat.order[state.combat.turnIndex])
-    : null;
-  const r = (actor && actor.kind === 'pc')
-    ? moveParty({ x: c.x, y: c.y, who: actor.id })
-    : moveParty({ x: c.x, y: c.y });
+  // Out of a fight the party travels together to wherever you point — that is
+  // what "we go over there" means at a real table. IN a fight, a click is one
+  // square, toward where you pointed, for whoever's turn it is; and on a
+  // monster's turn nobody moves at all. Teleporting across the room mid-combat
+  // was the one thing a click could do that the rules could not.
+  if (!state.combat.active) {
+    const r = moveParty({ x: c.x, y: c.y });
+    if (r?.error) { ring(c.x, c.y, '#D9534F'); return r; }
+    ring(c.x, c.y, '#F2C14E');
+    emit('player-move');               // the DM reacts to it like any other move
+    return r;
+  }
+  const actor = state.tokens.find(t => t.id === state.combat.order[state.combat.turnIndex]);
+  if (!actor || actor.kind !== 'pc') {
+    ring(c.x, c.y, '#D9534F');
+    return { error: `It is ${actor ? actor.name + "'s" : 'not your'} turn.` };
+  }
+  const step = oneStepToward(actor, c);
+  if (!step) { ring(c.x, c.y, '#D9534F'); return { error: 'No open square that way.' }; }
+  const r = moveParty({ x: step.x, y: step.y, who: actor.id });
   if (r?.error) { ring(c.x, c.y, '#D9534F'); return r; }
-  ring(c.x, c.y, '#F2C14E');
-  emit('player-move');                 // the DM reacts to it like any other move
-  return r;
+  ring(step.x, step.y, '#F2C14E');
+  if (step.x !== c.x || step.y !== c.y) ring(c.x, c.y, '#F2C14E55');   // where you pointed, faintly
+  emit('player-move');
+  return { ...r, step: true, from: { x: actor.x, y: actor.y }, toward: { x: c.x, y: c.y } };
+}
+
+/** One square from `from` toward `to` — diagonal if open, else the nearer straight. */
+function oneStepToward(from, to) {
+  const dx = Math.sign(to.x - from.x), dy = Math.sign(to.y - from.y);
+  if (!dx && !dy) return null;
+  const free = (x, y) => isWalkable(x, y) && !state.tokens.some(t => t.x === x && t.y === y && t.hp > 0);
+  const tries = [{ x: from.x + dx, y: from.y + dy }];
+  if (dx && dy) tries.push({ x: from.x + dx, y: from.y }, { x: from.x, y: from.y + dy });
+  else if (dx)  tries.push({ x: from.x + dx, y: from.y + 1 }, { x: from.x + dx, y: from.y - 1 });
+  else          tries.push({ x: from.x + 1, y: from.y + dy }, { x: from.x - 1, y: from.y + dy });
+  return tries.find(p => free(p.x, p.y)) || null;
 }
 
 // ── render loop ──────────────────────────────────────────────────────────────

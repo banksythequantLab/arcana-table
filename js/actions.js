@@ -269,8 +269,13 @@ export function addToken({ name, kind = 'monster', art, x, y, hp = 10, maxHp, sc
                 conditions: [], inventory: [] };
   state.tokens.push(tok);
   logStory('action', 'DM', `${name} appears on the board.`);
+  // "The vault warden didn't swing once." A monster that arrives mid-fight was
+  // never in the initiative order, so it stood there for the whole battle. It
+  // joins the round now, at the end, and acts when the turn comes to it.
+  let joined = false;
+  if (state.combat.active && kind === 'monster') { state.combat.order.push(tok.id); joined = true; }
   emit();
-  return { ok: true, token: tok };
+  return { ok: true, token: tok, ...(joined ? { joinedCombat: true, note: `${name} joins the fight and acts at the end of this round.` } : {}) };
 }
 
 export function removeToken({ tokenId }) {
@@ -318,10 +323,24 @@ export function revealArea({ x, y, radius = 3 }) {
 /** The only way the map changes: the quest moves the party. Not a tool. */
 function travelTo(mapId) {
   if (!MAPS[mapId] || mapId === state.scene.mapId) return;
+  const map = MAPS[mapId];
+  // "The glade changed but the chest remained." A new map is a new place: what
+  // stood on the old one — the chest, the dead, anything the DM spawned — does
+  // not come along. Only the party travels, and it arrives at the door.
+  state.tokens = state.tokens.filter(t => t.kind === 'pc');
+  if (state.combat.active) state.combat = { active: false, order: [], turnIndex: 0, round: 0 };
   state.scene.mapId = mapId;
+  state.scene.title = map.name;
+  state.scene.mood = map.mood || state.scene.mood;      // not "torchlight over wet stone" in a forest
   state.revealed = [];
-  state.scene.title = MAPS[mapId].name;
-  state.tokens.filter(t => t.kind === 'pc').forEach(t => revealAround(t.x, t.y, 3));
+  const entry = map.entry || { x: 2, y: 2 };
+  const pcs = state.tokens.filter(t => t.kind === 'pc');
+  const taken = new Set();
+  pcs.forEach((t, i) => {
+    const spot = i === 0 && isWalkable(entry.x, entry.y) ? entry : nearestFree(entry.x, entry.y, taken);
+    if (spot) { t.x = spot.x; t.y = spot.y; taken.add(`${spot.x},${spot.y}`); }
+    revealAround(t.x, t.y, 3);
+  });
   logStory('scene', 'DM', `— ${state.scene.title} —`);
 }
 
@@ -1399,11 +1418,20 @@ export function advanceQuest({ summary = '' } = {}) {
   // Brannok's own picture, for a stone guardian.
   const arrival = next.boss || next.spawn || null;
   const spawned = arrival ? addToken({ ...arrival, kind: 'monster', maxHp: arrival.hp }) : null;
+  // The set-piece monster does not wait to be noticed. It is a fight the moment
+  // it arrives, and it takes its own turns — the DM narrates, it does not have
+  // to remember to call start_combat for a thing the beat itself put there.
+  let fight = null;
+  if (spawned?.token && !state.combat.active) {
+    const pcs = state.tokens.filter(t => t.kind === 'pc').map(t => t.id);
+    fight = startCombat({ order: [...pcs, spawned.token.id] });
+  }
   emit('quest');
   return {
     ok: true, beat: next.id, title: next.title, objective: next.objective,
     beatNumber: q.beatIndex + 1, of: QUEST.beats.length,
     bossSpawned: spawned?.token?.name || null,
+    combatStarted: fight ? { order: fight.order, current: fight.current } : null,
     cleared: beat.title,
     paid: { items: beat.reward?.items || [], gold: beat.reward?.gold || 0, boon,
             partyLevel: level, maxHpGained: hpGain, honorific: beat.honorific || null },
@@ -1441,6 +1469,7 @@ export function resetQuest() {
   state.quest = { beatIndex: 0, status: 'active', completed: [], startedAt: Date.now() };
   state.downed = null;
   state.fitness.warmupAnswered = null;      // a new run gets asked once more
+  state.left = false;
   emit('quest');
   return { ok: true, ...getQuest() };
 }

@@ -335,6 +335,26 @@ check('victory screen is shown', await page.isVisible('#ending'));
 check('victory screen names the run', /Crown/i.test(await page.innerText('#ending-title')));
 check('advance_quest refuses after the run is over', !!(await call('advance_quest')).error);
 await page.screenshot({ path: 'screens/victory.png' });
+// Two honest endings: run it again, or leave. Leaving is not a reload — the DM
+// stops talking and listening, the table is saved as it stands, and the page rests.
+check('the ending offers to run it again AND to leave', await page.isVisible('#ending-again') && await page.isVisible('#ending-leave'));
+await page.click('#ending-leave');
+await page.waitForTimeout(250);
+check('leaving shows the farewell, not the victory card', await page.isVisible('#farewell') && await page.isHidden('#ending'));
+check('the farewell keeps the run\'s numbers', /Total reps/.test(await page.evaluate(() => document.getElementById('farewell-stats').textContent)));
+check('the DM has put down the dice — muted and no longer taking turns', await page.evaluate(async () => {
+  const { voice } = await import('/js/voice.js'); const { chat } = await import('/js/dm.js');
+  return voice.muted === true && chat.enabled === false && voice.listening === false;
+}));
+check('and the leaving is remembered across a reload', await (async () => {
+  await page.reload(); await page.waitForFunction(() => window.arcana); await page.waitForTimeout(300);
+  return await page.isVisible('#farewell') && await page.isHidden('#ending');
+})());
+check('from the farewell, sitting back down starts a fresh run', await (async () => {
+  await page.click('#farewell-again'); await page.waitForFunction(() => window.arcana); await page.waitForTimeout(300);
+  return await page.evaluate(() => window.__st.quest.status === 'active' && window.__st.left === false);
+})());
+await enterTable(page);                 // the fresh run opens with the gate and the warm-up card, as it should
 
 // back to an active run so the DM section below has a live table
 await page.evaluate(() => window.arcana.resetQuest());

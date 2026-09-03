@@ -56,14 +56,18 @@ const varies = await page.evaluate(async () => {
   const h = id => { let x = 2166136261;
     for (let i = 0; i < id.length; i++) { x ^= id.charCodeAt(i); x = Math.imul(x, 16777619); }
     return ((x >>> 0) % 10000) / 10000; };
+  // Ids carry a timestamp, so five live tokens can all hash to one side by
+  // chance (~6% of runs) — check the spread on a fixed dozen instead, and the
+  // live ones only for distinctness.
   const ids = window.__st.tokens.filter(t => t.kind === 'monster').map(t => t.id);
-  return { ids, us: ids.map(h) };
+  const fixed = Array.from({ length: 12 }, (_, i) => `mon-${i}-fixed`);
+  return { ids, us: ids.map(h), fixedUs: fixed.map(h) };
 });
 const us = varies.us;
 ck('each monster gets its own variation value', new Set(us).size === us.length, us.map(u => u.toFixed(2)).join(' '));
 ck('the values actually spread, not cluster', Math.max(...us) - Math.min(...us) > 0.3,
    `range ${(Math.max(...us) - Math.min(...us)).toFixed(2)}`);
-ck('some face each way', us.some(u => u > 0.5) && us.some(u => u <= 0.5));
+ck('some face each way', varies.fixedUs.some(u => u > 0.5) && varies.fixedUs.some(u => u <= 0.5));
 ck('heroes are never tinted', await page.evaluate(() =>
   window.__st.tokens.filter(t => t.kind === 'pc').length === 2));
 

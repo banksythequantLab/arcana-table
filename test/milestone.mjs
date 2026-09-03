@@ -69,8 +69,9 @@ ck('it is not a modal — you can still type', await page.isEnabled('#say'));
 console.log('— the rewards escalate across the run —');
 const paid = [{ gold: r1.paid.gold, boon: r1.paid.boon }];
 for (let i = 0; i < 3; i++) {
-  // beats are cleared over the body: put down whatever the last beat spawned
-  await page.evaluate(() => { window.__st.tokens.filter(t => t.kind === 'monster').forEach(t => { t.hp = 0; }); });
+  // beats are cleared over the body: put down whatever the last beat spawned,
+  // and end the fight it started
+  await page.evaluate(async () => { window.__st.tokens.filter(t => t.kind === 'monster').forEach(t => { t.hp = 0; }); (await import('/js/actions.js')).endCombat(); });
   const r = await call('advance_quest', { summary: 'Onward.' });
   if (r.paid) paid.push({ gold: r.paid.gold, boon: r.paid.boon });
 }
@@ -116,21 +117,44 @@ await page.evaluate(async () => {
 ck('once the guard is down and the fight is over, it advances', (await call('advance_quest', { summary: 'The guard goes under.' })).ok === true);
 // The Warden beat owns its monster: reaching beat 4 spawns it, and beat 4 is
 // not cleared while it lives — even with no initiative running.
-await page.evaluate(() => { window.__st.tokens.filter(t => t.kind === 'monster').forEach(t => { t.hp = 0; }); });
-await call('advance_quest', { summary: 'vault' });
-await page.evaluate(() => { window.__st.tokens.filter(t => t.kind === 'monster').forEach(t => { t.hp = 0; }); });
-await call('advance_quest', { summary: 'glade' });          // → beat 4, Warden spawns
+const slayAndRest = () => page.evaluate(async () => { window.__st.tokens.filter(t => t.kind === 'monster').forEach(t => { t.hp = 0; }); (await import('/js/actions.js')).endCombat(); });
+await slayAndRest();
+const toGlade = await call('advance_quest', { summary: 'vault opened' });   // beat 2 → 3: dungeon → forest
+ck('changing maps leaves the old furniture behind — no chest in the glade', await page.evaluate(() =>
+  !window.__st.tokens.some(t => t.kind !== 'pc')), JSON.stringify(await page.evaluate(() => window.__st.tokens.filter(t => t.kind !== 'pc').map(t => t.name))));
+ck('and the mood line changes with the place', await page.evaluate(() => !/wet stone/.test(window.__st.scene.mood)),
+   await page.evaluate(() => window.__st.scene.mood));
+ck('the party arrives at the entrance, not wherever it stood in the dungeon', await page.evaluate(() =>
+  window.__st.tokens.filter(t => t.kind === 'pc').every(t => t.x <= 4 && t.y <= 4)));
+await slayAndRest();
+const toWarden = await call('advance_quest', { summary: 'across' });        // → beat 4, Warden spawns
+ck('the Warden arrives AND the fight starts by itself', toWarden.bossSpawned === 'The Waking Warden' && !!toWarden.combatStarted,
+   JSON.stringify(toWarden.combatStarted));
+ck('the Warden is in the initiative order', await page.evaluate(() => {
+  const w = window.__st.tokens.find(t => t.name === 'The Waking Warden'); return window.__st.combat.active && window.__st.combat.order.includes(w?.id); }));
+// And it swings: run the round to its turn.
+const wardenSwung = await page.evaluate(async () => {
+  const A = await import('/js/actions.js');
+  const b = window.__st.tokens.find(t => t.name === 'Brannok'); b.hp = 999; b.maxHp = 999;
+  let acted = [];
+  for (let i = 0; i < 4 && !acted.length; i++) { const r = A.advanceTurn(); acted = acted.concat(r.monstersActed || []); }
+  return acted.map(a => a.name || a.actor || JSON.stringify(a).slice(0, 40));
+});
+ck('and it takes a swing when its turn comes', wardenSwung.length > 0, JSON.stringify(wardenSwung).slice(0, 80));
 const wardenUp = await call('advance_quest', { summary: 'we sneak past' });
-ck('the Warden beat refuses to clear while the Warden stands', !!wardenUp.error && wardenUp.mustDefeat === 'The Waking Warden', (wardenUp.error || '').slice(0, 70));
-await page.evaluate(() => { const w = window.__st.tokens.find(t => t.name === 'The Waking Warden'); if (w) w.hp = 0; });
+ck('the Warden beat refuses to clear while the Warden stands', !!wardenUp.error, (wardenUp.error || '').slice(0, 70));
+await slayAndRest();
 ck('and clears over its body', (await call('advance_quest', { summary: 'The Warden breaks.' })).ok === true);
 
 console.log('— and the Warden is not Brannok —');
-const warden = await page.evaluate(() =>
-  window.__st.tokens.find(t => /warden/i.test(t.name)));
+// The Warden's body stayed in the glade when the party went down to the crypt
+// (a new map is a new place), so read the beat definition, not the board.
+const warden = await page.evaluate(async () => (await import('/js/state.js')).QUEST.beats.find(b => b.id === 'warden').spawn);
 ck('the Warden beat spawns a stone warden', warden?.art === 'warden',
-   warden ? `${warden.name} · art=${warden.art}` : '(not spawned)');
+   warden ? `${warden.name} · art=${warden.art}` : '(not defined)');
 ck('it is not drawn with the knight art', warden?.art !== 'knight');
+ck('and no other beat mentions a warden, so the DM cannot be led to invent one early', await page.evaluate(async () =>
+  (await import('/js/state.js')).QUEST.beats.filter(b => b.id !== 'warden').every(b => !/warden/i.test(b.objective + (b.reward?.items || []).join(' ')))));
 ck('a warden drawing exists', await page.evaluate(async () =>
   !!(await import('/js/art.js')).TOKEN_ART.warden));
 
