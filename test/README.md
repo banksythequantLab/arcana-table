@@ -38,6 +38,6 @@ mocked except the network: the DM is either stubbed at the route level or, in
 These render the demo video and its assets, and are kept here because they drive
 the same headless browser:
 
-`record.mjs` (the gameplay bed) · `cards.mjs` (title cards) · `diagram.mjs` (the
+`record2.mjs` (the gameplay bed, with the DM's voice and event marks; `record.mjs` was the first cut) · `cards.mjs` (title cards) · `diagram.mjs` (the
 animated architecture model) · `lower-third.mjs` (the strip over the push-up
-footage) · `warm.mjs` (warm-up capture) · `assemble.py` (ffmpeg cut list).
+footage) · `warm.mjs` (warm-up capture) · `assemble2.py` (the cut, from the marks; `assemble.py` was the first).

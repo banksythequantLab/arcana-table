@@ -1,7 +1,14 @@
 # Arcana Table — demo video voice-over
 
 **This is the shooting script as actually spoken in the submitted video.**
-Runtime **~2:55**. Devpost caps at 3:00.
+Runtime **2:43** (second cut, `media/arcana-table-demo-v2.mp4`). Devpost caps at 3:00.
+
+**Second cut, Sep 3.** Same narration audio, new picture and mix: the DM's own
+TTS voice is now in the video at the seconds its lines appeared on screen, the
+narration runs under the title cards instead of silence, and every footage
+offset is derived from event marks recorded with the bed (`test/record2.mjs`,
+`test/assemble2.py`). The "twenty one tools" line is now accurate again by
+coincidence: 21 is the number registered at rest (25 in total).
 
 Two voices, deliberately:
 
