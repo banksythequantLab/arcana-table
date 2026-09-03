@@ -158,6 +158,11 @@ THREE WAYS TO STAKE EFFORT — and they are equals
   cannot do push-ups today; some are stuck on homework; some just did a set. Reach for an
   Oath as readily as reps, especially if they mention something they are avoiding, and
   give it the same weight in your voice: "Swear it. The dishes for the dagger."
+- THE PLAYER CHOSE THEIR CURRENCY. get_fitness_log returns effortPreference with a mayAsk
+  list. Offer only what is on it. This is enforced in the tools, not left to your judgement:
+  ask for push-ups from someone who set "Oaths only" and the call comes back refused, and you
+  will have burned a turn and broken the scene. If it says Oaths only, the Oath is not a
+  substitute for the mechanic — it IS the mechanic, and you offer it with a straight face.
 - ALWAYS call get_fitness_log first. Offer ONLY from availableExercises for reps and ONLY
   from availableHolds for holds — those lists are what this player's body can actually do — and read holdSeconds, oathsKept and
   repsThisSession to vary what you ask for and to ease off when they have done a lot.
@@ -264,8 +269,15 @@ export async function sendToDM(playerText, { silent = false } = {}) {
         `exchanges is a run someone finishes; at ten it is one nobody does.)`);
     }
     if (sinceOffer >= 2 && !state.challenge && !state.oath && !state.downed) {
+      // Name the currency this player actually accepts, or the nudge sends the
+      // DM straight into a refusal it then has to recover from mid-scene.
+      const pref = A.effortPref();
+      const what = pref === 'oaths' ? 'an Oath — this player takes nothing physical, so propose_oath is your only move'
+                 : pref === 'reps'  ? 'a Heroic Effort in reps — this player takes reps only'
+                 : pref === 'holds' ? 'a timed hold — this player takes holds only'
+                 : 'a Heroic Effort, a hold or an Oath';
       nudges.push(`(PACING: ${sinceOffer} exchanges since you last staked anything real. ` +
-        `Offer a Heroic Effort, a hold or an Oath this turn — that is the point of this table.)`);
+        `Offer ${what} this turn — that is the point of this table.)`);
     }
     if (nudges.length) convo.push({ role: 'system', content: nudges.join(' ') });
 
@@ -353,6 +365,9 @@ function boardBrief() {
       // otherwise have to remember to go looking for its own pacing.
       turnsSinceLastOffer: state.fitness.turnsSinceOffer || 0,
       offerOverdue: (state.fitness.turnsSinceOffer || 0) >= 2,
+      // The standing answer on which currency this table may charge in. In the
+      // per-turn context because it is the one thing that must not drift.
+      effortPreference: A.effortPref(),
     },
     warmupRunning: !!state.warmup,
     oathInProgress: state.oath ? { label: state.oath.label, minutes: state.oath.minutes, status: state.oath.status } : null,

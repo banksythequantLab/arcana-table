@@ -26,14 +26,17 @@
      gesture that unlocks the voice, and the copy earns the click. -->
 <div id="intro" class="intro-backdrop">
   <div class="intro-card">
-   <div class="intro-scroll">
+   <!-- A scrolling region, so it is a real tab stop with a real name rather
+        than the unnamed one Chrome hands every overflowing scroller. -->
+   <div class="intro-scroll" tabindex="0" role="region" aria-label="What Arcana Table is">
     <div class="intro-eyebrow">🎲 The WebMCP Challenge</div>
     <h1 class="intro-title">Arcana Table</h1>
     <p class="intro-lede">An AI Dungeon Master is already sitting at this table.
       Tell it what you do — out loud or typed — and it moves the board in front of you.</p>
     <ul class="intro-points">
       <li><b>🎤 Say it or type it.</b> Turn on hands-free and never touch the keyboard.</li>
-      <li><b>💪 Heroic Effort.</b> When a roll matters, the DM stakes something real against the dice: ten push-ups, a thirty-second plank — or an <b>Oath</b>, which is anything in the room this page can't see. Clear the sink. Twenty minutes of study. The table locks until you're back, and it pays exactly the same. Always optional.</li>
+      <li><b>💪 Heroic Effort.</b> When a roll matters, the DM stakes something real against the dice: ten push-ups for +5, a thirty-second plank, twenty-five reps for an outright natural 20. Always optional.</li>
+      <li><b>📜 Or swear an Oath.</b> Can't exercise today? Pay in something this page can't see — clear the sink, twenty minutes of study, the email you're dodging. Same dice, priced in minutes, and the table locks until you're back. Set <i>Anything · Reps · Holds · Oaths only</i> in the Party rail; the DM is held to it.</li>
       <li><b>🤸 Warm up first, if you like.</b> Standing stretches, head to ankle, each with a cue and a coaching note. Six of them in ninety seconds, twelve in three minutes — the DM offers you the choice before the first beat.</li>
       <li><b>🤖 Watch the Agent Log.</b> The DM has no back door: every move is a WebMCP tool call on <code>document.modelContext</code>, the same surface your own agent would use.</li>
     </ul>

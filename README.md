@@ -34,6 +34,20 @@ The Oath is not a consolation prize, and the DM is told so in as many words.
 Some players cannot do push-ups today. Some are stuck on homework. The table
 takes either.
 
+And you decide which of the three it may ask for. In the Party rail —
+**Anything · Reps · Holds · Oaths only** — set once and enforced in
+`propose_challenge` and `propose_oath` themselves, so an ask outside it comes
+back refused with the call the DM should have made instead. That last setting
+matters most: on **Oaths only** the table is fully playable with no physical
+capability at all, at the same prices, for the same dice. It is a setting rather
+than a sentence you say to a model because a preference a model merely knows
+about is one it drifts away from by turn forty; a preference the tool enforces
+is one it cannot.
+
+There is deliberately **no WebMCP tool to change it**. An agent that can widen
+what it is allowed to ask of your body is not a preference, it is a suggestion.
+The player sets it; the tools hold the DM to it.
+
 Runs open with an optional **warm-up** — twenty standing stretches, head to
 ankle, each with its own cue and a timer that advances itself. 90 seconds, 3, 5,
 or 10 minutes. Nothing needs a mat or a floor, and finishing it starts you warm:
@@ -101,7 +115,7 @@ await arcana.call('roll_dice', { formula: 'd20', reason: 'Attack the dragon' })
 | `move_token` | Animated movement, wall-aware | PCs light the whole path they walk |
 | `move_party` | Move the whole party in one call; companions take cells beside the leader | wall-aware · nobody stacks · lifts fog for everyone |
 | `attack` | One attack resolved end to end: to-hit, damage, fog lifted on the target | **reach enforced** — a melee swing out of range is refused, with the cell to move to |
-| `add_token` | Spawn monsters/NPCs/objects | 13 arts · monsters get a per-token tint, stature and facing so two of a kind are not one picture twice |
+| `add_token` | Spawn monsters/NPCs/objects | 15 arts · monsters get a per-token tint, stature and facing so two of a kind are not one picture twice |
 | `remove_token` | Take a token off the board | ⚠ removing a PC waits for player approval |
 | `start_combat` / `end_combat` | Initiative on/off | **dynamically registers/unregisters** the combat tools |
 | `advance_turn` | Next combatant | combat-only |
@@ -217,7 +231,7 @@ npx serve .        # or: python3 -m http.server 8080
 cd test && npm install && npm test
 ```
 
-**264 assertions across nine suites**, Playwright + Chromium, all against the real
+**314 assertions across ten suites**, Playwright + Chromium, all against the real
 page — see `test/README.md` for what each one covers. The largest, `smoke.mjs`,
 drives the full tool surface **through the real `document.modelContext`** — enumerating tools with `getTools()`, invoking
 them with `executeTool()`, asserting `readOnlyHint` on the read tools, and

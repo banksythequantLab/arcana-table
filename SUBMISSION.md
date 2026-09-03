@@ -194,6 +194,20 @@ design commitments in the code rather than assertions:
   or a timed hold, or an **Oath** — which needs no physical capability at all
   and pays exactly the same. This is the accessibility argument the whole
   Heroic Effort design is built around.
+- **And the player picks the currency, not the model.** A control in the Party
+  rail — *Anything · Reps · Holds · Oaths only* — is this table's standing answer
+  on what it may charge in, and it is enforced inside `propose_challenge` and
+  `propose_oath` rather than described in the system prompt. Ask a player set to
+  **Oaths only** for ten push-ups and the tool refuses, names the preference, and
+  hands back `useInstead: "propose_oath"`. On that setting the entire game is
+  playable with no physical capability whatsoever, at identical prices for
+  identical dice. We built it as a gate rather than a prompt line because we had
+  already watched three separate behaviours drift back after a dozen exchanges
+  however firmly the prompt was worded — a preference a model merely knows about
+  is one it forgets, and forgetting this one asks something of a body that its
+  owner already said no to. There is **no tool to change the setting**, only to
+  read it: an agent that can widen what it may ask of you is not a preference.
+  Covered end to end by `test/oath.mjs` (47 assertions).
 - **Mobile.** Two breakpoints (860px and 560px). At phone width the quest rail
   collapses to numbered beats, the panel fills the screen instead of leaving
   dead space, the warm-up goes full-screen, and inputs are 16px so iOS does not
@@ -205,7 +219,7 @@ design commitments in the code rather than assertions:
 Vanilla JS single-page app, zero build step, no backend beyond a ~200-line
 Cloudflare Worker that proxies OpenAI — a canvas-rendered grid board (3 maps,
 fog of war, drag-and-drop tokens), state in localStorage, cel-shaded cartoon
-art. A 264-assertion Playwright suite drives the tools through the real
+art. A 314-assertion Playwright suite drives the tools through the real
 `document.modelContext` — `getTools()`, `executeTool()`, `readOnlyHint` on
 reads, the registry growing and shrinking with combat and with a downed hero,
 both approval outcomes, all three effort modes, the guided warm-up, and a
@@ -298,6 +312,6 @@ disagreements between model families, so a different model usually just works.
 
 - **Live:** https://arcana-table.pages.dev
 - **Code:** https://github.com/banksythequantLab/arcana-table
-- **Tests:** `cd test && npm install && npm test` — 253 assertions across nine
-  suites against the real `document.modelContext`, including the 9 accessibility
+- **Tests:** `cd test && npm install && npm test` — 314 assertions across ten
+  suites against the real `document.modelContext`, including the 11 accessibility
   checks above. `test/README.md` says what each suite covers.

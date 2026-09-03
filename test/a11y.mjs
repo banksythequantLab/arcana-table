@@ -18,9 +18,19 @@ let pass=0, fail=0;
 const ck=(l,c,x='')=>{ c?(pass++,console.log('  ✓ '+l)):(fail++,console.log('  ✗ '+l+' '+x)); };
 
 // 1. the intro gate is reachable and dismissible by keyboard alone
+// Chrome makes an overflowing scroller a tab stop of its own — correct, since a
+// keyboard user has to be able to scroll the copy — so the first stop may be the
+// scrolling region. What matters is that focus is trapped in the gate and the
+// CTA is right there, not that it is stop number one.
 await page.keyboard.press('Tab');
-const first = await page.evaluate(()=>document.activeElement?.id);
-ck('keyboard focus lands inside the intro gate', ['intro-voice','intro-type'].includes(first), first);
+const first = await page.evaluate(()=>({ id: document.activeElement?.id, cls: document.activeElement?.className,
+                                         inGate: !!document.activeElement?.closest('#intro'),
+                                         named: !!document.activeElement?.getAttribute('aria-label') }));
+ck('keyboard focus lands inside the intro gate', first.inGate, JSON.stringify(first));
+ck('and that first stop has a name, scroller or button', !!first.id || first.named, JSON.stringify(first));
+await page.keyboard.press('Tab');
+const second = await page.evaluate(()=>document.activeElement?.id);
+ck('the call to action is within two stops', ['intro-voice','intro-type'].includes(second) || ['intro-voice','intro-type'].includes(first.id), `${first.id||first.cls} → ${second}`);
 await page.evaluate(()=>document.getElementById('intro-type').focus());
 await page.keyboard.press('Enter');
 await page.waitForTimeout(600);

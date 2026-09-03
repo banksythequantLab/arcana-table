@@ -141,10 +141,16 @@ const snag = board.tokens.find(t => t.name === 'Snaggle');
 ck('every token reports reach and range', typeof snag.reach === 'number' && typeof snag.range === 'number',
    `reach ${snag.reach}, range ${snag.range}`);
 ck('the board names who is acting', !!board.actor, board.actor);
-ck('tokens carry distance from the actor', typeof snag.distanceFromActor === 'number',
-   `${snag.distanceFromActor}`);
-ck('and whether it is reachable', typeof snag.inMeleeReach === 'boolean' && typeof snag.inRangedRange === 'boolean',
-   `melee ${snag.inMeleeReach} / ranged ${snag.inRangedRange}`);
+// Initiative is rolled, so Snaggle is sometimes the one acting — and a token
+// correctly reports no distance to itself. Measure from someone else, or this
+// assertion fails on roughly one run in three for the wrong reason.
+const other = board.tokens.find(t => t.name !== board.actor);
+ck('tokens carry distance from the actor', typeof other.distanceFromActor === 'number',
+   `${board.actor} → ${other.name}: ${other.distanceFromActor}`);
+ck('the actor itself reports no distance to itself',
+   board.tokens.find(t => t.name === board.actor)?.distanceFromActor === undefined);
+ck('and whether it is reachable', typeof other.inMeleeReach === 'boolean' && typeof other.inRangedRange === 'boolean',
+   `melee ${other.inMeleeReach} / ranged ${other.inRangedRange}`);
 ck('tokens say whether they are visible', typeof snag.visible === 'boolean');
 
 ck('no page errors', errs.length === 0, errs.slice(0, 2).join(' | '));

@@ -200,6 +200,17 @@ export function warmupSeq(plan) {
 // Oaths a DM can reach for when a player would rather spend effort than sweat.
 export const OATH_KINDS = ['chores', 'study', 'reading', 'practice', 'admin', 'tidy'];
 
+// Not everyone can pay in push-ups, and not everyone wants to. The table takes
+// three currencies and this is the player's standing answer on which of them it
+// may ask for. It is enforced in the tools rather than described in the prompt,
+// because a preference the DM merely knows about is one it forgets by turn six.
+export const EFFORT_PREFS = {
+  any:   { label: 'Anything',   hint: 'reps, holds and Oaths',                   modes: ['reps', 'hold'], oaths: true },
+  reps:  { label: 'Reps',       hint: 'push-ups, squats — counted',              modes: ['reps'],         oaths: false },
+  holds: { label: 'Holds',      hint: 'planks, wall sits — timed',               modes: ['hold'],         oaths: false },
+  oaths: { label: 'Oaths only', hint: 'chores, study, reading — nothing physical', modes: [],             oaths: true },
+};
+
 const STORAGE_KEY = 'arcana-table-v1';
 
 function freshState() {
@@ -236,6 +247,7 @@ function freshState() {
     warmup: null,                 // {planId, index, seq, hold, count, remaining, paused}
     oath: null,                   // {label, kind, minutes, endsAt, reward} — the table waits
     settings: { autoApprove: false,
+                effortPref: 'any',        // which of the three currencies the table may ask for
                 exercisePool: ['push-ups', 'crunches', 'jumping jacks', 'squats'],
                 holdPool: ['plank', 'wall sit', 'squat hold', 'glute bridge'] },
   };

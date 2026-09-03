@@ -6,6 +6,7 @@ import {
   state, save, findToken, isWalkable, GRID_W, GRID_H, MAPS, QUEST,
   REACH, DEFAULT_REACH, gridDistance,
   DEATH_SAVE_DC, DEATH_SAVE_FAILS, STRETCHES, WARMUP_PLANS, warmupSeq, OATH_KINDS,
+  EFFORT_PREFS,
 } from './state.js';
 
 const listeners = new Set();
@@ -75,6 +76,47 @@ export function allowedExercises() {
 export function allowedHolds() {
   const pool = state.settings.holdPool;
   return Array.isArray(pool) && pool.length ? pool.filter(e => HOLDS.includes(e)) : HOLDS;
+}
+
+// ── which currency this table may charge in ──────────────────────────────────
+// A player who cannot exercise had to say so out loud and hope the DM kept
+// remembering it. Now they set it once and the TOOLS refuse the wrong kind of
+// ask, which is the only version of a preference a language model cannot drift
+// away from. Unknown or missing (an old save) reads as "anything".
+export { EFFORT_PREFS };
+
+export function effortPref() {
+  const p = state.settings?.effortPref;
+  return EFFORT_PREFS[p] ? p : 'any';
+}
+
+export function setEffortPref(pref) {
+  if (!EFFORT_PREFS[pref]) return { error: `Unknown preference "${pref}". Choose: ${Object.keys(EFFORT_PREFS).join(', ')}.` };
+  if (!state.settings) state.settings = {};
+  state.settings.effortPref = pref;
+  emit('fitness');
+  return { effortPreference: pref, label: EFFORT_PREFS[pref].label };
+}
+
+/** Null if this kind of ask is allowed, otherwise the refusal the DM should read. */
+function effortGate(kind) {          // kind: 'reps' | 'hold' | 'oath'
+  const pref = effortPref();
+  if (pref === 'any') return null;
+  const p = EFFORT_PREFS[pref];
+  const ok = kind === 'oath' ? p.oaths : p.modes.includes(kind);
+  if (ok) return null;
+  const instead = pref === 'oaths'
+    ? 'Call propose_oath instead — something real in the room, priced in minutes. It pays exactly the same.'
+    : pref === 'reps'
+      ? 'Call propose_challenge with mode "reps" instead.'
+      : 'Call propose_challenge with mode "hold" instead.';
+  const asked = kind === 'oath' ? 'An Oath' : kind === 'hold' ? 'A timed hold' : 'A rep exercise';
+  return {
+    error: `This player has set their effort preference to "${p.label}" (${p.hint}). ` +
+           `${asked} is not something they have agreed to be asked for. ${instead}`,
+    effortPreference: pref,
+    useInstead: pref === 'oaths' ? 'propose_oath' : 'propose_challenge',
+  };
 }
 
 /** What this player may be asked for in a given mode. */
@@ -575,6 +617,8 @@ export function proposeChallenge({ exercise, reps, reward, reason = '', mode = '
   if (state.challenge) return { error: 'A challenge is already in progress — resolve it first.' };
   if (state.oath) return { error: 'The player is away keeping an Oath. Wait for them.' };
   mode = mode === 'hold' ? 'hold' : 'reps';
+  const gate = effortGate(mode);
+  if (gate) return gate;
   exercise = String(exercise || '').toLowerCase();
   // Validate against the list for THIS mode — a plank is not a rep exercise and
   // push-ups are not a hold, and checking one against the other rejects both.
@@ -707,6 +751,8 @@ const oathWaiters = new Map();
 export function proposeOath({ label, kind = 'chores', minutes, reward, reason = '' }) {
   if (state.oath) return { error: 'An Oath is already being kept. Wait for the player to come back.' };
   if (state.challenge) return { error: 'A challenge is already in progress — resolve it first.' };
+  const gate = effortGate('oath');
+  if (gate) return gate;
   label = String(label || '').trim().slice(0, 90);
   if (!label) return { error: 'Say what the Oath actually is, e.g. "clear the sink" or "read 10 pages".' };
   kind = OATH_KINDS.includes(String(kind).toLowerCase()) ? String(kind).toLowerCase() : 'chores';
@@ -1102,12 +1148,24 @@ export function getFitnessLog() {
     turnsSinceLastOffer: state.fitness.turnsSinceOffer || 0,
     offerOverdue: (state.fitness.turnsSinceOffer || 0) >= 2,
     oathKinds: OATH_KINDS,
+    effortPreference: {
+      setting: effortPref(),
+      label: EFFORT_PREFS[effortPref()].label,
+      mayAsk: [
+        ...EFFORT_PREFS[effortPref()].modes.map(m => m === 'hold' ? 'propose_challenge mode "hold"' : 'propose_challenge mode "reps"'),
+        ...(EFFORT_PREFS[effortPref()].oaths ? ['propose_oath'] : []),
+      ],
+      note: effortPref() === 'any'
+        ? 'This player takes all three. Vary between them.'
+        : `The player set this themselves. Anything outside mayAsk is REFUSED by the tool, not merely discouraged — do not spend a turn discovering that.`,
+    },
     coachNote: [
       'PRICE LIST: effortScale maps how much you ask for to what it is worth — 5 reps or 20s for +2, 10 or 30s for +5, 15 or 45s for +8, 25 or 90s for a natural 20. Ask bigger, pay bigger. Omit the reward and the size of the ask picks one.',
       'PACING: stake something real about every SECOND exchange. If offerOverdue is true you are already late — offer on this turn unless a hero is down or the player is mid-challenge.',
       'Three ways to stake effort, and they are equals — never treat the Oath as the lesser option.',
       'reps: countable, tapped or counted out loud. hold: a timed hold, the ring counts itself down.',
       'oath: something real in the room the app cannot see. It locks the table for the minutes agreed.',
+      'READ effortPreference FIRST and offer only what mayAsk lists — the tools refuse the rest.',
       'Offer ONLY from availableExercises for mode "reps", and ONLY from availableHolds for mode "hold" — the player chose them.',
       'Vary muscle groups; scale down if they are slowing. Everything here is always optional.',
     ].join(' '),

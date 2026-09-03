@@ -404,6 +404,11 @@ export async function initTools() {
     currentStretch: () => A.currentStretch(),
     skipStretch: () => A.skipStretch(),
     finishWarmup: (o) => A.finishWarmup(o || { early: true }),
+    // Which currency the table may charge in. Deliberately NOT a WebMCP tool:
+    // an agent that can widen what it is allowed to ask of a body is not a
+    // preference, it is a suggestion. The player sets it, the tools enforce it.
+    effortPref: () => A.effortPref(),
+    setEffortPref: (p) => A.setEffortPref(p),
   };
   window.__st = state;                 // tests reach in to fast-forward clocks
   emit('agent');

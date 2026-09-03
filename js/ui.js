@@ -80,6 +80,7 @@ export function initUI() {
   bindChallengeModal();
   bindWarmup();
   bindOath();
+  bindEffortPref();
   bindSay();
   bindIntro();
   onChange(render);
@@ -259,10 +260,31 @@ function renderParty() {
     + (others.length ? `<div class="others"><b>On the board:</b> ${others.map(t => `${esc(t.name)} (${t.hp}/${t.maxHp})`).join(' · ')}</div>` : '');
 
   const f = state.fitness;
+  const pref = A.effortPref();
   $('#fitness-panel').innerHTML = `
     <b>💪 Heroic Effort</b>
-    <div class="fit-row"><span>${f.totalReps}</span> total reps · <span>${f.challengesDone}</span> challenges</div>
-    ${Object.entries(f.byExercise).map(([k, v]) => `<div class="fit-ex">${esc(k)} <b>${v}</b></div>`).join('') || '<div class="fit-ex"><i>No sweat spilled yet.</i></div>'}`;
+    <div class="fit-row"><span>${f.totalReps}</span> total reps · <span>${f.oathsKept}</span> Oaths kept</div>
+    ${Object.entries(f.byExercise).map(([k, v]) => `<div class="fit-ex">${esc(k)} <b>${v}</b></div>`).join('') || '<div class="fit-ex"><i>No sweat spilled yet.</i></div>'}
+    <div class="pref-label" id="pref-label">The table may ask me for</div>
+    <div class="pref-row" role="radiogroup" aria-labelledby="pref-label">
+      ${Object.entries(A.EFFORT_PREFS).map(([k, p]) => `
+        <button type="button" class="pref${k === pref ? ' on' : ''}" data-pref="${k}"
+                role="radio" aria-checked="${k === pref}" title="${esc(p.hint)}">${esc(p.label)}</button>`).join('')}
+    </div>
+    <div class="pref-hint">${esc(A.EFFORT_PREFS[pref].hint)}. Change it any time — the DM is held to it.</div>`;
+}
+
+// The fitness panel is redrawn wholesale on every fitness event, so the
+// preference buttons cannot own their handlers. Delegate once, at boot.
+function bindEffortPref() {
+  $('#fitness-panel').addEventListener('click', e => {
+    const b = e.target.closest('[data-pref]');
+    if (!b) return;
+    A.setEffortPref(b.dataset.pref);
+    const p = A.EFFORT_PREFS[b.dataset.pref];
+    A.logStory('challenge', 'You', `📜 The table may now ask for: ${p.label.toLowerCase()} — ${p.hint}.`);
+    A.emit('story');
+  });
 }
 
 // ── agent log + approvals ────────────────────────────────────────────────────
