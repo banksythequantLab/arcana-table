@@ -73,11 +73,14 @@ v = VOS
 # title card and the warm-up card appearing, and Derek comes in after it has
 # had the floor. Before this the DM only ever spoke under the narration, ducked,
 # and nobody got to hear what the product actually sounds like.
-SOLO = 14.0
-SOLO2 = 10.0
+TASTE = 4.4        # the DM's first clause, alone, after Derek introduces it
+SOLO2 = 10.0       # the Oath answered, in the DM's voice — it is narrating the game
 CUT = [
     ('card',  'open',   2.0,                                   None),
-    ('shot',  None,     v['vo01_problem'] + v['vo02_whatitis'] - 2.0 + SOLO, at('warm_offer', 37.0, 0.9)),
+    ('shot',  None,     v['vo01_problem'] + v['vo02_whatitis'] - 2.0, at('table', 31.4, 0.3)),
+    # "...everything it says, it makes true on the board." — and then it says
+    # something: one clause, alone, while the warm-up card appears.
+    ('shot',  None,     TASTE,                                 at('warm_offer', 37.0, 0.6)),
     ('card',  'webmcp', 4.5,                                   None),
     ('model', None,     v['vo03a_nobackdoor'] + v['vo03b_contract'] - 4.5, 0.4),
     ('card',  'heroic', 2.0,                                   None),
@@ -140,16 +143,13 @@ silent = BUILD / 'video_silent.mp4'
 run(['ffmpeg','-y','-loglevel','error','-f','concat','-safe','0','-i',str(listing),'-c','copy',str(silent)])
 
 # ── Derek's narration: continuous, starting on each card ─────────────────────
-ORDER = ['vo01_problem','vo02_whatitis','vo03a_nobackdoor','vo03b_contract','vo04_heroic',
-         'vo07_swap','vo04b_payoff','vo08_oath',None,'vo10_brain','vo05_hood_trim','vo06_close']
+ORDER = ['vo01_problem','vo02_whatitis',('sil', TASTE),'vo03a_nobackdoor','vo03b_contract','vo04_heroic',
+         'vo07_swap','vo04b_payoff','vo08_oath',('sil', SOLO2),'vo10_brain','vo05_hood_trim','vo06_close']
 apieces = []
-lead = BUILD / 'a_lead.wav'
-run(['ffmpeg','-y','-loglevel','error','-f','lavfi','-i','anullsrc=channel_layout=stereo:sample_rate=48000','-t',f'{SOLO:.3f}',str(lead)])
-apieces.append(lead)
 for j, name in enumerate(ORDER):
     out = BUILD / f'a{j:02d}.wav'
-    if name is None:      # the DM's solo after the Oath
-        run(['ffmpeg','-y','-loglevel','error','-f','lavfi','-i','anullsrc=channel_layout=stereo:sample_rate=48000','-t',f'{SOLO2:.3f}',str(out)])
+    if isinstance(name, tuple):      # a hole for the DM to speak in
+        run(['ffmpeg','-y','-loglevel','error','-f','lavfi','-i','anullsrc=channel_layout=stereo:sample_rate=48000','-t',f'{name[1]:.3f}',str(out)])
     else:
         run(['ffmpeg','-y','-loglevel','error','-i',str(VO/f'{name}.wav'),
              '-ar','48000','-ac','2','-af','loudnorm=I=-17:TP=-1.5:LRA=11',str(out)])
@@ -165,15 +165,16 @@ run(['ffmpeg','-y','-loglevel','error','-f','concat','-safe','0','-i',str(alist)
 # ── the DM's voice, at the seconds its words appeared on screen ──────────────
 # Lines that would play under the wrong picture. 03 is the DM narrating a miss,
 # and it begins a tenth of a second before the cut into the Oath card.
-SKIP_DM = {'dm/03.mp3'}
+SKIP_DM = {'dm/03.mp3', 'dm/00.mp3'}     # 00 is heard as the four-second taste instead
 # The Oath-answered line is spoken a few seconds after the card closes, while
 # the DM's turn is still running tools. Pin it to the shot of the card closing
 # instead — that is the picture its words describe.
-solo2_video = sum(l for (k, s, l, st) in CUT[:10])          # video time of CUT[10]
-# The opening line starts on the title card, not three seconds into the shot —
-# five seconds of silence at the top of a demo is five seconds of a judge leaving.
-PIN_DM = {'dm/00.mp3': 0.5, 'dm/04.mp3': solo2_video + 0.9}
-placed = []
+taste_video = sum(l for (k, s, l, st) in CUT[:2])           # video time of CUT[2]
+solo2_video = sum(l for (k, s, l, st) in CUT[:11])          # video time of CUT[11]
+PIN_DM = {'dm/04.mp3': solo2_video + 0.9}
+# Derek introduces the DM; then it speaks — one clause, four seconds, alone.
+EXTRA_DM = [(taste_video + 0.15, BED / 'dm/00_taste.mp3', 'The Ember Crown is burning the marshes… (taste)')]
+placed = list(EXTRA_DM)
 for c in dmclips:
     if c['file'] in SKIP_DM: continue
     if c['file'] in PIN_DM:
