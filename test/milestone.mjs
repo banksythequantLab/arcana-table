@@ -23,6 +23,9 @@ await page.waitForFunction(() => window.arcana);
 await page.evaluate(() => localStorage.clear());
 await page.reload(); await page.waitForFunction(() => window.arcana);
 await page.click('#intro-type');
+// The table now opens with the warm-up card already up (the pre-recorded opening); clear it like a player would.
+await page.waitForSelector('#warm-offer:not([hidden])', { timeout: 3000 }).catch(() => {});
+if (await page.isVisible('#warm-offer-no').catch(() => false)) { await page.click('#warm-offer-no'); await page.waitForTimeout(150); }
 
 let pass = 0, fail = 0;
 const ck = (l, ok, x = '') => { ok ? pass++ : fail++; console.log(`  ${ok ? '✓' : '✗ FAIL'} ${l}${x ? '  ' + x : ''}`); };
@@ -66,6 +69,8 @@ ck('it is not a modal — you can still type', await page.isEnabled('#say'));
 console.log('— the rewards escalate across the run —');
 const paid = [{ gold: r1.paid.gold, boon: r1.paid.boon }];
 for (let i = 0; i < 3; i++) {
+  // beats are cleared over the body: put down whatever the last beat spawned
+  await page.evaluate(() => { window.__st.tokens.filter(t => t.kind === 'monster').forEach(t => { t.hp = 0; }); });
   const r = await call('advance_quest', { summary: 'Onward.' });
   if (r.paid) paid.push({ gold: r.paid.gold, boon: r.paid.boon });
 }
@@ -90,6 +95,36 @@ ck('a levelled hero hits harder', await page.evaluate(async () => {
 }), 'level adds to every swing');
 ck('every beat banks a boon', paid.every(p => !!p.boon), paid.map(p => p.boon).join(' · '));
 
+console.log('— a beat is cleared over the body, not around it —');
+// "The guard got hit and advanced a level — the guard still isn't dead."
+await page.evaluate(async () => {
+  const A = await import('/js/actions.js');
+  A.resetQuest();
+  window.__st.tokens = window.__st.tokens.filter(t => t.kind !== 'monster');
+  const pc = window.__st.tokens.find(t => t.kind === 'pc');
+  A.addToken({ name: 'Drowned Guard', kind: 'monster', art: 'skeleton', x: pc.x + 1, y: pc.y, hp: 14 });
+  A.startCombat({});
+});
+const midFight = await call('advance_quest', { summary: 'One hit and we move on.' });
+ck('advance_quest is REFUSED while a fight is on', !!midFight.error && midFight.combatActive === true, (midFight.error || '').slice(0, 80));
+ck('and it names who is still standing', (midFight.standing || []).includes('Drowned Guard'));
+ck('the beat did not move', await page.evaluate(() => window.__st.quest.beatIndex) === 0);
+await page.evaluate(async () => {
+  window.__st.tokens.find(t => t.name === 'Drowned Guard').hp = 0;
+  (await import('/js/actions.js')).endCombat();
+});
+ck('once the guard is down and the fight is over, it advances', (await call('advance_quest', { summary: 'The guard goes under.' })).ok === true);
+// The Warden beat owns its monster: reaching beat 4 spawns it, and beat 4 is
+// not cleared while it lives — even with no initiative running.
+await page.evaluate(() => { window.__st.tokens.filter(t => t.kind === 'monster').forEach(t => { t.hp = 0; }); });
+await call('advance_quest', { summary: 'vault' });
+await page.evaluate(() => { window.__st.tokens.filter(t => t.kind === 'monster').forEach(t => { t.hp = 0; }); });
+await call('advance_quest', { summary: 'glade' });          // → beat 4, Warden spawns
+const wardenUp = await call('advance_quest', { summary: 'we sneak past' });
+ck('the Warden beat refuses to clear while the Warden stands', !!wardenUp.error && wardenUp.mustDefeat === 'The Waking Warden', (wardenUp.error || '').slice(0, 70));
+await page.evaluate(() => { const w = window.__st.tokens.find(t => t.name === 'The Waking Warden'); if (w) w.hp = 0; });
+ck('and clears over its body', (await call('advance_quest', { summary: 'The Warden breaks.' })).ok === true);
+
 console.log('— and the Warden is not Brannok —');
 const warden = await page.evaluate(() =>
   window.__st.tokens.find(t => /warden/i.test(t.name)));
@@ -109,9 +144,18 @@ const escapable = async (sel, label) => {
 };
 
 // Every state that can appear, not just the two that used to be checked.
-await page.evaluate(async () => (await import('/js/actions.js'))
-  .proposeChallenge({ mode: 'reps', exercise: 'push-ups', reps: 10, reward: 'nat20', reason: 'x' }));
-await page.waitForSelector('#challenge-modal:not([hidden])');
+// proposeChallenge parks on a promise until the player answers — never await it
+// to completion from a test; race it against a tick and read the DOM.
+const offered = await page.evaluate(async () => {
+  const A = await import('/js/actions.js');
+  window.__st.challenge = null; window.__st.tasks = null; window.__st.oath = null; window.__st.warmup = null;
+  return Promise.race([
+    A.proposeChallenge({ mode: 'reps', exercise: 'push-ups', reps: 10, reward: 'nat20', reason: 'x' }),
+    new Promise(r => setTimeout(() => r({ parked: true }), 300)),
+  ]);
+});
+ck('a challenge can be offered', !offered?.error, JSON.stringify(offered).slice(0, 80));
+await page.waitForSelector('#challenge-modal:not([hidden])', { timeout: 5000 });
 await escapable('#chal-decline', 'a challenge being offered');
 await page.evaluate(async () => (await import('/js/actions.js')).declineChallenge());
 await page.waitForTimeout(200);

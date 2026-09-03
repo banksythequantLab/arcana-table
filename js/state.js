@@ -140,6 +140,20 @@ export const REACH = {
 };
 export const DEFAULT_REACH = { reach: 1, range: 0 };
 
+// To-hit was a bare d20 against AC, for everyone. Brannok is AC 17, so every
+// monster in the game needed a 17 or better to touch him — one swing in five —
+// and a whole run went by without a hero taking a point of damage. These are
+// added to the d20. Heroes: ability modifier plus proficiency. Monsters: what
+// a creature of that stature should threaten.
+export const ATTACK_BONUS = {
+  knight: 5, wizard: 4, villager: 1,
+  goblin: 3, skeleton: 3, wolf: 4, rat: 2, ooze: 2, spider: 4,
+  wraith: 5, ogre: 5, dragon: 7, warden: 6, wight: 7,
+  chest: 0,
+};
+export const DEFAULT_ATTACK_BONUS = 3;
+export const attackBonusOf = t => ATTACK_BONUS[t?.art] ?? DEFAULT_ATTACK_BONUS;
+
 /** Grid distance, diagonals counting as one square. */
 export function gridDistance(a, b) {
   return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));

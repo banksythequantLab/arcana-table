@@ -4,7 +4,7 @@
 
 import {
   state, save, findToken, isWalkable, GRID_W, GRID_H, MAPS, QUEST,
-  REACH, DEFAULT_REACH, gridDistance,
+  REACH, DEFAULT_REACH, gridDistance, attackBonusOf,
   DEATH_SAVE_DC, DEATH_SAVE_FAILS, STRETCHES, WARMUP_PLANS, warmupSeq, OATH_KINDS,
   EFFORT_PREFS,
 } from './state.js';
@@ -132,11 +132,13 @@ export function parseFormula(formula) {
   return { n: Math.min(parseInt(m[1] || '1', 10), 20), sides: parseInt(m[2], 10), mod: parseInt(m[3] || '0', 10) };
 }
 
-export function rollDice({ formula = 'd20', reason = '' } = {}) {
+export function rollDice({ formula = 'd20', reason = '', forPlayer = true } = {}) {
   const p = parseFormula(formula);
   if (!p) return { error: `Could not parse dice formula "${formula}". Try "d20", "2d6+3".` };
 
-  const b = state.boosts;
+  // Heroic boosts belong to the player. A monster's swing must never spend the
+  // natural 20 someone just did push-ups for — which it could, and did.
+  const b = forPlayer ? state.boosts : { bonus: 0, advantage: false, setRoll: null };
   const boostsUsed = [];
   let rolls = [];
 
@@ -457,22 +459,29 @@ export function attack({ attackerId, targetId, kind = 'melee', damage, reason = 
   const fireball = kind === 'spell' && d > 1;
 
   // Through rollDice, so a Heroic Effort boost spends itself on the swing.
-  const roll = rollDice({ formula: 'd20', reason: reason || `${a.name} attacks ${t.name}` });
+  const roll = rollDice({ formula: 'd20', reason: reason || `${a.name} attacks ${t.name}`, forPlayer: a.kind === 'pc' });
   const ac = t.ac ?? 12;
-  const hit = roll.nat20 || (!roll.nat1 && roll.total >= ac);
+  // d20 + the attacker's bonus against AC. It used to be the bare die, and
+  // nothing in the game could reliably touch a knight in plate.
+  const atk = attackBonusOf(a);
+  const toHit = roll.total + atk;
+  const hit = roll.nat20 || (!roll.nat1 && toHit >= ac);
   // A swing should be visible on the board, not only readable in the log — an
   // arc from the attacker through the target, so you can see who went at whom.
   // Set before the hit check, because a miss is a swing too.
   if (melee) state.swingFx = { from: { x: a.x, y: a.y }, to: { x: t.x, y: t.y }, crit: !!roll.nat20, hit, t: Date.now() };
 
   if (!hit) {
-    logStory('combat', a.name, `swings at ${t.name} and misses.`);
+    logStory('combat', a.name, `swings at ${t.name} and misses (${roll.total}+${atk} = ${toHit} vs AC ${ac}).`);
     emit('combat');
-    return { ok: true, hit: false, roll: roll.total, nat1: roll.nat1, targetAc: ac, distance: d, kind };
+    return { ok: true, hit: false, roll: roll.total, attackBonus: atk, toHit, nat1: roll.nat1, targetAc: ac, distance: d, kind };
   }
 
   // A level should be felt when you swing, not only on the character sheet.
-  const lvl = a.kind === 'pc' ? (state.party.level || 1) : 1;
+  // Everyone scales with the party's level: heroes hit harder as they level,
+  // and so does what they are fighting, or a level-five party with seventy
+  // hit points shrugs off the same six-damage goblins it met in the hall.
+  const lvl = state.party.level || 1;
   const base = Number(damage) || (roll.nat20 ? 12 : 6);
   const dmg = Math.max(1, Math.round(base + (lvl - 1) * 2));
   const after = updateHp({ tokenId: t.id, delta: -dmg });
@@ -496,7 +505,7 @@ export function attack({ attackerId, targetId, kind = 'melee', damage, reason = 
   }
 
   emit('combat');
-  return { ok: true, hit: true, critical: !!roll.nat20, roll: roll.total, targetAc: ac,
+  return { ok: true, hit: true, critical: !!roll.nat20, roll: roll.total, attackBonus: atk, toHit, targetAc: ac,
            damage: dmg, distance: d, kind, target: t.name, fireball,
            splash: splash.length ? splash : undefined,
            targetHp: after.hp, targetDown: after.down, boosts: roll.boostsUsed };
@@ -1294,6 +1303,30 @@ export function advanceQuest({ summary = '' } = {}) {
   if (timeStopped()) return { error: 'A hero is down and time has stopped. Get them up before the story moves on.' };
   const beat = QUEST.beats[q.beatIndex];
   if (!beat) return { error: 'No beat is in progress.' };
+
+  // "The guard got hit and advanced a level — the guard still isn't dead."
+  // A beat is not cleared while the fight for it is still on. Either the party
+  // finishes it, or it genuinely gets away (end_combat first, deliberately). And
+  // a beat that owns a named monster — the Warden, the Wight — is cleared over
+  // that monster's body, not around it.
+  if (state.combat.active) {
+    const standing = state.tokens.filter(t => t.kind === 'monster' && t.hp > 0).map(t => t.name);
+    return {
+      error: `A fight is still on — ${standing.length ? standing.join(', ') + (standing.length > 1 ? ' are' : ' is') + ' still standing' : 'initiative is still running'}. ` +
+             `Finish it, then advance. If the party truly slips away instead, call end_combat first and say so — but a beat is not cleared mid-swing.`,
+      combatActive: true, standing,
+    };
+  }
+  const owned = beat.boss || beat.spawn;
+  if (owned) {
+    const alive = state.tokens.find(t => t.kind === 'monster' && t.name === owned.name && t.hp > 0);
+    if (alive) {
+      return {
+        error: `${alive.name} still stands (${alive.hp}/${alive.maxHp}). This beat is cleared over its body, not around it.`,
+        mustDefeat: alive.name, hp: alive.hp,
+      };
+    }
+  }
 
   q.completed.push({ id: beat.id, title: beat.title, at: Date.now(), summary: String(summary || '').slice(0, 240) });
   logStory('quest', 'DM', `✦ ${beat.title} — complete. ${summary}`.trim());

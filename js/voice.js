@@ -216,7 +216,7 @@ function handleChallengeSpeech(heard) {
 }
 
 // ── voice ───────────────────────────────────────────────────────────────────
-export async function say(text) {
+export async function say(text, { url: prebaked = null } = {}) {
   if (voice.muted || !text) return;
   const line = String(text).replace(/\*+/g, '').slice(0, 900);
 
@@ -239,6 +239,11 @@ export async function say(text) {
   emit('voice');
 
   try {
+    if (prebaked) {
+      // A line that is always the same ships as a file: no model call, no TTS
+      // round trip, the DM is talking within a second of the click.
+      try { await playUrl(prebaked); return; } catch { /* fall through to TTS */ }
+    }
     const r = await fetch(`${DM_ENDPOINT}/speak`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

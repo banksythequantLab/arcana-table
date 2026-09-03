@@ -65,6 +65,8 @@ const turns = () => page.evaluate(async () =>
   (await import('/js/dm.js')).chat.messages.filter(m => m.role === 'user').map(m => m.text));
 
 await page.click('#intro-voice');                 // hands-free, the path that broke
+await page.waitForSelector('#warm-offer:not([hidden])', { timeout: 3000 }).catch(() => {});
+if (await page.isVisible('#warm-offer-no').catch(() => false)) { await page.click('#warm-offer-no'); await page.waitForTimeout(150); }
 // The opening line is spoken immediately, so the mic is legitimately shut for a
 // moment; what matters is that hands-free is on and the ear opens once it can.
 // Assert the wait itself: re-reading afterwards races the next spoken line,

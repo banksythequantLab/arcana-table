@@ -35,6 +35,10 @@ await page.evaluate(()=>document.getElementById('intro-type').focus());
 await page.keyboard.press('Enter');
 await page.waitForTimeout(600);
 ck('the gate can be dismissed with the keyboard', await page.isHidden('#intro'));
+// The warm-up offer card follows the gate now; a keyboard user must be able to leave it too.
+await page.waitForSelector('#warm-offer:not([hidden])', { timeout: 3000 }).catch(() => {});
+if (await page.isVisible('#warm-offer-no').catch(() => false)) { await page.evaluate(() => document.getElementById('warm-offer-no').focus()); await page.keyboard.press('Enter'); await page.waitForTimeout(150); }
+ck('the warm-up card can be dismissed with the keyboard too', await page.isHidden('#warm-offer'));
 
 // 2. every interactive control is focusable and named
 const unlabeled = await page.evaluate(()=>{

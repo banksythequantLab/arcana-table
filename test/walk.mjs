@@ -26,6 +26,9 @@ await page.waitForFunction(() => window.arcana);
 await page.evaluate(() => localStorage.clear());
 await page.reload(); await page.waitForFunction(() => window.arcana);
 await page.click('#intro-type');
+// The table now opens with the warm-up card already up (the pre-recorded opening); clear it like a player would.
+await page.waitForSelector('#warm-offer:not([hidden])', { timeout: 3000 }).catch(() => {});
+if (await page.isVisible('#warm-offer-no').catch(() => false)) { await page.click('#warm-offer-no'); await page.waitForTimeout(150); }
 await page.waitForTimeout(400);
 
 let pass = 0, fail = 0;

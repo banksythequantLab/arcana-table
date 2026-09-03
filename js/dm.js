@@ -13,6 +13,19 @@ import { say } from './voice.js';
 export { DM_ENDPOINT };
 
 const MAX_TOOL_HOPS = 6;      // tool → result → tool … before we must speak
+
+// An offer described in prose is an offer that never happened: no card, no
+// clock, no button, nothing for the player to accept. The player saw exactly
+// this — "Five push-ups would put a +2 edge on your next roll, if you want to
+// stake effort before the clash" — and the tool was never called. However the
+// prompt is worded the model drifts back to narrating the bargain, so the loop
+// refuses a reply that reads like one and sends it back to make the call.
+const OFFER_WORDS  = /\b(push-?ups?|squats?|crunch(?:es)?|jumping jacks?|lunges?|burpees?|planks?|wall sits?|sit-?ups?|high knees|mountain climbers|glute bridges?|dead hangs?|hollow holds?|oath|swear|dishes|the sink|minutes? of (?:study|reading|practice)|reps?)\b/i;
+const REWARD_WORDS = /(\+\s?\d|natural (?:twenty|20)|nat ?20|advantage|edge on|bonus|(?:on|to) your next (?:roll|swing|check|attack)|stake|wager|buy you|buys you|earn you|earns you)/i;
+export function looksLikeProseOffer(text) {
+  const s = String(text || '');
+  return OFFER_WORDS.test(s) && REWARD_WORDS.test(s);
+}
 const HISTORY_TURNS = 22;
 
 export const chat = {
@@ -182,6 +195,11 @@ THREE WAYS TO STAKE EFFORT — and they are equals
   repsThisSession to vary what you ask for and to ease off when they have done a lot.
 - Offer it in character and make it feel earned: "The wyrm rears back. Ten push-ups, and
   I'll let the fates hand you a twenty."
+- AN OFFER IS A TOOL CALL, NEVER A SENTENCE. If you catch yourself writing "five push-ups
+  would give you +2" you have made a mistake: nothing appeared on the table and the player
+  cannot accept it. Call propose_challenge (or propose_task_list / propose_oath) FIRST, then
+  speak the one-line flourish. A reply that describes a bargain without the call is sent
+  back to you unspoken.
 - ALWAYS optional. If they decline, roll normally, never nag, never moralize, and never
   mention it again that turn.
 - OFFER EVERY OTHER ROLL, AND THE DICE ENFORCE IT. This is the point of the whole
@@ -311,6 +329,8 @@ export async function sendToDM(playerText, { silent = false } = {}) {
     if (nudges.length) convo.push({ role: 'system', content: nudges.join(' ') });
 
     let spoke = false;
+    let offeredThisTurn = false;          // did a propose_* tool actually run?
+    let bouncedProseOffer = false;        // refuse a prose offer once, never loop
     for (let hop = 0; hop <= MAX_TOOL_HOPS; hop++) {
       const reply = await ask(convo, tools);
 
@@ -319,6 +339,7 @@ export async function sendToDM(playerText, { silent = false } = {}) {
         for (const call of reply.tool_calls) {
           let args = {};
           try { args = JSON.parse(call.function.arguments || '{}'); } catch { /* model slip */ }
+          if (/^propose_/.test(call.function.name)) offeredThisTurn = true;
           const result = await runTool(call.function.name, args);
           convo.push({
             role: 'tool',
@@ -336,6 +357,22 @@ export async function sendToDM(playerText, { silent = false } = {}) {
       }
 
       const text = (reply.content || '').trim();
+      // The bargain has to be a CARD. If the reply reads like an offer and no
+      // propose_* tool ran this turn, it does not reach the player: it goes back
+      // with the instruction to make the call, once. If the model still will not,
+      // the second version is spoken rather than leaving the turn silent.
+      const nothingStaked = !state.challenge && !state.tasks && !state.oath;
+      if (text && !offeredThisTurn && nothingStaked && !bouncedProseOffer && looksLikeProseOffer(text)) {
+        bouncedProseOffer = true;
+        A.logStory('quest', 'table', '⚠ The DM described a bargain in words instead of putting it on the table — sent back to make the call.');
+        convo.push({ role: 'assistant', content: text });
+        convo.push({ role: 'system', content:
+          '(You just DESCRIBED an offer in prose: "' + text.slice(0, 160).replace(/"/g, "'") + '…". ' +
+          'A described offer does not exist — there is no card, no clock, nothing for the player to accept. ' +
+          'Call propose_challenge, propose_task_list or propose_oath NOW with exactly what you described, ' +
+          'then say one short line. Do not repeat the offer in words.)' });
+        continue;
+      }
       if (text) { chat.messages.push({ role: 'dm', text, t: Date.now() }); spoke = true; say(text); }
       break;
     }
@@ -406,9 +443,24 @@ function boardBrief() {
 }
 
 /** Opening beat, once, when the table is fresh. */
+// The first line is always the same line, so it is not generated: no GPT call,
+// no TTS round trip. The player clicks in and the DM is already talking, and the
+// warm-up card is already on the table. The model sees the line in its history
+// as its own, and picks up from there once the player answers.
+export const OPENING_LINE =
+  'Before we begin — stand up, loosen out, and let the warm-up card choose your pace. ' +
+  'The Ember Crown is burning the marshes from the crypt beneath the Sunken Keep. ' +
+  'Take it back before the fire spreads.';
+export const OPENING_AUDIO = 'assets/voice/opening.mp3';
+
 export async function openScene() {
   if (chat.messages.length) return;
-  await sendToDM('(The player has just sat down at the table. Name the quest and the stakes, set the opening scene, and ask what they do.)', { silent: true });
+  chat.messages.push({ role: 'dm', text: OPENING_LINE, t: Date.now() });
+  emit('chat');
+  // The card the line refers to, through the same tool path the model uses (and
+  // the same Agent Log row), so the opening is not a side door either.
+  try { await window.arcana.call('start_warmup', {}); } catch { A.offerWarmup({}); }
+  await say(OPENING_LINE, { url: OPENING_AUDIO });
 }
 
 /** A player action taken on the board deserves a DM reaction. */

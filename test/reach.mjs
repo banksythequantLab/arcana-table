@@ -28,6 +28,9 @@ await page.evaluate(() => localStorage.clear());
 await page.reload();
 await page.waitForFunction(() => window.arcana);
 await page.click('#intro-type');
+// The table now opens with the warm-up card already up (the pre-recorded opening); clear it like a player would.
+await page.waitForSelector('#warm-offer:not([hidden])', { timeout: 3000 }).catch(() => {});
+if (await page.isVisible('#warm-offer-no').catch(() => false)) { await page.click('#warm-offer-no'); await page.waitForTimeout(150); }
 
 let pass = 0, fail = 0;
 const ck = (l, ok, x = '') => { ok ? pass++ : fail++; console.log(`  ${ok ? '✓' : '✗ FAIL'} ${l}${x ? '  ' + x : ''}`); };
@@ -328,6 +331,53 @@ const aq = await page.evaluate(async () => {
     ? true : JSON.stringify({ map: window.__st.scene.mapId, r1: r1.error || r1.beatNumber, r2: r2.error || r2.beatNumber });
 });
 ck('advance_quest is what actually moves the party on', aq === true, aq === true ? '' : aq);
+
+console.log('— monsters can actually hurt you —');
+// "Went through the entire game and no damage to heroes." To-hit was a bare
+// d20 against AC; nothing could reliably touch a knight in plate. Now the die
+// carries an attack bonus, so a hundred goblin swings at Brannok land plenty.
+const swings = await page.evaluate(async () => {
+  const A = await import('/js/actions.js');
+  const b = window.__st.tokens.find(t => t.name === 'Brannok');
+  b.hp = 999; b.maxHp = 999;                       // survive the barrage
+  const g = A.addToken({ name: 'Swarm', kind: 'monster', art: 'goblin', x: b.x + 1, y: b.y, hp: 5000 }).token;
+  let hits = 0, seenBonus = null;
+  for (let i = 0; i < 100; i++) {
+    const r = A.attack({ attackerId: g.id, targetId: b.id, kind: 'melee' });
+    if (r.hit) hits++;
+    seenBonus = r.attackBonus;
+  }
+  return { hits, seenBonus, hp: b.hp };
+});
+ck('a goblin swings with an attack bonus', swings.seenBonus === 3, `+${swings.seenBonus}`);
+ck('and lands a real share of a hundred swings at AC 17', swings.hits >= 20, `${swings.hits}/100 hit`);
+ck('and the knight actually lost hit points', swings.hp < 999, `${swings.hp} left`);
+ck('a hero swings with a bigger bonus than a goblin', await page.evaluate(async () => {
+  const A = await import('/js/actions.js');
+  const b = window.__st.tokens.find(t => t.name === 'Brannok');
+  const g = window.__st.tokens.find(t => t.name === 'Swarm');
+  return A.attack({ attackerId: b.id, targetId: g.id, kind: 'melee' }).attackBonus === 5;
+}));
+
+console.log('— your Heroic boost is yours, not the goblin\'s —');
+const stolen = await page.evaluate(async () => {
+  const A = await import('/js/actions.js');
+  const b = window.__st.tokens.find(t => t.name === 'Brannok');
+  const g = window.__st.tokens.find(t => t.name === 'Swarm');
+  window.__st.boosts.setRoll = 20;                 // the player did the push-ups
+  const r = A.attack({ attackerId: g.id, targetId: b.id, kind: 'melee' });   // the goblin swings first
+  return { goblinGotNat20: r.critical === true && r.roll === 20, stillBanked: window.__st.boosts.setRoll === 20 };
+});
+ck('a monster\'s swing does not spend the player\'s natural 20', !stolen.goblinGotNat20 && stolen.stillBanked, JSON.stringify(stolen));
+ck('the hero\'s next swing does', await page.evaluate(async () => {
+  const A = await import('/js/actions.js');
+  const b = window.__st.tokens.find(t => t.name === 'Brannok');
+  const g = window.__st.tokens.find(t => t.name === 'Swarm');
+  const r = A.attack({ attackerId: b.id, targetId: g.id, kind: 'melee' });
+  return r.critical === true && window.__st.boosts.setRoll === null;
+}));
+await page.evaluate(() => { const b = window.__st.tokens.find(t => t.name === 'Brannok'); b.maxHp = 24; b.hp = 24;
+  window.__st.tokens = window.__st.tokens.filter(t => t.name !== 'Swarm'); });
 
 console.log('— what you kill leaves the board —');
 // It used to only get a line in the log. The corpse stayed drawn, kept its

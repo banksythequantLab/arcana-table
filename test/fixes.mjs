@@ -8,7 +8,7 @@ import { extname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const root = join(fileURLToPath(import.meta.url), '..', '..');
-const MIME = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css' };
+const MIME = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.mp3':'audio/mpeg' };
 const srv = createServer(async (q, s) => {
   const p = q.url === '/' ? '/index.html' : q.url.split('?')[0];
   try { s.writeHead(200, { 'content-type': MIME[extname(p)] || 'text/plain' });
@@ -25,6 +25,9 @@ await page.evaluate(() => localStorage.clear());
 await page.reload();
 await page.waitForFunction(() => window.arcana);
 await page.click('#intro-type');
+// The table now opens with the warm-up card already up (the pre-recorded opening); clear it like a player would.
+await page.waitForSelector('#warm-offer:not([hidden])', { timeout: 3000 }).catch(() => {});
+if (await page.isVisible('#warm-offer-no').catch(() => false)) { await page.click('#warm-offer-no'); await page.waitForTimeout(150); }
 
 let pass = 0, fail = 0;
 const ck = (label, ok, extra = '') => { ok ? pass++ : fail++; console.log(`  ${ok ? '✓' : '✗ FAIL'} ${label}${extra ? '  ' + extra : ''}`); };
@@ -131,6 +134,102 @@ ck('the party lands on open floor instead', await page.evaluate(async () => {
   return window.__st.tokens.filter(t => t.kind === 'pc').every(t => isWalkable(t.x, t.y));
 }));
 ck('and it says where they actually stopped', /is wall/.test(wall.note || ''), wall.note || '');
+
+console.log('— an offer is a tool call, never a sentence —');
+// The player saw this exact line, and no card ever appeared. The detector that
+// sends such a reply back is held to it, and to the near-misses it must NOT
+// catch, because bouncing ordinary narration would be worse than the bug.
+const prose = await page.evaluate(async () => {
+  const { looksLikeProseOffer } = await import('/js/dm.js');
+  const yes = [
+    'Five push-ups would put a +2 edge on your next roll, if you want to stake effort before the clash; otherwise, choose your move and we\u2019ll resolve it normally.',
+    'Ten push-ups and I\u2019ll let the fates hand you a natural twenty.',
+    'Hold a plank for thirty seconds and take advantage on the swing.',
+    'Swear an oath \u2014 the dishes, ten minutes \u2014 and the same +5 waits for you.',
+    'Give me five squats for a +2 bonus.',
+  ];
+  const no = [
+    'The drowned guard rises from the water, rusted blade dripping. What do you do?',
+    'Brannok\u2019s sword bites deep and the creature reels. Mira, you\u2019re up.',
+    'You push open the iron door. Beyond it, stairs descend into the dark.',
+    'The push-ups are done \u2014 your arms burn, and the die is yours. Roll when ready.',
+    'You wade in up to your knees; the water is cold and the sink of mud pulls at your boots.',
+  ];
+  return { caught: yes.map(looksLikeProseOffer), spared: no.map(looksLikeProseOffer) };
+});
+ck('the exact line the player saw is caught', prose.caught[0] === true);
+ck('so are four other ways of saying it', prose.caught.every(Boolean), JSON.stringify(prose.caught));
+ck('plain narration is never mistaken for an offer', prose.spared.every(v => v === false), JSON.stringify(prose.spared));
+ck('finished push-ups being narrated is not an offer either', prose.spared[3] === false);
+
+console.log('— and the loop sends a prose offer back until the call is made —');
+// A DM that answers Derek\'s exact sentence with no tool call, and only makes the
+// call when told to. The player must never see the first version.
+let asks = 0;
+await page.unroute('**/arcana-dm*/**').catch(() => {});
+await page.route(/arcana-dm.*workers\.dev\/speak/, r => r.fulfill({ status: 200, contentType: 'audio/mpeg', body: '' }));
+await page.route(/arcana-dm.*workers\.dev\/?$/, async r => {
+  asks++;
+  const body = JSON.parse(r.request().postData() || '{}');
+  const bounced = (body.messages || []).some(m => m.role === 'system' && /DESCRIBED an offer/.test(m.content || ''));
+  if (!bounced) {
+    return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+      content: 'Five push-ups would put a +2 edge on your next roll, if you want to stake effort before the clash; otherwise, choose your move and we\u2019ll resolve it normally.',
+      tool_calls: [] }) });
+  }
+  if (!(body.messages || []).some(m => m.role === 'tool')) {
+    return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+      content: null,
+      tool_calls: [{ id: 'c1', type: 'function', function: { name: 'propose_challenge',
+        arguments: JSON.stringify({ exercise: 'push-ups', reps: 5, reward: 'bonus+2', reason: 'Before the clash.' }) } }] }) });
+  }
+  return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+    content: 'The guard braces. Five push-ups, and the edge is yours.', tool_calls: [] }) });
+});
+await page.evaluate(() => { window.__st.challenge = null; window.__st.tasks = null; window.__st.oath = null; });
+const dmBefore = await page.evaluate(async () => (await import('/js/dm.js')).chat.messages.filter(m => m.role === 'dm').length);
+await page.evaluate(async () => (await import('/js/dm.js')).sendToDM('I face the guard.'));
+await page.waitForFunction(() => !!window.__st.challenge, null, { timeout: 15000 }).catch(() => {});
+const bounce = await page.evaluate(async () => {
+  const dm = await import('/js/dm.js');
+  return {
+    dmLines: dm.chat.messages.filter(m => m.role === 'dm').map(m => m.text),
+    challenge: window.__st.challenge ? { exercise: window.__st.challenge.exercise, reps: window.__st.challenge.reps } : null,
+    logged: window.__st.log.some(l => /described a bargain in words/i.test(l.text)),
+  };
+});
+const newLines = bounce.dmLines.slice(dmBefore);
+ck('the DM was asked more than once', asks >= 2, `${asks} asks`);
+ck('a challenge card is on the table', bounce.challenge?.exercise === 'push-ups' && bounce.challenge?.reps === 5, JSON.stringify(bounce.challenge));
+ck('the prose version was never spoken to the player', !newLines.some(l => /would put a \+2 edge/.test(l)), JSON.stringify(newLines).slice(0, 120));
+ck('the corrected line was', newLines.some(l => /edge is yours/.test(l)));
+ck('and the story log says what happened', bounce.logged);
+
+console.log('— the opening is pre-recorded: the DM is talking before the model is even asked —');
+// Reload to a fresh table with the DM endpoint BLOCKED. The opening line, the
+// warm-up card and the audio request must all happen anyway, from the file.
+await page.unroute(/arcana-dm.*workers\.dev\/?$/).catch(() => {});
+await page.unroute(/arcana-dm.*workers\.dev\/speak/).catch(() => {});
+let dmCalls = 0, ttsCalls = 0, openingFetched = false;
+await page.route('**/arcana-dm*/**', r => { if (/\/speak$/.test(r.request().url())) ttsCalls++; else dmCalls++; r.abort(); });
+await page.route('**/assets/voice/opening.mp3', r => { openingFetched = true; r.continue(); });
+await page.evaluate(() => localStorage.clear());
+await page.reload(); await page.waitForFunction(() => window.arcana);
+await page.click('#intro-type');
+await page.waitForSelector('#warm-offer:not([hidden])', { timeout: 5000 }).catch(() => {});
+await page.waitForTimeout(600);
+const opening = await page.evaluate(async () => {
+  const dm = await import('/js/dm.js');
+  return { first: dm.chat.messages[0]?.text || '', line: dm.OPENING_LINE, card: !document.getElementById('warm-offer').hidden,
+           logged: window.__st.agentLog.some(e => e.tool === 'start_warmup') };
+});
+ck('the first thing the DM says is the scripted opening', opening.first === opening.line, opening.first.slice(0, 60));
+ck('it says so without a single call to the model', dmCalls === 0, `${dmCalls} DM calls`);
+ck('and without a TTS round trip', ttsCalls === 0, `${ttsCalls} TTS calls`);
+ck('the pre-recorded file was requested instead', openingFetched);
+ck('the warm-up card is already on the table', opening.card);
+ck('and it went through the tool path, so it is in the Agent Log', opening.logged);
+ck('the opening audio ships with the site', (await page.evaluate(async () => (await fetch('/assets/voice/opening.mp3')).ok)));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 await b.close(); srv.close();

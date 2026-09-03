@@ -103,7 +103,7 @@ export const BASE_TOOLS = [
   },
   {
     name: 'advance_quest',
-    description: 'Mark the current beat achieved and move the run to the next one. This pays out the milestone loot, swaps the map when the next beat is elsewhere, and on the final beat spawns the boss. Call it the moment the party has actually done what the objective asked — never before, and never twice for the same beat. Advancing past the last beat wins the run.',
+    description: 'REFUSED while combat is running or the beat\'s own monster still stands — a beat is cleared over the body, not around it. Mark the current beat achieved and move the run to the next one. This pays out the milestone loot, swaps the map when the next beat is elsewhere, and on the final beat spawns the boss. Call it the moment the party has actually done what the objective asked — never before, and never twice for the same beat. Advancing past the last beat wins the run.',
     inputSchema: obj({ summary: str('One line on how the party pulled it off, in DM voice') }),
     handler: a => A.advanceQuest(a),
   },

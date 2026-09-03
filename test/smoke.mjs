@@ -53,6 +53,9 @@ async function enterTable(page, { muted = true } = {}) {
   // Enter by typing, not hands-free: a headless run has no microphone.
   await page.click(muted ? '#intro-type' : '#intro-voice');
   await page.waitForSelector('#intro[hidden]', { timeout: 10000 }).catch(() => {});
+  // The table opens with the warm-up card already up (pre-recorded opening); clear it like a player would.
+  await page.waitForSelector('#warm-offer:not([hidden])', { timeout: 3000 }).catch(() => {});
+  if (await page.isVisible('#warm-offer-no').catch(() => false)) { await page.click('#warm-offer-no'); await page.waitForTimeout(150); }
 }
 
 const BASE_N = 21, COMBAT_N = 24, DOWNED_N = 22;   // base · +combat · +death_save
@@ -278,8 +281,11 @@ check('clearing a beat pays a milestone', (await call('get_board_state')).party.
 check('completed beat is recorded', (await call('get_quest')).completed.length === 1);
 
 // walk to the final beat and confirm the boss actually spawns
+// A beat is cleared over its monster's body now, so each step first finishes
+// whatever the beat spawned (the Warden on beat 4) before advancing.
+const slayAll = () => page.evaluate(() => { window.__st.tokens.filter(t => t.kind === 'monster').forEach(t => { t.hp = 0; }); });
 let last = null;
-for (let i = 0; i < 3; i++) last = await call('advance_quest', { summary: 'onward' });
+for (let i = 0; i < 3; i++) { await call('end_combat'); await slayAll(); last = await call('advance_quest', { summary: 'onward' }); }
 check('final beat spawns the boss', last.bossSpawned === 'The Cinder Wight', JSON.stringify(last).slice(0, 140));
 check('final beat is flagged as final', (await call('get_quest')).current.isFinalBeat === true);
 // Not a hardcoded HP total — that drifts every time the boss is tuned. What
@@ -320,6 +326,9 @@ check('the revived hero is actually standing', (await call('get_board_state')).t
 await call('end_combat');
 
 // ── winning ─────────────────────────────────────────────────────────────────
+const early = await call('advance_quest', { summary: 'We just leave.' });
+check('the run cannot be won while the Cinder Wight stands', !!early.error && early.mustDefeat === 'The Cinder Wight', early.error);
+await slayAll();
 const win = await call('advance_quest', { summary: 'The Wight falls. The Crown is taken.' });
 check('clearing the last beat wins the run', win.questComplete === true && win.status === 'won', JSON.stringify(win).slice(0, 120));
 check('victory screen is shown', await page.isVisible('#ending'));
