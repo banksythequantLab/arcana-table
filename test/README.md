@@ -2,7 +2,7 @@
 
 ```bash
 npm install
-npm test          # every suite, in order — 253 assertions
+npm test          # every suite, in order — 264 assertions
 ```
 
 Playwright drives a real headless Chromium against the real page. Nothing is
@@ -16,11 +16,11 @@ mocked except the network: the DM is either stubbed at the route level or, in
 | `smoke.mjs` | 95 | The whole game through the tool surface: the real `document.modelContext`, `getTools()` / `executeTool()`, dynamic registration in and out of combat, both approval paths, a complete push-ups-to-natural-20 loop, all three effort modes, the warm-up, the quest, and the frozen board when a hero drops. |
 | `a11y.mjs` | 9 | Keyboard-only entry, accessible names, a visible focus ring, the canvas text alternative, the live region on the log, and the dice animation collapsing under `prefers-reduced-motion`. |
 | `reach.mjs` | 32 | Position is a rule: a melee attack out of range is refused with the cell to move to, spells work at distance and are bounded too, Mira's fireball bursts on a cluster and never on the party, and attacking or starting a fight lifts the fog on what you are fighting. |
-| `fixes.mjs` | 23 | Bugs a player actually hit, each with the check that would have caught it — the warm-up spanning the body rather than circling the neck, holds not being validated against the reps list, the party moving as one, and a walk lighting its whole corridor. |
+| `fixes.mjs` | 25 | Bugs a player actually hit, each with the check that would have caught it — the warm-up spanning the body rather than circling the neck, holds not being validated against the reps list, the party moving as one, and a walk lighting its whole corridor. |
 | `echo.mjs` | 15 | Hands-free not hearing itself. Installs a fake `SpeechRecognition` and replays the real failure: the DM's own line fed back while speaking, again as a late fragment, and again as "ten push-ups" during a live challenge. The only coverage this path has — headless Chromium has no speech recognition, so every other suite types. |
 | `variety.mjs` | 29 | Three more player reports: every monster looking identical, the table almost never asking for exercise, and a reward that ignored the size of the ask. Covers the bestiary, the per-token variation, the offer pacing clock, the effort/reward ladder, and name-matching surviving what speech recognition actually returns. |
 | `walk.mjs` | 10 | Clicking the map walks the party there — the first thing every player tries, and until now the only way to move anything was to drag a token. Also the board's only PIXEL check: a scope bug once made every monster vanish from the canvas while all 196 assertions still passed, because nothing asserted the board had drawn anything. |
-| `milestone.mjs` | 26 | Clearing a beat pays, visibly and more each time — loot, a banked boon, a short rest to full — with a banner that names all three. Also that no timer is a trap: a running hold, a 25-minute Oath and a ten-minute warm-up can each be left at any point, and the Cinder Wight has its own art at twice the size. |
+| `milestone.mjs` | 35 | Clearing a beat pays, visibly and more each time — loot, a banked boon, a short rest to full — with a banner that names all three. Also that no timer is a trap: a running hold, a 25-minute Oath and a ten-minute warm-up can each be left at any point, and the Cinder Wight has its own art at twice the size. |
 | `inspector.mjs` | 14 | The DM Panel is the live registry, not a rack of buttons: it lists exactly what `getTools()` returns, follows it in and out of combat, and its schema-built forms really do go through `executeTool` and reach the Agent Log. |
 
 ## Checks you run by hand
@@ -29,6 +29,7 @@ mocked except the network: the DM is either stubbed at the route level or, in
 - `npm run mobile` — screenshots the phone layout at 390×844 and reports whether anything overflows.
 - `npm run live` — plays the **deployed** build against the real Worker, gate to first tool call. Byte-compare the files against pages.dev first; a site that loads but does not play is exactly what the other suites cannot catch.
 - `npm run playtest` — a real conversation with the live DM. Not deterministic, so not part of `npm test`; it is how the behavioural bugs got found.
+- `npm run fullrun` — drives thirteen player turns at the live DM and reports how far the run actually got: beats cleared, map swaps, party level, every tool error. Takes about ten minutes and costs real API calls, which is why it is not in `npm test` — but it is the only thing that exercises `advance_quest` past the first beat, and it is what caught the DM spending nine exchanges on one beat of five.
 
 ## Not tests
 

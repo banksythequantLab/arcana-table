@@ -35,10 +35,16 @@ const r1 = await call('advance_quest', { summary: 'Cut the drowned guard down.' 
 ck('the beat advanced', !r1.error && r1.beatNumber === 2, JSON.stringify(r1).slice(0, 70));
 ck('it names what was cleared and what it paid', !!r1.cleared && !!r1.paid, JSON.stringify(r1.paid));
 ck('a boon is banked for the next beat', !!r1.paid.boon, r1.paid.boon || '(none)');
+ck('THE PARTY LEVELS UP', r1.paid.partyLevel === 2, `level ${r1.paid.partyLevel}`);
+ck('and the level is permanent, not a one-roll boost', await page.evaluate(() =>
+  window.__st.party.level === 2));
+ck('every hero gained max health', r1.paid.maxHpGained >= 10 && await page.evaluate(() =>
+  window.__st.tokens.find(t => t.name === 'Brannok').maxHp > 24), `+${r1.paid.maxHpGained} max hp`);
+ck('the beat carries an honorific of its own', r1.paid.honorific === 'Keep-Breakers', r1.paid.honorific || '(none)');
 ck('the boon is real, not just a label', await page.evaluate(() =>
   window.__st.boosts.bonus > 0 || window.__st.boosts.advantage || window.__st.boosts.setRoll != null),
   JSON.stringify(await page.evaluate(() => window.__st.boosts)));
-ck('the party is back to full', await page.evaluate(() =>
+ck('the party is back to full at the NEW maximum', await page.evaluate(() =>
   window.__st.tokens.filter(t => t.kind === 'pc').every(t => t.hp === t.maxHp)));
 ck('loot and gold landed', (r1.paid.items || []).length > 0 && r1.paid.gold >= 40,
    `${r1.paid.items} · ${r1.paid.gold}g`);
@@ -51,6 +57,7 @@ const banner = await page.evaluate(() => ({
   chips: [...document.querySelectorAll('#ms-rewards .ms-chip')].map(c => c.textContent),
 }));
 ck('the banner names the beat', /BEAT 1 OF 5/.test(banner.step) && banner.title.length > 4, JSON.stringify(banner.step));
+ck('the LEVEL is the headline', /LEVEL 2/.test(await page.innerText('#ms-level')), await page.innerText('#ms-level'));
 ck('it lists the loot, the boon and the heal', banner.chips.length >= 3 &&
    banner.chips.some(c => /⚡/.test(c)) && banner.chips.some(c => /full/.test(c)), JSON.stringify(banner.chips));
 await page.screenshot({ path: 'screens/milestone.png' });
@@ -64,6 +71,23 @@ for (let i = 0; i < 3; i++) {
 }
 ck('gold rises every beat', paid.every((p, i) => i === 0 || p.gold > paid[i - 1].gold),
    paid.map(p => p.gold).join(' → '));
+ck('the party keeps levelling', await page.evaluate(() => window.__st.party.level) === 5,
+   `level ${await page.evaluate(() => window.__st.party.level)}`);
+ck('max health compounds across the run', await page.evaluate(() =>
+  window.__st.tokens.find(t => t.name === 'Brannok').maxHp >= 24 + 10 + 12 + 14 + 16),
+  `${await page.evaluate(() => window.__st.tokens.find(t => t.name === 'Brannok').maxHp)} max hp`);
+ck('later beats pay a second boon on top', paid.slice(2).some(p => / and \+5 on top/.test(p.boon || '')),
+   paid.map(p => p.boon).join(' | '));
+ck('a levelled hero hits harder', await page.evaluate(async () => {
+  const A = await import('/js/actions.js');
+  A.addToken({ name: 'Dummy', kind: 'monster', art: 'ooze', x: 4, y: 6, hp: 90 });
+  const t = window.__st.tokens.find(x => x.name === 'Dummy');
+  const b = window.__st.tokens.find(x => x.name === 'Brannok');
+  b.x = t.x + 1; b.y = t.y;
+  window.__st.boosts.setRoll = 20;                 // guarantee a hit to read the damage
+  const r = A.attack({ attackerId: 'Brannok', targetId: 'Dummy', kind: 'melee', damage: 6 });
+  return r.damage > 6;
+}), 'level adds to every swing');
 ck('every beat banks a boon', paid.every(p => !!p.boon), paid.map(p => p.boon).join(' · '));
 
 console.log('— and the Warden is not Brannok —');

@@ -205,7 +205,7 @@ design commitments in the code rather than assertions:
 Vanilla JS single-page app, zero build step, no backend beyond a ~200-line
 Cloudflare Worker that proxies OpenAI — a canvas-rendered grid board (3 maps,
 fog of war, drag-and-drop tokens), state in localStorage, cel-shaded cartoon
-art. A 253-assertion Playwright suite drives the tools through the real
+art. A 264-assertion Playwright suite drives the tools through the real
 `document.modelContext` — `getTools()`, `executeTool()`, `readOnlyHint` on
 reads, the registry growing and shrinking with combat and with a downed hero,
 both approval outcomes, all three effort modes, the guided warm-up, and a

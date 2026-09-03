@@ -123,7 +123,14 @@ const gaps = await page.evaluate(() => {
 ck('every cell along a walk is lit, with no dark middle', gaps.dark.length === 0,
    gaps.dark.length ? `dark: ${gaps.dark.join(' ')}` : `${gaps.lit} cells lit from (${gaps.from.x},${gaps.from.y}) to (${gaps.to.x},${gaps.to.y})`);
 const wall = await page.evaluate(() => window.arcana.call('move_party', { x: 0, y: 0 }));
-ck('a wall is refused, with a usable message', !!wall.error, wall.error || '');
+// Travel is not a precision act. A wall used to be an error the DM had to
+// notice and retry, and a live run burned three calls on exactly that.
+ck('a wall no longer fails the move', !wall.error, JSON.stringify(wall).slice(0, 80));
+ck('the party lands on open floor instead', await page.evaluate(async () => {
+  const { isWalkable } = await import('/js/state.js');
+  return window.__st.tokens.filter(t => t.kind === 'pc').every(t => isWalkable(t.x, t.y));
+}));
+ck('and it says where they actually stopped', /is wall/.test(wall.note || ''), wall.note || '');
 
 console.log(`\n${pass} passed, ${fail} failed`);
 await b.close(); srv.close();

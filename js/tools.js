@@ -121,7 +121,7 @@ export const BASE_TOOLS = [
   },
   {
     name: 'set_scene',
-    description: 'Change the scene: switch the map ("dungeon" = Sunken Keep, "forest" = Whispering Glade, "crypt" = Ember Crypt), retitle it, set the mood line. Switching maps resets fog of war around the party.',
+    description: 'Retitle the scene and set its mood line. You may also switch the map ("dungeon" = Sunken Keep, "forest" = Whispering Glade, "crypt" = Ember Crypt) — but DO NOT: each quest beat owns its map and advance_quest switches it for you. Setting a different one puts the board somewhere the quest is not. Use this for title and mood; switching maps resets fog of war around the party.',
     inputSchema: obj({ mapId: { type: 'string', enum: ['dungeon', 'forest', 'crypt'], description: 'Which battle map' }, title: str('Scene title'), mood: str('One-line mood, shown under the title') }),
     handler: a => A.setScene(a),
   },

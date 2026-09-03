@@ -79,24 +79,28 @@ export const QUEST = {
       objective: 'Get the party through the flooded entry hall of the Sunken Keep. Something drowned guards it — fight or outwit it.',
       reward: { items: ['Keep Warden\'s Key'], gold: 40 },
       boon: 'bonus+3',
+      honorific: 'Keep-Breakers',
     },
     {
       id: 'vault', mapId: 'dungeon', title: 'Open the drowned vault',
       objective: 'The old chest in the far chamber is the Warden\'s vault. Reach it, open it, survive what is guarding it.',
       reward: { items: ['Emberward Charm', 'Flask of Deep Water'], gold: 90 },
       boon: 'bonus+5',
+      honorific: 'Vaultwise',
     },
     {
       id: 'glade', mapId: 'forest', title: 'Cross the Whispering Glade',
       objective: 'The road to the crypt runs through the glade. It is watched. Get the party to the far side.',
       reward: { items: ['Glade-Sung Arrow', 'Whispering Cloak'], gold: 140 },
       boon: 'advantage',
+      honorific: 'Glade-Walkers',
     },
     {
       id: 'warden', mapId: 'forest', title: 'Break the Warden\'s ring',
       objective: 'A standing ring of stone wardens bars the crypt door. Beat the one that wakes.',
       reward: { items: ['Crypt Door Sigil', 'Warden\'s Broken Crown'], gold: 220 },
       boon: 'bonus+8',
+      honorific: 'Warden-Breakers',
       elite: true,
       spawn: { name: 'The Waking Warden', art: 'warden', hp: 34, x: 11, y: 5 },
     },
@@ -105,6 +109,7 @@ export const QUEST = {
       objective: 'The Cinder Wight waits in the Ember Crypt wearing the Crown. This is the last fight of the run. Make it hurt.',
       reward: { items: ['The Ember Crown', 'Cinderheart Ember'], gold: 500 },
       boon: 'nat20',
+      honorific: 'Crown-Takers',
       boss: { name: 'The Cinder Wight', art: 'wight', hp: 60, x: 11, y: 3, scale: 2 },
     },
   ],
@@ -209,7 +214,7 @@ function freshState() {
     combat: { active: false, order: [], turnIndex: 0, round: 1 },
     log: [],                      // story log entries {t, type, actor, text}
     agentLog: [],                 // tool-call entries {t, tool, args, status, note}
-    party: { gold: 0, loot: [] },
+    party: { gold: 0, loot: [], level: 1 },   // the party levels on every cleared beat
     dice: null,                   // last roll result
     spellFx: null,                // {x, y, kind, t} — the board paints the burst
     milestone: null,              // {t, title, items, gold, boon} — the beat-cleared banner

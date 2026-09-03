@@ -39,7 +39,10 @@ THE BOARD IS REAL
   noise — call move_party in that same turn with the cell they arrive at.
   Describing a walk without moving the tokens leaves the heroes standing in the
   room the player just left, and the player is looking right at them.
-- Move a monster? call move_token. New room? move_party, then set_scene / reveal_area.
+- Move a monster? call move_token. New room? move_party, then reveal_area.
+- DO NOT switch maps with set_scene. Each beat owns its map and advance_quest
+  changes it for you; setting a different one leaves the board somewhere the
+  quest is not. Use set_scene for the title and the mood line only.
 
 POSITION DECIDES WHAT A CHARACTER CAN DO
 - Every attack goes through the attack tool. Do NOT roll dice and adjust HP by
@@ -79,8 +82,14 @@ HOW YOU SPEAK
 YOU ARE RUNNING A QUEST, NOT A SANDBOX
 - Every turn's context carries a "quest" block: the run, the beat the party is on,
   and that beat's objective. That objective is your job. Steer toward it.
-- Five beats, roughly two minutes of play each. Do not dawdle: introduce the
-  obstacle, let the player act on it once or twice, resolve it, move on.
+- A BEAT IS TWO TO FOUR EXCHANGES. Introduce the obstacle, let the player act on
+  it once or twice, resolve it, ADVANCE. get_quest returns exchangesOnThisBeat
+  and beatOverdue; when beatOverdue is true you have been here too long — bring
+  it to a head on THIS turn and call advance_quest. A live run took nine
+  exchanges to clear the first beat of five, which is a session nobody finishes.
+- If the player says they are moving on — "on to the glade", "we head for the
+  crypt" — and the obstacle is dealt with, that IS the cue. Advance. Do not make
+  them ask twice.
 - When the party has actually achieved the objective, call advance_quest with a
   one-line summary. That is what pays the milestone loot, swaps the map and, on
   the last beat, spawns the boss. Nothing else moves the run forward.
@@ -241,6 +250,25 @@ export async function sendToDM(playerText, { silent = false } = {}) {
     ];
     if (playerText && silent) convo.push({ role: 'user', content: playerText });
 
+    // Pacing nudges go in the MESSAGE STREAM, not in the board JSON. A live run
+    // showed the DM reading exchangesOnThisBeat and beatOverdue in a blob and
+    // sailing past both — ten exchanges, one beat cleared of five. The same
+    // facts as a direct instruction, arriving last, are acted on.
+    const onBeat = state.quest.turnsOnBeat || 0;
+    const sinceOffer = state.fitness.turnsSinceOffer || 0;
+    const nudges = [];
+    if (state.quest.status === 'active' && onBeat >= 4) {
+      const b = A.currentBeat();
+      nudges.push(`(PACING: you have spent ${onBeat} exchanges on "${b?.title}" — too long. ` +
+        `Bring this beat to a head in THIS reply and call advance_quest. Five beats at four ` +
+        `exchanges is a run someone finishes; at ten it is one nobody does.)`);
+    }
+    if (sinceOffer >= 2 && !state.challenge && !state.oath && !state.downed) {
+      nudges.push(`(PACING: ${sinceOffer} exchanges since you last staked anything real. ` +
+        `Offer a Heroic Effort, a hold or an Oath this turn — that is the point of this table.)`);
+    }
+    if (nudges.length) convo.push({ role: 'system', content: nudges.join(' ') });
+
     let spoke = false;
     for (let hop = 0; hop <= MAX_TOOL_HOPS; hop++) {
       const reply = await ask(convo, tools);
@@ -305,7 +333,9 @@ function humanError(raw) {
 
 function boardBrief() {
   return {
-    quest: A.getQuest(),                 // the destination — read this first
+    quest: A.getQuest(),
+    beatPacing: { exchangesOnThisBeat: state.quest.turnsOnBeat || 0,
+                  overdue: (state.quest.turnsOnBeat || 0) >= 4 },                 // the destination — read this first
     scene: state.scene,
     tokens: state.tokens.map(t => ({ name: t.name, kind: t.kind, at: [t.x, t.y], hp: `${t.hp}/${t.maxHp}`, conditions: t.conditions })),
     combat: state.combat.active

@@ -168,7 +168,16 @@ export function moveParty({ x, y, who = 'all' }) {
   if (!pcs.length) return { error: who === 'all' ? 'No party on the board.' : `No party member matches "${who}".` };
   x = Math.max(0, Math.min(GRID_W - 1, Math.round(x)));
   y = Math.max(0, Math.min(GRID_H - 1, Math.round(y)));
-  if (!isWalkable(x, y)) return { error: `(${x},${y}) is a wall — pick an open floor cell. Call get_board_state if you are unsure.` };
+  // A wall used to be an error the DM had to notice and retry, and a live run
+  // burned three calls on exactly that. Travel is not a precision act: land on
+  // the nearest open floor instead and say where they actually ended up.
+  let nudged = null;
+  if (!isWalkable(x, y)) {
+    const near = nearestFree(x, y, new Set());
+    if (!near) return { error: `Nothing open anywhere near (${x},${y}). Call get_board_state.` };
+    nudged = { asked: { x, y }, landed: near };
+    x = near.x; y = near.y;
+  }
 
   // Everyone not travelling still occupies their cell.
   const taken = new Set(state.tokens.filter(t => !pcs.includes(t)).map(t => `${t.x},${t.y}`));
@@ -185,7 +194,8 @@ export function moveParty({ x, y, who = 'all' }) {
   if (!moved.length) return { error: `Nowhere to stand near (${x},${y}) — every cell is occupied.` };
   logStory('action', 'Party', `moves to (${x}, ${y}).`);
   emit();
-  return { ok: true, moved, left: pcs.length - moved.length };
+  return { ok: true, moved, left: pcs.length - moved.length,
+           ...(nudged ? { note: `(${nudged.asked.x},${nudged.asked.y}) is wall; the party stopped at (${x},${y}).` } : {}) };
 }
 
 export function addToken({ name, kind = 'monster', art, x, y, hp = 10, maxHp, scale }) {
@@ -386,7 +396,10 @@ export function attack({ attackerId, targetId, kind = 'melee', damage, reason = 
     return { ok: true, hit: false, roll: roll.total, nat1: roll.nat1, targetAc: ac, distance: d, kind };
   }
 
-  const dmg = Math.max(1, Math.round(Number(damage) || (roll.nat20 ? 12 : 6)));
+  // A level should be felt when you swing, not only on the character sheet.
+  const lvl = a.kind === 'pc' ? (state.party.level || 1) : 1;
+  const base = Number(damage) || (roll.nat20 ? 12 : 6);
+  const dmg = Math.max(1, Math.round(base + (lvl - 1) * 2));
   const after = updateHp({ tokenId: t.id, delta: -dmg });
 
   let splash = [];
@@ -545,6 +558,11 @@ const challengeWaiters = new Map();   // id → {resolve}
 /** One player turn has gone by without the table asking for anything. */
 export function notePlayerTurn() {
   state.fitness.turnsSinceOffer = (state.fitness.turnsSinceOffer || 0) + 1;
+  // And how long we have been on this beat. A live run showed the DM taking
+  // nine exchanges to clear one of five — a judge playing for five minutes
+  // would never reach the boss. Telling it "roughly two minutes a beat" did
+  // nothing; a number it can see does.
+  state.quest.turnsOnBeat = (state.quest.turnsOnBeat || 0) + 1;
 }
 
 /** An offer was made — reps, hold or Oath. Restarts the clock. */
@@ -913,19 +931,31 @@ export function advanceQuest({ summary = '' } = {}) {
   //      Heroic Effort pays in, so progress and sweat spend the same way,
   //   3. a short rest: every hero back to full, because arriving at the Cinder
   //      Wight on four hit points is not a difficulty curve, it is a dead end.
-  const healed = [];
-  state.tokens.filter(t => t.kind === 'pc' && t.hp < t.maxHp).forEach(t => {
-    healed.push({ name: t.name, from: t.hp, to: t.maxHp });
-    t.hp = t.maxHp;
+  // THE PARTY LEVELS. A one-shot dice boost is a small thing to win for the
+  // hardest fight of the run — and it is gone on the next roll. A level is
+  // permanent, it compounds, and every beat after this one is fought with it:
+  // more maximum health, and heavier hits. That is what makes clearing a beat
+  // feel like getting somewhere rather than collecting a token.
+  state.party.level = (state.party.level || 1) + 1;
+  const level = state.party.level;
+  const hpGain = 6 + level * 2;                  // 10, 12, 14, 16, 18 across the run
+  const levelled = [];
+  state.tokens.filter(t => t.kind === 'pc').forEach(t => {
+    t.maxHp += hpGain;
+    t.hp = t.maxHp;                              // and a full rest into the bargain
+    levelled.push({ name: t.name, maxHp: t.maxHp });
   });
-  if (healed.length) {
-    logStory('quest', 'DM', `The party takes a breath. ${healed.map(h => h.name).join(' and ')} back to full.`);
-  }
+  logStory('quest', 'DM',
+    `⬆ THE PARTY IS LEVEL ${level}` + (beat.honorific ? ` — ${beat.honorific}.` : '.') +
+    ` +${hpGain} max health each, and everyone is back to full.`);
 
   let boon = null;
   if (beat.boon && REWARDS[beat.boon]) {
     REWARDS[beat.boon].apply(state.boosts);
     boon = REWARDS[beat.boon].label;
+    // From the third beat on it pays two boons, not one — the run should feel
+    // like it is accelerating, and the last fights are the ones that need it.
+    if (level >= 4) { REWARDS['bonus+5'].apply(state.boosts); boon += ' · and +5 on top'; }
     logStory('quest', 'DM', `✦ Milestone boon: ${boon}. Spend it well.`);
   }
 
@@ -934,10 +964,11 @@ export function advanceQuest({ summary = '' } = {}) {
     t: Date.now(), title: beat.title,
     beatNumber: q.beatIndex + 1, of: QUEST.beats.length,
     items: beat.reward?.items || [], gold: beat.reward?.gold || 0,
-    boon, healed: healed.length,
+    boon, level, hpGain, honorific: beat.honorific || null,
   };
 
   q.beatIndex++;
+  q.turnsOnBeat = 0;
   const next = QUEST.beats[q.beatIndex];
   if (!next) {
     q.status = 'won';
@@ -946,9 +977,12 @@ export function advanceQuest({ summary = '' } = {}) {
     logStory('quest', 'DM', `👑 ${QUEST.name} is yours. The marshes cool. The run is won.`);
     emit('quest');
     return { ok: true, questComplete: true, status: 'won', totalReps: state.fitness.totalReps,
-             loot: state.party.loot, gold: state.party.gold, boon, healed: healed.length };
+             loot: state.party.loot, gold: state.party.gold, boon, level, hpGain };
   }
 
+  // The beat owns its map. A live run had the DM set_scene back to the dungeon
+  // while the party stood in the glade, so the board and the rail disagreed
+  // about where everyone was.
   if (next.mapId !== state.scene.mapId) setScene({ mapId: next.mapId });
   logStory('quest', 'DM', `✦ Next: ${next.title} — ${next.objective}`);
   // A beat can name the thing that bars it, so the DM does not have to invent a
@@ -962,9 +996,11 @@ export function advanceQuest({ summary = '' } = {}) {
     beatNumber: q.beatIndex + 1, of: QUEST.beats.length,
     bossSpawned: spawned?.token?.name || null,
     cleared: beat.title,
-    paid: { items: beat.reward?.items || [], gold: beat.reward?.gold || 0, boon, healedToFull: healed.length },
+    paid: { items: beat.reward?.items || [], gold: beat.reward?.gold || 0, boon,
+            partyLevel: level, maxHpGained: hpGain, honorific: beat.honorific || null },
     note: (next.boss ? 'This is the final beat. Play it like one. ' : '') +
-          'Tell the player what they just earned — the loot, the boon, and that the party is back to full.',
+          `Tell the player what they just earned, and make it sound like something: the party is now LEVEL ${level}, ` +
+          `every hero gained +${hpGain} maximum health and is back to full, plus the loot and the boon.`,
   };
 }
 
@@ -980,10 +1016,14 @@ export function getQuest() {
     current: beat ? { id: beat.id, title: beat.title, objective: beat.objective, map: MAPS[beat.mapId].name, isFinalBeat: !!beat.boss } : null,
     upcoming: QUEST.beats.slice(q.beatIndex + 1).map(b => b.title),
     completed: q.completed.map(c => c.title),
+    exchangesOnThisBeat: q.turnsOnBeat || 0,
+    beatOverdue: (q.turnsOnBeat || 0) >= 4,
     timeStopped: timeStopped(),
     downed: state.downed ? { name: state.downed.name, successes: state.downed.saves, failures: state.downed.fails, of: DEATH_SAVE_FAILS } : null,
     note: q.status === 'active'
-      ? 'Drive play toward current.objective. When the party has achieved it, call advance_quest — that is what moves the story and pays the milestone.'
+      ? 'Drive play toward current.objective. When the party has achieved it, call advance_quest — that is what moves the story and pays the milestone. ' +
+        'A beat is two to four exchanges. If beatOverdue is true you have been here too long: bring the obstacle to a head THIS turn and advance. ' +
+        'Five beats at four exchanges is a twenty-minute run; at nine it is a session nobody finishes.'
       : `The run is ${q.status}.`,
   };
 }

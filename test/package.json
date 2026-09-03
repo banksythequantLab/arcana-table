@@ -15,7 +15,8 @@
     "live": "node live.mjs",
     "playtest": "node playtest.mjs",
     "variety": "node variety.mjs",
-    "walk": "node walk.mjs"
+    "walk": "node walk.mjs",
+    "fullrun": "node fullrun.mjs"
   },
   "license": "MIT",
   "dependencies": {

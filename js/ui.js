@@ -103,6 +103,8 @@ function renderHeader() {
   badge.innerHTML = m.html;
 
   const boosts = [];
+  // The level is permanent, so it sits in the header for the whole run.
+  if ((state.party.level || 1) > 1) boosts.push(`⬆ LEVEL ${state.party.level}`);
   if (state.boosts.setRoll === 20) boosts.push('⚡ NAT 20 armed');
   else if (state.boosts.setRoll != null) boosts.push(`⚡ die set to ${state.boosts.setRoll}`);
   if (state.boosts.advantage) boosts.push('⚡ advantage');
@@ -244,7 +246,9 @@ function renderParty() {
   const el = $('#party-panel');
   const pcs = state.tokens.filter(t => t.kind === 'pc');
   const others = state.tokens.filter(t => t.kind !== 'pc');
-  el.innerHTML = pcs.map(t => `
+  const lvl = state.party.level || 1;
+  el.innerHTML = `<div class="party-level">⬆ PARTY LEVEL ${lvl}${lvl > 1 ? ` · +${(lvl - 1) * 2} damage` : ''}</div>` +
+    pcs.map(t => `
     <div class="pc-card">
       <div class="pc-head"><b>${esc(t.name)}</b><span>AC ${t.ac ?? '—'}</span></div>
       <div class="hp-row"><div class="hp-bar"><div style="width:${(t.hp / t.maxHp) * 100}%"></div></div><span>${t.hp}/${t.maxHp}</span></div>
@@ -650,13 +654,16 @@ function renderMilestone() {
   if (!el || !m || m.t === msShownAt) return;
   msShownAt = m.t;
 
+  // The LEVEL is the headline — it is the part that lasts. Everything else is
+  // the spoils underneath it.
   $('#ms-step').textContent = `BEAT ${m.beatNumber} OF ${m.of}`;
-  $('#ms-title').textContent = m.title;
+  $('#ms-level').textContent = `LEVEL ${m.level || 2}`;
+  $('#ms-title').textContent = m.honorific ? `${m.title} · ${m.honorific}` : m.title;
   const chips = [];
+  if (m.hpGain) chips.push(`<span class="ms-chip heal">❤️ +${m.hpGain} max health, all back to full</span>`);
+  if (m.boon) chips.push(`<span class="ms-chip boon">⚡ ${esc(m.boon)}</span>`);
   (m.items || []).forEach(i => chips.push(`<span class="ms-chip">🎁 ${esc(i)}</span>`));
   if (m.gold) chips.push(`<span class="ms-chip">🪙 ${m.gold} gold</span>`);
-  if (m.boon) chips.push(`<span class="ms-chip boon">⚡ ${esc(m.boon)}</span>`);
-  if (m.healed) chips.push(`<span class="ms-chip heal">❤️ party back to full</span>`);
   $('#ms-rewards').innerHTML = chips.join('');
 
   el.hidden = false;
