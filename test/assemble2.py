@@ -74,7 +74,7 @@ v = VOS
 # had the floor. Before this the DM only ever spoke under the narration, ducked,
 # and nobody got to hear what the product actually sounds like.
 TASTE = 4.4        # the DM's first clause, alone, after Derek introduces it
-SOLO2 = 10.4       # the Oath answered, in the DM's voice — one sentence, then Derek resumes
+# (A second DM solo over the Oath paying off was cut on review: the DM speaks once.)
 CUT = [
     ('card',  'open',   2.0,                                   None),
     ('shot',  None,     v['vo01_problem'] + v['vo02_whatitis'] - 2.0, at('table', 31.4, 0.3)),
@@ -89,9 +89,6 @@ CUT = [
     ('shot',  None,     (v['vo07_swap'] - 10.0) + v['vo04b_payoff'], at('nat20', 160.0, 1.6)),
     ('card',  'oath',   2.0,                                   None),
     ('shot',  None,     v['vo08_oath'] - 2.0,                  at('oath_offer', 200.0, 0.6)),
-    # The DM's second solo: the Oath answered, in its own voice — "the dishes are
-    # cleared, and the oath answers". Narration is silent for this shot.
-    ('shot',  None,     SOLO2,                                 at('oath_kept', 278.8, 1.4)),
     ('model', None,     v['vo10_brain'],                       28.0),
     # "Under the hood", cut at a real pause after the tool names: the last third
     # of the narration was the wordiest, and this is where it rambled.
@@ -144,7 +141,7 @@ run(['ffmpeg','-y','-loglevel','error','-f','concat','-safe','0','-i',str(listin
 
 # ── Derek's narration: continuous, starting on each card ─────────────────────
 ORDER = ['vo01_problem','vo02_whatitis',('sil', TASTE),'vo03a_nobackdoor','vo03b_contract','vo04_heroic',
-         'vo07_swap','vo04b_payoff','vo08_oath',('sil', SOLO2),'vo10_brain','vo05_hood_trim','vo06_close']
+         'vo07_swap','vo04b_payoff','vo08_oath','vo10_brain','vo05_hood_trim','vo06_close']
 apieces = []
 for j, name in enumerate(ORDER):
     out = BUILD / f'a{j:02d}.wav'
@@ -170,14 +167,12 @@ SKIP_DM = {'dm/00.mp3', 'dm/01.mp3', 'dm/02.mp3', 'dm/03.mp3', 'dm/04.mp3', 'dm/
 # the DM's turn is still running tools. Pin it to the shot of the card closing
 # instead — that is the picture its words describe.
 taste_video = sum(l for (k, s, l, st) in CUT[:2])           # video time of CUT[2]
-solo2_video = sum(l for (k, s, l, st) in CUT[:11])          # video time of CUT[11]
 PIN_DM = {}
 # Derek introduces the DM; then it speaks — one clause, four seconds, alone.
 # Two voices never speak at once. The DM is heard ONLY in the holes left in the
 # narration, and each clip is cut at a sentence end before the narration resumes.
 EXTRA_DM = [
     (taste_video + 0.15, BED / 'dm/00_taste.mp3', 'The Ember Crown is burning the marshes… (taste)'),
-    (solo2_video + 0.8,  BED / 'dm/04_solo.mp3',  'The dishes are cleared, and the oath answers… (one sentence)'),
 ]
 placed = list(EXTRA_DM)
 for c in dmclips:
