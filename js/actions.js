@@ -1141,6 +1141,16 @@ let warmTimer = null;
 export function offerWarmup({ reason = '' } = {}) {
   if (state.warmup) return { error: 'A warm-up is already running.' };
   if (state.warmupOffer) return { error: 'The warm-up card is already on screen.' };
+  // Asked once. The DM was told "if they say no, never raise it again" and
+  // raised it again anyway, three times in one session — so the answer is kept
+  // and the tool refuses, whatever the prompt remembers.
+  if (state.fitness.warmupAnswered) {
+    return {
+      error: `The player already answered the warm-up (${state.fitness.warmupAnswered}). Do not offer it again this run. ` +
+             `If they ASK to stretch mid-game in their own words, call start_warmup with the plan they named.`,
+      alreadyAnswered: state.fitness.warmupAnswered,
+    };
+  }
   state.warmupOffer = { reason, plans: ['90s', '3min', '5min'], t: Date.now() };
   logStory('challenge', 'DM', '🤸 Warm-up offered — 90 seconds, 3 minutes, or straight in.');
   emit('warmup');
@@ -1151,6 +1161,7 @@ export function offerWarmup({ reason = '' } = {}) {
 export function dismissWarmupOffer() {
   if (!state.warmupOffer) return { error: 'No warm-up offered.' };
   state.warmupOffer = null;
+  state.fitness.warmupAnswered = 'declined';
   logStory('challenge', 'Player', 'skipped the warm-up — straight into the keep.');
   emit('warmup');
   return { ok: true, declined: true };
@@ -1162,6 +1173,7 @@ export function startWarmup({ plan } = {}) {
   if (!WARMUP_PLANS[plan]) return { error: `Unknown plan "${plan}". Choose: ${Object.keys(WARMUP_PLANS).join(', ')}.` };
   if (state.warmup) return { error: 'A warm-up is already running.' };
   state.warmupOffer = null;
+  state.fitness.warmupAnswered = `started ${plan}`;
   const p = WARMUP_PLANS[plan];
   // seq is the list of stretch indices this plan runs — it spans the body, so
   // index is a position in seq, never a position in STRETCHES.
@@ -1395,6 +1407,7 @@ export function getQuest() {
 export function resetQuest() {
   state.quest = { beatIndex: 0, status: 'active', completed: [], startedAt: Date.now() };
   state.downed = null;
+  state.fitness.warmupAnswered = null;      // a new run gets asked once more
   emit('quest');
   return { ok: true, ...getQuest() };
 }

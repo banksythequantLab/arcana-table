@@ -139,7 +139,14 @@ console.log('— the DM is told what it can reach —');
 // Snaggle caught the fireball splash earlier and is dead — and now that the
 // dead actually leave the board, it is not there to inspect. Use something with
 // hit points left.
-await call('add_token', { name: 'Reporter', kind: 'monster', art: 'goblin', x: 14, y: 9, hp: 9 });
+// Monsters act when a fight starts now, and they can drop a hero — which
+// freezes the board and refuses add_token. Stand everyone up first.
+await page.evaluate(async () => {
+  const A = await import('/js/actions.js');
+  window.__st.tokens.filter(t => t.kind === 'pc').forEach(t => { t.hp = t.maxHp; });
+  window.__st.downed = null;
+  A.addToken({ name: 'Reporter', kind: 'monster', art: 'goblin', x: 14, y: 9, hp: 9 });
+});
 const board = await call('get_board_state');
 const snag = board.tokens.find(t => t.name === 'Reporter');
 ck('every token reports reach and range', typeof snag.reach === 'number' && typeof snag.range === 'number',

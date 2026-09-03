@@ -118,7 +118,9 @@ function renderHeader() {
   $('#combat-strip').hidden = !c.active;
   if (c.active) {
     const cur = state.tokens.find(t => t.id === c.order[c.turnIndex]);
-    $('#combat-strip').innerHTML = `⚔ Round ${c.round} — <b>${esc(cur?.name || '?')}</b>'s turn` +
+    // One span for the sentence: the strip is a flex row with a gap, and a bare
+    // <b> as its own flex child was getting the gap on both sides — "Brannok 's".
+    $('#combat-strip').innerHTML = `<span>⚔ Round ${c.round} — <b>${esc(cur?.name || '?')}</b>'s turn</span>` +
       `<button class="mini" id="btn-next-turn">Next turn ▸</button>`;
     $('#btn-next-turn').onclick = () => A.advanceTurn();
   }

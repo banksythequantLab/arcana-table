@@ -178,6 +178,28 @@ await page.click('#warm-done');
 await page.waitForTimeout(250);
 ck('and it ends', await page.evaluate(() => window.__st.warmup === null));
 
+console.log('— the warm-up is offered as a card, and only once —');
+// "It asked me to stretch several times." The prompt said never to raise it
+// again after a no; the model raised it three times. The tool keeps the answer.
+await page.evaluate(() => { window.__st.fitness.warmupAnswered = null; });
+const w1 = await call('start_warmup', {});
+ck('start_warmup with no plan OFFERS rather than starts', w1.offered === true && await page.isVisible('#warm-offer'), JSON.stringify(w1).slice(0, 60));
+ck('the card has the plan buttons on it', await page.$$eval('#warm-offer [data-plan]', b => b.length) >= 2);
+ck('and a way to skip it', await page.isEnabled('#warm-offer-no'));
+await page.click('#warm-offer-no');
+await page.waitForTimeout(150);
+ck('declining closes the card', await page.isHidden('#warm-offer'));
+const w2 = await call('start_warmup', {});
+ck('a SECOND offer is refused by the tool', !!w2.error && /already answered/i.test(w2.error), (w2.error || '').slice(0, 60));
+ck('and no card came back', await page.isHidden('#warm-offer'));
+ck('but a plan the player named out loud still starts', (await call('start_warmup', { plan: '90s' })).ok === true);
+await page.evaluate(async () => (await import('/js/actions.js')).finishWarmup({ early: true }));
+ck('a new run is asked once more', await page.evaluate(async () => {
+  const A = await import('/js/actions.js');
+  A.resetQuest();
+  return window.__st.fitness.warmupAnswered === null;
+}));
+
 console.log('— the boss looks like a boss —');
 const boss = await page.evaluate(async () => {
   const { QUEST } = await import('/js/state.js');

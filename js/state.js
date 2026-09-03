@@ -238,6 +238,7 @@ function freshState() {
       holdSeconds: 0,             // planks, wall sits, stretches
       oathsKept: 0, oathMinutes: 0, oathsBroken: 0,
       warmedUp: false,            // has the player stretched this session
+      warmupAnswered: null,       // 'declined' | 'started 3min' — asked once, never again
       // Exchanges since the DM last staked something real. The model was
       // leaving eight or ten turns between offers however the prompt was
       // worded, so the count is handed to it explicitly and it is told plainly

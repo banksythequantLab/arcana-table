@@ -28,7 +28,7 @@ Vanilla JavaScript, zero build step, a canvas-rendered board, state in localStor
 
 The DM loop is ~180 lines: read the live registry with `getTools()`, translate it to OpenAI function specs, send the conversation to the Worker, run whatever tool calls come back through `executeTool()`, feed the results in, repeat up to seven hops, then speak. That loop *is* the integration — OpenAI supplies the judgement, WebMCP supplies the hands. The **🎩 DM Panel** tab is a live inspector for the same registry: every tool `getTools()` reports, with its JSON Schema rendered as a form that calls `executeTool()`. Same door, same Agent Log.
 
-A **427-assertion Playwright suite** across eleven files drives all of this through the real `document.modelContext` in headless Chromium — the registry growing and shrinking with combat, both approval outcomes, every effort mode, a five-beat run walked to victory, and pixel checks on the canvas, because we once shipped a scope bug that blanked every monster while all 196 assertions still passed.
+A **435-assertion Playwright suite** across eleven files drives all of this through the real `document.modelContext` in headless Chromium — the registry growing and shrinking with combat, both approval outcomes, every effort mode, a five-beat run walked to victory, and pixel checks on the canvas, because we once shipped a scope bug that blanked every monster while all 196 assertions still passed.
 
 ## Challenges we ran into
 
