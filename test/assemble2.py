@@ -74,7 +74,8 @@ v = VOS
 # had the floor. Before this the DM only ever spoke under the narration, ducked,
 # and nobody got to hear what the product actually sounds like.
 TASTE = 4.4        # the DM's first clause, alone, after Derek introduces it
-# (A second DM solo over the Oath paying off was cut on review: the DM speaks once.)
+HOLD_LIVE = 1.5    # the gold twenty is on screen for 0.8s before the damage roll overwrites it
+SOLO2 = 6.4        # the Oath answered, in the DM's voice — one short clause, then Derek resumes
 CUT = [
     ('card',  'open',   2.0,                                   None),
     ('shot',  None,     v['vo01_problem'] + v['vo02_whatitis'] - 2.0, at('table', 31.4, 0.3)),
@@ -86,9 +87,13 @@ CUT = [
     ('card',  'heroic', 2.0,                                   None),
     ('shot',  None,     v['vo04_heroic'] - 2.0,                at('challenge_offer', 120.0, 0.8)),
     ('slate', 'burpees',10.0,                                  None),
-    ('shot',  None,     (v['vo07_swap'] - 10.0) + v['vo04b_payoff'], at('nat20', 160.0, 1.6)),
+    # Ends on the gold twenty and HOLDS it: the very next roll used to flash up in
+    # the same gold styling with a different number, which read as a mistake.
+    ('hold',  None,     (v['vo07_swap'] - 10.0) + v['vo04b_payoff'], at('nat20', 160.0, 1.6)),
     ('card',  'oath',   2.0,                                   None),
     ('shot',  None,     v['vo08_oath'] - 2.0,                  at('oath_offer', 200.0, 0.6)),
+    # The DM, briefly: the Oath clock at zero, "Done — I kept it", and its line.
+    ('shot',  None,     SOLO2,                                 at('oath_kept', 278.8, 1.4)),
     ('model', None,     v['vo10_brain'],                       28.0),
     # "Under the hood", cut at a real pause after the tool names: the last third
     # of the narration was the wordiest, and this is where it rambled.
@@ -111,6 +116,16 @@ for i, (kind, src, length, start) in enumerate(CUT):
                  '-t',f'{length:.3f}','-r',str(FPS),'-an','-c:v','libx264','-preset','veryfast',
                  '-crf','20','-pix_fmt','yuv420p',str(out)])
         src = 'pushups'
+    elif kind == 'hold':
+        live = HOLD_LIVE                             # tumble, land — then freeze on the gold
+        s = min(start, max(FOOT_LEN - live - 0.1, 0))
+        # Trim on the INPUT side, so the pad can extend the output past it.
+        run(['ffmpeg','-y','-loglevel','error','-ss',f'{s:.3f}','-t',f'{live:.3f}','-i',str(FOOT),
+             '-r',str(FPS),'-an','-c:v','libx264','-preset','veryfast','-crf','20','-pix_fmt','yuv420p',
+             '-vf',f'scale={W}:{H},tpad=stop_mode=clone:stop_duration={length - live:.3f}',
+             '-t',f'{length:.3f}',str(out)])
+        timeline.append((cursor, s, live))
+        start = s
     elif kind == 'model':
         run(['ffmpeg','-y','-loglevel','error','-stream_loop','-1','-i',str(MODEL),
              '-ss',f'{start:.3f}','-t',f'{length:.3f}','-r',str(FPS),'-an',
@@ -130,7 +145,7 @@ for i, (kind, src, length, start) in enumerate(CUT):
         timeline.append((cursor, s, length))          # (video time, footage time, len)
         start = s
     parts.append(out)
-    print(f'  {i:02d} {kind:5} {src or "footage":8} {length:6.1f}s' + (f'  @bed {start:.1f}s' if kind == 'shot' else ''))
+    print(f'  {i:02d} {kind:5} {src or "footage":8} {length:6.1f}s' + (f'  @bed {start:.1f}s' if kind in ('shot','hold') else ''))
     cursor += length
 TOTAL = cursor
 
@@ -141,7 +156,7 @@ run(['ffmpeg','-y','-loglevel','error','-f','concat','-safe','0','-i',str(listin
 
 # ── Derek's narration: continuous, starting on each card ─────────────────────
 ORDER = ['vo01_problem','vo02_whatitis',('sil', TASTE),'vo03a_nobackdoor','vo03b_contract','vo04_heroic',
-         'vo07_swap','vo04b_payoff','vo08_oath','vo10_brain','vo05_hood_trim','vo06_close']
+         'vo07_swap','vo04b_payoff','vo08_oath',('sil', SOLO2),'vo10_brain','vo05_hood_trim','vo06_close']
 apieces = []
 for j, name in enumerate(ORDER):
     out = BUILD / f'a{j:02d}.wav'
@@ -171,8 +186,10 @@ PIN_DM = {}
 # Derek introduces the DM; then it speaks — one clause, four seconds, alone.
 # Two voices never speak at once. The DM is heard ONLY in the holes left in the
 # narration, and each clip is cut at a sentence end before the narration resumes.
+solo2_video = sum(l for (k, s, l, st) in CUT[:11])          # video time of CUT[11]
 EXTRA_DM = [
     (taste_video + 0.15, BED / 'dm/00_taste.mp3', 'The Ember Crown is burning the marshes… (taste)'),
+    (solo2_video + 0.6,  BED / 'dm/04_short.mp3', 'The dishes are cleared, and the oath answers: Brannok\'s blade strikes with impossible force (short)'),
 ]
 placed = list(EXTRA_DM)
 for c in dmclips:
