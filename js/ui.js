@@ -79,7 +79,9 @@ export function initUI() {
   bindDMPanel();
   bindChallengeModal();
   bindWarmup();
+  bindWarmOffer();
   bindOath();
+  bindTasks();
   bindEffortPref();
   bindSay();
   bindIntro();
@@ -425,6 +427,19 @@ function bindChallengeModal() {
   });
 }
 
+function bindWarmOffer() {
+  document.querySelectorAll('#warm-offer [data-plan]').forEach(b => {
+    b.onclick = () => A.startWarmup({ plan: b.dataset.plan });
+  });
+  $('#warm-offer-no').onclick = () => A.dismissWarmupOffer();
+}
+
+function renderWarmOffer() {
+  const o = state.warmupOffer;
+  $('#warm-offer').hidden = !o || !!state.warmup;
+  if (o && o.reason) $('#warm-offer-reason').textContent = o.reason;
+}
+
 function bindWarmup() {
   $('#warm-pause').onclick = () => A.pauseWarmup();
   $('#warm-skip').onclick = () => A.skipStretch();
@@ -693,6 +708,38 @@ function renderMilestone() {
   msTimer = setTimeout(() => { el.hidden = true; }, 7000);
 }
 
+// ── a task list ──────────────────────────────────────────────────────────────
+// Rows, not one ultimatum. The claim button carries the running total so the
+// player can see the price of what they have ticked before they commit to it.
+function bindTasks() {
+  $('#tasks-list').addEventListener('click', e => {
+    const row = e.target.closest('[data-task]');
+    if (row) A.toggleTask(Number(row.dataset.task));
+  });
+  $('#tasks-claim').onclick = () => A.claimTasks();
+  $('#tasks-skip').onclick = () => A.claimTasks();   // nothing ticked pays nothing
+}
+
+function renderTasks() {
+  const t = state.tasks;
+  const el = $('#tasks');
+  el.hidden = !t;
+  if (!t) return;
+  $('#tasks-reason').textContent = t.reason || '';
+  $('#tasks-list').innerHTML = t.items.map((i, n) => `
+    <button type="button" class="task-row${i.done ? ' on' : ''}" data-task="${n}"
+            role="checkbox" aria-checked="${i.done}">
+      <span class="task-box" aria-hidden="true">${i.done ? '✓' : ''}</span>
+      <span class="task-label">${esc(i.label)}</span>
+      <span class="task-pts">+${i.bonus}</span>
+    </button>`).join('');
+  const total = A.taskTotal();
+  const claim = $('#tasks-claim');
+  claim.textContent = total > 0 ? `Claim +${total} 🔥` : 'Roll fate as it lies';
+  claim.classList.toggle('ghost', total === 0);
+  $('#tasks-skip').hidden = total > 0;
+}
+
 // ── an Oath ──────────────────────────────────────────────────────────────────
 function renderOath() {
   const o = state.oath;
@@ -772,6 +819,8 @@ function renderQuest() {
 function render() {
   renderHeader();
   renderWarmup();
+  renderWarmOffer();
+  renderTasks();
   renderOath();
   renderQuest();
   renderLog();

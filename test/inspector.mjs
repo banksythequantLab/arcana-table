@@ -84,10 +84,23 @@ ck('a tool error is shown, not swallowed',
 // The registry is dynamic — the panel must follow it.
 const before = (await rows()).length;
 await page.evaluate(() => window.arcana.call('start_combat', {}));
-await page.waitForFunction(n => document.querySelectorAll('.mcp-tool').length > n, before);
-const during = await rows();
+// The three combat tools register one at a time and BOTH sides grow as they
+// land — so "the panel has more rows than before" is true after the first of
+// three, and reading the panel and the registry in two separate calls compares
+// two different instants. Wait for all three to be there, then read both in one
+// evaluate so the comparison is of a single moment.
+await page.waitForFunction(() => {
+  const shown = [...document.querySelectorAll('.mcp-tool')].map(d => d.dataset.tool);
+  return ['advance_turn', 'update_hp', 'apply_condition'].every(n => shown.includes(n));
+}, null, { timeout: 5000 });
+const snap = await page.evaluate(async () => ({
+  panel: [...document.querySelectorAll('.mcp-tool')].map(d => d.dataset.tool),
+  live: (await (document.modelContext || navigator.modelContext).getTools()).map(t => t.name),
+}));
+const during = snap.panel;
 ck('combat tools appear in the panel', during.includes('advance_turn'), `${before} → ${during.length}`);
-ck('the panel still matches the registry', JSON.stringify(during) === JSON.stringify(await registry()));
+ck('the panel still matches the registry', JSON.stringify(snap.panel) === JSON.stringify(snap.live),
+   `panel ${snap.panel.length} | registry ${snap.live.length}`);
 await page.evaluate(() => window.arcana.call('end_combat', {}));
 await page.waitForFunction(n => document.querySelectorAll('.mcp-tool').length === n, before);
 ck('and they leave again when the fight ends', !(await rows()).includes('advance_turn'));

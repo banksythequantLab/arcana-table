@@ -55,7 +55,7 @@ async function enterTable(page, { muted = true } = {}) {
   await page.waitForSelector('#intro[hidden]', { timeout: 10000 }).catch(() => {});
 }
 
-const BASE_N = 20, COMBAT_N = 23, DOWNED_N = 21;   // base · +combat · +death_save
+const BASE_N = 21, COMBAT_N = 24, DOWNED_N = 22;   // base · +combat · +death_save
 const call = (name, args) => page.evaluate(([n, a]) => window.arcana.call(n, a), [name, args]);
 let pass = 0, fail = 0;
 const check = (label, cond, extra = '') => {
@@ -114,13 +114,16 @@ check('character sheet for Brannok', sheet.name === 'Brannok' && sheet.abilities
 
 console.log('— narration / scene —');
 check('narrate ok', (await call('narrate', { text: 'A chill wind rises.' })).ok === true);
-check('set_scene to crypt', (await call('set_scene', { mapId: 'crypt', mood: 'Embers drift upward.' })).ok === true);
+// Maps belong to beats now: only advance_quest travels. set_scene keeps title and mood.
+const crypt = await call('set_scene', { mapId: 'crypt', mood: 'Embers drift upward.' });
+check('set_scene REFUSES to switch the map', !!crypt.error && crypt.useInstead === 'advance_quest', crypt.error);
+check('set_scene still sets the mood', (await call('set_scene', { mood: 'Embers drift upward.' })).ok === true);
 check('set_scene rejects bad map', !!(await call('set_scene', { mapId: 'moonbase' })).error);
 
 console.log('— board ops —');
 const spawn = await call('add_token', { name: 'Snaggle', kind: 'monster', art: 'goblin', x: 11, y: 6, hp: 7 });
 check('add_token spawns goblin', spawn.ok && spawn.token.name === 'Snaggle');
-const mv = await call('move_token', { tokenId: 'Brannok', x: 5, y: 6 });
+const mv = await call('move_token', { tokenId: 'Brannok', x: 6, y: 6 });   // open floor on the keep map
 check('move_token ok', mv.ok === true, JSON.stringify(mv));
 check('move into wall rejected', !!(await call('move_token', { tokenId: 'Brannok', x: 0, y: 0 })).error);
 check('reveal_area ok', (await call('reveal_area', { x: 10, y: 6, radius: 4 })).ok === true);
@@ -144,12 +147,15 @@ const dmg = await call('update_hp', { tokenId: 'Snaggle', delta: -3 });
 check('damage goblin (no approval needed)', dmg.ok && dmg.hp === 4, JSON.stringify(dmg));
 
 // PC damage requires approval — approve via UI button
+// Monsters take their own turns now, so the goblin may already have hit him
+// when it won initiative — measure from wherever he actually is.
+const hpBefore = await page.evaluate(() => window.__st.tokens.find(t => t.name === 'Brannok').hp);
 const pcDmgPromise = call('update_hp', { tokenId: 'Brannok', delta: -5 });
 await page.waitForSelector('.approval', { timeout: 5000 });
 await page.screenshot({ path: 'screens/approval.png' });
 await page.click('.approval .ok');
 const pcDmg = await pcDmgPromise;
-check('PC damage approved via ✓', pcDmg.ok && pcDmg.hp === 19, JSON.stringify(pcDmg));
+check('PC damage approved via ✓', pcDmg.ok && pcDmg.hp === hpBefore - 5, `${hpBefore} → ${JSON.stringify(pcDmg)}`);
 
 // deny path
 const denyPromise = call('remove_token', { tokenId: 'Brannok' });

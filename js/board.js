@@ -5,7 +5,7 @@
 import { state, GRID_W, GRID_H, currentMap, isRevealed, isWalkable, findToken } from './state.js';
 import { moveToken, moveParty, onChange, emit } from './actions.js';
 import { TOKEN_ART, TILE_COLORS } from './art.js';
-import { fx, step, draw as drawFx, damageNumber, burst, ring, kick, flash } from './fx.js';
+import { fx, step, draw as drawFx, damageNumber, burst, ring, kick, flash, slash } from './fx.js';
 
 let canvas, ctx, cell = 44, offX = 0, offY = 0;
 let drag = null;
@@ -16,6 +16,14 @@ let lastPos = new Map();
 let lastHp = new Map();
 let lastDiceT = 0;
 let lastSpellT = 0;
+let lastSwingT = 0;
+let lastDeathT = 0;
+
+/** The dice overlay sits on top of the board; anything drawn under it is lost. */
+const diceOverlayUp = () => {
+  const o = document.getElementById('dice-overlay');
+  return !!o && !o.hidden;
+};
 let lastMsT = 0;
 let lastFrame = performance.now();
 
@@ -87,6 +95,29 @@ function detectChanges(prime = false) {
     ring(sp.x, sp.y, '#F0762E');
     flash('rgba(240,118,46,.22)', 380);
     kick(10);
+  }
+
+  // An attack rolls dice, and the dice overlay covers the whole board for two to
+  // three seconds — so a swing played the moment it resolved was drawn entirely
+  // behind it and nobody ever saw one. Both of these wait for the board to be
+  // visible again; the render loop fires them on the first clear frame.
+  if (!diceOverlayUp()) {
+    // Steel, visible: an arc from the attacker across the target.
+    const sw = state.swingFx;
+    if (sw && sw.t !== lastSwingT) {
+      lastSwingT = sw.t;
+      slash(sw.from, sw.to, { crit: sw.crit, hit: sw.hit !== false });
+    }
+
+    // Something died here. It is already gone from state.tokens by the time this
+    // runs, so the puff is the only thing marking where it stood.
+    const df = state.deathFx;
+    if (df && df.t !== lastDeathT) {
+      lastDeathT = df.t;
+      burst(df.x, df.y, 18, '#6B5E76');
+      burst(df.x, df.y, 9, '#C9A97A');
+      ring(df.x, df.y, '#8A8194');
+    }
   }
 
   // A cleared beat throws a small party over the heroes.

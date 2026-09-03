@@ -332,6 +332,9 @@ input[type=checkbox]{flex:0 0 auto;width:18px;height:18px;padding:0;accent-color
    makes it cream-on-cream, i.e. invisible. Every paper card needs ink. */
 .chal-row .btn.ghost,
 .warm-row .btn.ghost,
+.warm-plan-row .btn.ghost,
+.warm-offer-card .btn.ghost,
+.tasks-foot .btn.ghost,
 .oath-row .btn.ghost{color:var(--ink);border-color:var(--ink)}
 /* a disabled button must look disabled, not merely refuse to work */
 .btn:disabled{opacity:.42;cursor:default;box-shadow:none}
@@ -608,7 +611,34 @@ input[type=checkbox]{flex:0 0 auto;width:18px;height:18px;padding:0;accent-color
 .oath-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
 .oath-clock{font:800 62px/1 "Baloo 2",cursive;color:#8A3A12;margin:6px 0 8px;font-variant-numeric:tabular-nums}
 .oath-copy{margin:0 0 16px;font-size:15px;color:#4A3F55;line-height:1.5}
-.oath-honour{margin:14px 0 0;font-size:12px;font-style:italic;color:#7A6E80}
+/* The warm-up offer: a choice, with the choices on it */
+.warm-offer-card{max-width:440px;text-align:center}
+.warm-plan-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:16px 0 10px}
+.warm-plan-row .btn{flex:1 1 120px}
+@media (max-width:560px){ .warm-plan-row .btn{flex:1 1 100%} }
+
+/* Task list — one card, several prices */
+.tasks-card{max-width:460px}
+.tasks-list{display:flex;flex-direction:column;gap:8px;margin:14px 0 4px}
+.task-row{display:flex;align-items:center;gap:10px;width:100%;padding:11px 13px;
+          border:2px solid #C9A97A;border-radius:11px;background:#FBF3E2;
+          color:#4A3B2A;font:700 15px/1.25 inherit;text-align:left;cursor:pointer}
+.task-row:hover{background:#F5E6C8}
+.task-row:focus-visible{outline:3px solid #2F6F4F;outline-offset:2px}
+.task-box{flex:0 0 22px;height:22px;border:2px solid #8A7A5A;border-radius:6px;
+          display:grid;place-items:center;font-size:14px;background:#FFF}
+.task-label{flex:1}
+.task-pts{font:800 15px "Baloo 2",cursive;color:#8A3A12;white-space:nowrap}
+.task-row.on{background:#EAF3E4;border-color:#2F6F4F}
+.task-row.on .task-box{background:#2F6F4F;border-color:#2F6F4F;color:#FFF}
+.task-row.on .task-pts{color:#2F6F4F}
+.tasks-foot{display:flex;gap:9px;align-items:center;justify-content:center;margin-top:14px;flex-wrap:wrap}
+.tasks-note{margin:9px 0 0;font-size:12px;font-style:italic;color:#6B5E76}
+@media (max-width:560px){ .task-row{font-size:14px;padding:13px 11px} }
+
+.oath-escape{margin:12px 0 0;font-size:12.5px;color:#6B5E76}
+.oath-escape b{color:#4A3B2A}
+.oath-honour{margin:6px 0 0;font-size:12px;font-style:italic;color:#7A6E80}
 
 @media (max-width: 860px){
   .warm-backdrop{inset:0}          /* the panel stacks below on a phone */

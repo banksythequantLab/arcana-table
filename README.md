@@ -30,6 +30,15 @@ dice. **Heroic Effort** has three shapes and they all pay the same:
   agreed, the DM waits in silence, and you confirm on your honour when you get
   back. Nothing here can verify it, which is rather the point.
 
+Or the DM can put up a **task list** instead of one ultimatum: three small
+things at once, each priced on its own — five push-ups, a twenty-second plank,
+five squats, +2 apiece. Tick off whatever you actually did. All three is +6, two
+of three is +4, and that partial credit is the point: one big ask is a yes/no
+question, and a player who would decline it will usually take part of a list.
+The rows are priced off the same ladder as a single challenge, so it is not a
+cheaper door to the same rewards — and because flat bonuses are what add up, a
+list never pays advantage or a natural 20. Those stay with the single ask.
+
 The Oath is not a consolation prize, and the DM is told so in as many words.
 Some players cannot do push-ups today. Some are stuck on homework. The table
 takes either.
@@ -74,7 +83,7 @@ Built for [The WebMCP Challenge](https://webmcp.devpost.com/) (Devpost, 2026).
 
 1. **Just open the live URL — in any modern browser.** The page ships the
    vendored [`@mcp-b/webmcp-polyfill`](https://github.com/WebMCP-org/npm-packages)
-   (MIT), so `document.modelContext` and all 24 tools are real even where the
+   (MIT), so `document.modelContext` and all 25 tools are real even where the
    browser hasn't implemented WebMCP yet. No flags, no setup. Where the browser
    *does* ship WebMCP natively, the native implementation wins and the badge
    says `WebMCP native` instead of `polyfill`.
@@ -83,7 +92,7 @@ Built for [The WebMCP Challenge](https://webmcp.devpost.com/) (Devpost, 2026).
 3. **Or bring your own agent.** In a WebMCP-capable agent browser, point your
    agent at the page: *"You're my co-DM. Read the board, set the scene, and run
    me through this dungeon. Offer Heroic Effort when a roll matters."* It drives
-   the identical 24 tools.
+   the identical 25 tools.
 4. **Or run it yourself.** The **🎩 DM Panel** tab is a live inspector for the
    registry: every tool `getTools()` reports, with its schema rendered as a form
    that calls `executeTool()`. Same door the DM uses, same Agent Log. The game
@@ -108,23 +117,24 @@ await arcana.call('roll_dice', { formula: 'd20', reason: 'Attack the dragon' })
 | `get_board_state` | Scene, map grid + legend, tokens, combat, boosts, recent log | `readOnlyHint` |
 | `get_character_sheet` | HP/AC/abilities/conditions/inventory | `readOnlyHint` |
 | `get_fitness_log` | Reps, exercises, rewards earned, active challenge | `readOnlyHint` — lets the agent pace the workout |
-| `roll_dice` | Animated, public dice rolls; Heroic boosts auto-apply | |
+| `roll_dice` | Animated, public dice rolls; Heroic boosts auto-apply | **paced**: two rolls with nothing staked and it refuses once, asking for an offer first |
 | `narrate` | DM voice into the story log | |
-| `set_scene` | Swap between 3 battle maps, set title/mood | resets fog |
+| `set_scene` | Title and mood line | **cannot change the map** — beats own maps, and only `advance_quest` travels, because that is the call that pays |
 | `reveal_area` | Clear fog of war | |
 | `move_token` | Animated movement, wall-aware | PCs light the whole path they walk |
 | `move_party` | Move the whole party in one call; companions take cells beside the leader | wall-aware · nobody stacks · lifts fog for everyone |
 | `attack` | One attack resolved end to end: to-hit, damage, fog lifted on the target | **reach enforced** — a melee swing out of range is refused, with the cell to move to |
 | `add_token` | Spawn monsters/NPCs/objects | 15 arts · monsters get a per-token tint, stature and facing so two of a kind are not one picture twice |
 | `remove_token` | Take a token off the board | ⚠ removing a PC waits for player approval |
-| `start_combat` / `end_combat` | Initiative on/off | **dynamically registers/unregisters** the combat tools |
-| `advance_turn` | Next combatant | combat-only |
+| `start_combat` / `end_combat` | Initiative on/off | **dynamically registers/unregisters** the combat tools · a monster that wins initiative acts at once |
+| `advance_turn` | Next combatant | combat-only · **every monster whose turn comes up acts by itself** — closes, swings or shoots — until a hero is up |
 | `update_hp` | Damage / healing | combat-only · PC damage waits for approval |
 | `apply_condition` | poisoned, stunned, blessed… | combat-only |
 | `award_loot` | Items + gold | |
 | `propose_challenge` | **Heroic Effort**: reps or a timed hold vs. a dice reward | resolves when the player finishes or declines |
+| `propose_task_list` | 2-3 small asks at once, each worth its own flat bonus | tick off what you did — all three is +6, two of three is +4 |
 | `propose_oath` | Stake a real-world task — chores, study, reading | **locks the table** for the minutes agreed |
-| `start_warmup` | Guided standing stretches: 90s / 3 / 5 / 10 min | finishing grants +2 next roll |
+| `start_warmup` | Guided standing stretches: 90s / 3 / 5 / 10 min | called with no plan it shows a card and the player picks · finishing grants +2 next roll |
 | `get_quest` | The run: which of the five beats, its objective, what is done | `readOnlyHint` — the DM's destination |
 | `advance_quest` | Mark a beat achieved: pays the milestone, swaps the map, spawns the boss | clearing the last beat wins the run |
 | `death_save` | Roll for a hero at 0 HP | **only registered while someone is down** |
@@ -139,7 +149,7 @@ Design choices worth noting:
   `registerTool(def, { signal })` — and unregistered by `controller.abort()`,
   which is how the WebMCP spec removes tools and fires `toolchange` so agents
   refresh. The test suite asserts this against the live registry: `getTools()`
-  returns 20, then 23 once combat starts, then 20 again when it ends — and 24
+  returns 21, then 24 once combat starts, then 21 again when it ends — and 25
   when a hero drops mid-fight, because `death_save` exists only while someone is
   bleeding out.
 - **Human-in-the-loop by construction.** Destructive calls (`remove_token` on a PC,
@@ -231,7 +241,7 @@ npx serve .        # or: python3 -m http.server 8080
 cd test && npm install && npm test
 ```
 
-**314 assertions across ten suites**, Playwright + Chromium, all against the real
+**427 assertions across eleven suites**, Playwright + Chromium, all against the real
 page — see `test/README.md` for what each one covers. The largest, `smoke.mjs`,
 drives the full tool surface **through the real `document.modelContext`** — enumerating tools with `getTools()`, invoking
 them with `executeTool()`, asserting `readOnlyHint` on the read tools, and

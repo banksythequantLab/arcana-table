@@ -141,6 +141,24 @@
 </div>
 
 <!-- Heroic Effort modal -->
+<!-- The warm-up is a choice with two good answers, so it is a card with the
+     buttons on it — not a question in the chat that the player has to answer in
+     prose while the moment passes. -->
+<div id="warm-offer" class="warm-backdrop" hidden>
+  <div class="warm-card warm-offer-card">
+    <div class="warm-eyebrow">🤸 BEFORE YOU GO IN</div>
+    <div class="warm-name">Warm up first?</div>
+    <p id="warm-offer-reason" class="warm-cue">Twenty standing stretches, head to ankle.
+      Nothing needs a mat or the floor — and finishing starts you warm: <b>+2 on your first roll</b>.</p>
+    <div class="warm-plan-row">
+      <button class="btn big" data-plan="90s" type="button">90 seconds</button>
+      <button class="btn big" data-plan="3min" type="button">3 minutes</button>
+      <button class="btn ghost" data-plan="5min" type="button">5 minutes</button>
+    </div>
+    <button id="warm-offer-no" class="btn ghost" type="button">Straight in, no stretching ▸</button>
+  </div>
+</div>
+
 <div id="warmup" class="warm-backdrop" hidden>
   <div class="warm-card">
     <div class="warm-head">
@@ -180,6 +198,12 @@
         <button id="oath-keep" class="btn big" type="button" disabled>Done — I kept it</button>
         <button id="oath-quit" class="btn ghost" type="button">I had to stop</button>
       </div>
+      <!-- The Oath locks the whole board, so the way out has to be obvious from
+           the first second, not discovered at minute twenty. It costs the
+           reward and nothing else — say so, or "I had to stop" reads as a
+           confession and someone just trying the table sits there stuck. -->
+      <p class="oath-escape">Just trying the table? <b>I had to stop</b> works from the first
+        second — you lose the reward, nothing else.</p>
       <p class="oath-honour">On your honour. Nothing here can check, which is rather the point.</p>
     </div>
   </div>
@@ -210,6 +234,22 @@
     <p id="ending-sub" class="ending-sub"></p>
     <div id="ending-stats" class="ending-stats"></div>
     <button id="ending-again" class="btn big" type="button">Run it again →</button>
+  </div>
+</div>
+
+<!-- A task list instead of one take-it-or-leave-it ask. Three small things, each
+     worth its own points, tick off whatever you actually did. A player who says
+     no to "ten push-ups" will often say yes to two rows out of three. -->
+<div id="tasks" class="chal-backdrop" hidden>
+  <div class="chal-card tasks-card">
+    <div class="chal-eyebrow">📋 PICK YOUR PRICE</div>
+    <p id="tasks-reason" class="chal-reason"></p>
+    <div id="tasks-list" class="tasks-list"></div>
+    <div class="tasks-foot">
+      <button id="tasks-claim" class="btn big" type="button">Roll fate as it lies</button>
+      <button id="tasks-skip" class="btn ghost" type="button">Skip this ▸</button>
+    </div>
+    <p class="tasks-note">Tick what you actually did. Part of the list still pays.</p>
   </div>
 </div>
 

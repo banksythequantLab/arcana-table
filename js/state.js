@@ -228,6 +228,8 @@ function freshState() {
     party: { gold: 0, loot: [], level: 1 },   // the party levels on every cleared beat
     dice: null,                   // last roll result
     spellFx: null,                // {x, y, kind, t} — the board paints the burst
+    swingFx: null,                // {from, to, t} — the arc of a melee swing
+    deathFx: null,                // {x, y, art, name, t} — where something fell
     milestone: null,              // {t, title, items, gold, boon} — the beat-cleared banner
     boosts: { bonus: 0, advantage: false, setRoll: null },  // earned via Heroic Effort
     challenge: null,              // active exercise challenge
@@ -241,10 +243,17 @@ function freshState() {
       // worded, so the count is handed to it explicitly and it is told plainly
       // when it is overdue.
       turnsSinceOffer: 0, offersMade: 0,
+      // Turns were the wrong unit. A DM can roll three times inside one
+      // exchange and the turn clock only ticks once, so the table went whole
+      // fights without staking anything while the counter said it was fine.
+      // Rolls are what the player actually experiences, so rolls are counted.
+      rollsSinceOffer: 0, rollsGated: 0, rollGateWaived: false,
     },
     quest: { beatIndex: 0, status: 'active', completed: [], startedAt: Date.now() },
     downed: null,                 // {tokenId, saves, fails} — the board is frozen while this is set
+    warmupOffer: null,            // {reason, plans} — the card asking which plan
     warmup: null,                 // {planId, index, seq, hold, count, remaining, paused}
+    tasks: null,                  // {items:[{label,bonus,done}]} — pick your own price
     oath: null,                   // {label, kind, minutes, endsAt, reward} — the table waits
     settings: { autoApprove: false,
                 effortPref: 'any',        // which of the three currencies the table may ask for
@@ -263,7 +272,7 @@ function load() {
       // Neither a live challenge nor a running warm-up is a save state: half a
       // set of push-ups means nothing, and a restored warm-up has no interval
       // behind it, so its card would sit frozen on a stretch forever.
-      if (s && s.tokens && s.scene) return { ...freshState(), ...s, challenge: null, warmup: null };
+      if (s && s.tokens && s.scene) return { ...freshState(), ...s, challenge: null, warmup: null, warmupOffer: null, tasks: null };
     }
   } catch (e) { /* private mode / corrupt save — start fresh */ }
   return freshState();

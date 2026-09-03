@@ -50,6 +50,15 @@ all pay identically.
   words that an Oath is an equal, never a consolation prize, and to reach for
   one when a player mentions something they are avoiding.
 
+- **A task list** — the same effort, asked better. Three small rows on one card,
+  each worth its own flat bonus: five push-ups, a twenty-second plank, five
+  squats, +2 each. Tick off what you actually did; all three is +6 and two of
+  three is +4. One offer is a yes/no question and a decline pays nothing, but a
+  player who will not do ten push-ups will very often do two rows out of three.
+  Rows are priced off the same ladder as the single ask, so the list is not a
+  discount — and since only flat bonuses add, it never pays advantage or a
+  natural 20. Those stay with `propose_challenge`.
+
 **On the Oath having no verification.** It doesn't, deliberately, and the UI
 says so to your face: *"On your honour. Nothing here can check, which is rather
 the point."* We could have faked a check. We chose not to, for three reasons.
@@ -105,14 +114,15 @@ is the way out of death, which is the argument the whole project is making.
   A ~200-line Cloudflare Worker holds the OpenAI API key so none reaches a
   browser — origin-locked, size-capped, 40 req/min per IP.
 
-- **24 tools** registered through `document.modelContext` / `navigator.modelContext`
-  (20 always on, 3 more while combat runs, 1 more while a hero is bleeding out)
+- **25 tools** registered through `document.modelContext` / `navigator.modelContext`
+  (21 always on, 3 more while combat runs, 1 more while a hero is bleeding out)
   — reads (`get_board_state`, `get_character_sheet`, `get_fitness_log`, `get_quest`, all
   `readOnlyHint: true`), board actions (`move_party`, `move_token`, `add_token`,
   `reveal_area`, `set_scene`), the reach-enforcing `attack`, game flow (`roll_dice`, `narrate`, `start_combat`, `end_combat`,
   `remove_token`, `award_loot`)
   the quest tools (`get_quest`, `advance_quest`), and the effort tools
-  (`propose_challenge` for reps and timed holds, `propose_oath` for real-world
+  (`propose_challenge` for reps and timed holds, `propose_task_list` for a card of
+  2-3 small asks the player can part-complete, `propose_oath` for real-world
   commitments, `start_warmup` for the guided stretch program).
 - **Dynamic registration, the way the spec prescribes:** combat tools
   (`advance_turn`, `update_hp`, `apply_condition`) exist only while combat runs.
@@ -120,13 +130,28 @@ is the way out of death, which is the argument the whole project is making.
   { signal })` — and removed by `controller.abort()`, which fires `toolchange`
   so agents refresh. The same pattern registers `death_save` only while a hero
   is at 0 HP. Our tests assert it against the live registry: `getTools()` returns
-  20, then 23 during combat, then 20 again — and 24 when a hero drops mid-fight,
+  21, then 24 during combat, then 21 again — and 25 when a hero drops mid-fight,
   because `death_save` joins the combat set.
 - **No flag, no setup, for anyone:** the page vendors the MIT
-  `@mcp-b/webmcp-polyfill`, so `document.modelContext` and the full 24-tool
-  surface are real in any modern browser — 20 registered at rest, the rest
+  `@mcp-b/webmcp-polyfill`, so `document.modelContext` and the full 25-tool
+  surface are real in any modern browser — 21 registered at rest, the rest
   appearing with combat and with a downed hero. Judges just open the URL. Where WebMCP ships natively,
   that implementation wins and the badge honestly reads `native` vs `polyfill`.
+- **The rules that matter are enforced by the tools, not requested in the prompt.**
+  We asked the model to offer effort more often three different ways — system
+  prompt, a counter in every turn's context, a nudge injected into the message
+  stream — and it complied for a while and drifted back every time. So the
+  version that shipped is not a request: after two rolls with nothing staked,
+  `roll_dice` refuses once and names the offer to make first (never twice in a
+  row, so it cannot wedge a game). The same lesson runs through the rest of the
+  surface. `set_scene` cannot change the map — only `advance_quest` travels,
+  because that is the call that pays the milestone, and a DM once walked the
+  party into the glade the other way and the beat never cleared. Monsters take
+  their own turns the moment initiative reaches them, closing and swinging at
+  the nearest hero and handing the DM the result to narrate, because "say the
+  word and the goblin attacks" is not a turn. What dies leaves the board. A
+  language model is a good storyteller and an unreliable referee; the tools are
+  the referee.
 - **Human-in-the-loop by construction:** destructive calls (removing a token,
   damaging a player character) suspend inside `execute()` — for up to 45 seconds, after which the call
   resolves as denied and the DM is told to carry on without it — until the player
@@ -219,7 +244,7 @@ design commitments in the code rather than assertions:
 Vanilla JS single-page app, zero build step, no backend beyond a ~200-line
 Cloudflare Worker that proxies OpenAI — a canvas-rendered grid board (3 maps,
 fog of war, drag-and-drop tokens), state in localStorage, cel-shaded cartoon
-art. A 314-assertion Playwright suite drives the tools through the real
+art. A 427-assertion Playwright suite drives the tools through the real
 `document.modelContext` — `getTools()`, `executeTool()`, `readOnlyHint` on
 reads, the registry growing and shrinking with combat and with a downed hero,
 both approval outcomes, all three effort modes, the guided warm-up, and a
@@ -312,6 +337,6 @@ disagreements between model families, so a different model usually just works.
 
 - **Live:** https://arcana-table.pages.dev
 - **Code:** https://github.com/banksythequantLab/arcana-table
-- **Tests:** `cd test && npm install && npm test` — 314 assertions across ten
+- **Tests:** `cd test && npm install && npm test` — 427 assertions across eleven
   suites against the real `document.modelContext`, including the 11 accessibility
   checks above. `test/README.md` says what each suite covers.

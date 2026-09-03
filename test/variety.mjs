@@ -87,6 +87,73 @@ await page.evaluate(async () => {
   A.proposeOath({ label: 'the sink', kind: 'chores', minutes: 5, reward: 'bonus+2', reason: 'now' });
 });
 ck('an Oath counts as staking effort too', (await pace()).since === 0, JSON.stringify(await pace()));
+
+// The turn clock above was advisory and the model drifted past it anyway. This
+// one is not advisory: the dice stop. Everything below is the gate.
+console.log('— and after two unpaid rolls the dice actually stop —');
+const clearStakes = () => page.evaluate(() => {
+  window.__st.challenge = null; window.__st.oath = null; window.__st.warmup = null; window.__st.downed = null;
+  window.__st.fitness.rollsSinceOffer = 0; window.__st.fitness.rollGateWaived = false;
+});
+const rollsLeft = () => page.evaluate(async () => (await import('/js/actions.js')).getFitnessLog().rollsLeftBeforeDiceStop);
+await clearStakes();
+ck('a fresh clock allows two rolls', await rollsLeft() === 2);
+let r1 = await call('roll_dice', { formula: 'd20', reason: 'first' });
+ck('the first roll goes through', typeof r1.total === 'number', JSON.stringify(r1).slice(0, 60));
+ck('and the clock ticks down', await rollsLeft() === 1);
+let r2 = await call('roll_dice', { formula: 'd20', reason: 'second' });
+ck('so does the second', typeof r2.total === 'number');
+ck('now the dice are locked', await rollsLeft() === 0);
+const gated = await call('roll_dice', { formula: 'd20', reason: 'third' });
+ck('the third roll is REFUSED', !!gated.error, (gated.error || '').slice(0, 55));
+ck('the refusal says an offer must come first', gated.mustOfferFirst === true);
+ck('it names how many rolls went unpaid', gated.rollsSinceOffer >= 2, `${gated.rollsSinceOffer}`);
+ck('and it tells the DM the refusal will not repeat, so it cannot deadlock',
+   /will not repeat/i.test(gated.note || ''), gated.note || '');
+
+// A pacing rule that can wedge a game is worse than the drift it fixes.
+const afterWaiver = await call('roll_dice', { formula: 'd20', reason: 'again' });
+ck('rolling again immediately is allowed — one refusal, never two',
+   typeof afterWaiver.total === 'number', JSON.stringify(afterWaiver).slice(0, 60));
+const gated2 = await call('roll_dice', { formula: 'd20', reason: 'and again' });
+ck('but it comes back on the next roll if still nothing is staked', !!gated2.error);
+
+console.log('— staking something clears it —');
+await page.evaluate(async () => {
+  const A = await import('/js/actions.js');
+  A.proposeChallenge({ mode: 'reps', exercise: 'push-ups', reps: 5, reward: 'bonus+2', reason: 'pay for it' });
+});
+ck('a live challenge lifts the gate at once', typeof (await call('roll_dice', { formula: 'd20' })).total === 'number');
+await page.evaluate(async () => (await import('/js/actions.js')).declineChallenge());
+// One roll has already happened since that offer, so one of the two is spent —
+// the point is that the clock restarted rather than staying run out.
+ck('and having offered restarted the roll clock', await rollsLeft() === 1, `${await rollsLeft()}`);
+
+console.log('— the gate never fires where it would break something —');
+await page.evaluate(() => { window.__st.fitness.rollsSinceOffer = 9; window.__st.fitness.rollGateWaived = false; });
+await page.evaluate(() => { window.__st.downed = { tokenId: 'x', saves: 0, fails: 0 }; });
+ck('a downed hero is never made to wait for a bargain to roll a death save',
+   await page.evaluate(async () => !(await import('/js/actions.js')).rollGateRefusal()));
+await page.evaluate(() => { window.__st.downed = null; window.__st.warmup = { planId: '90s' }; });
+ck('nor is a player mid warm-up',
+   await page.evaluate(async () => !(await import('/js/actions.js')).rollGateRefusal()));
+await page.evaluate(() => { window.__st.warmup = null; });
+// attack() rolls internally; gating that mid-resolution would leave a half-done swing.
+await page.evaluate(() => { window.__st.fitness.rollsSinceOffer = 9; window.__st.fitness.rollGateWaived = false; });
+const atk = await page.evaluate(async () => {
+  const A = await import('/js/actions.js');
+  const pc = window.__st.tokens.find(t => t.kind === 'pc');
+  const mob = A.addToken({ name: 'Gate Test', kind: 'monster', art: 'rat', x: pc.x + 1, y: pc.y, hp: 6 }).token;
+  return A.attack({ attackerId: pc.id, targetId: mob.id, kind: 'melee' });
+});
+ck('an attack resolves even with the dice clock run out', !atk.error, (atk.error || '').slice(0, 50));
+ck('and its internal roll still counts toward pacing',
+   await page.evaluate(() => window.__st.fitness.rollsSinceOffer) > 9);
+await clearStakes();
+// The pricing section below reads the Oath sworn earlier, which the gate checks
+// had to clear out of the way. Swear it again so that section runs unchanged.
+await page.evaluate(async () => (await import('/js/actions.js'))
+  .proposeOath({ label: 'the sink', kind: 'chores', minutes: 5, reward: 'bonus+2', reason: 'now' }));
 console.log('— effort and reward scale together —');
 // The Oath sworn above locks the table on purpose; end it before pricing.
 await page.evaluate(async () => {

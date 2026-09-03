@@ -163,6 +163,10 @@ export function rollDice({ formula = 'd20', reason = '' } = {}) {
   const nat1  = p.sides === 20 && p.n === 1 && rolls[0] === 1 && !boostsUsed.length;
 
   const result = { formula, reason, rolls, mod: p.mod, bonus, total, sides: p.sides, nat20, nat1, boostsUsed, t: Date.now() };
+  // Every roll the player sees counts toward the pacing clock, including the
+  // ones the attack tool makes for itself — from the chair they are all rolls.
+  state.fitness.rollsSinceOffer = (state.fitness.rollsSinceOffer || 0) + 1;
+  state.fitness.rollGateWaived = false;   // one waiver, spent — see rollGateRefusal
   state.dice = result;
   logStory('roll', 'Dice', `${reason ? reason + ' — ' : ''}${formula}: [${rolls.join(', ')}]` +
     (p.mod ? ` ${p.mod > 0 ? '+' : ''}${p.mod}` : '') + (bonus ? ` +${bonus}⚡` : '') + ` = ${total}` +
@@ -271,7 +275,7 @@ export function removeToken({ tokenId }) {
   const t = findToken(tokenId);
   if (!t) return { error: `No token matches "${tokenId}".` };
   state.tokens = state.tokens.filter(x => x.id !== t.id);
-  state.combat.order = state.combat.order.filter(id => id !== t.id);
+  dropFromOrder(t.id);          // same turn-index care as a token that dies
   logStory('action', 'DM', `${t.name} is removed from the board.`);
   emit();
   return { ok: true, removed: t.id };
@@ -309,12 +313,32 @@ export function revealArea({ x, y, radius = 3 }) {
   return { ok: true, x, y, radius };
 }
 
+/** The only way the map changes: the quest moves the party. Not a tool. */
+function travelTo(mapId) {
+  if (!MAPS[mapId] || mapId === state.scene.mapId) return;
+  state.scene.mapId = mapId;
+  state.revealed = [];
+  state.scene.title = MAPS[mapId].name;
+  state.tokens.filter(t => t.kind === 'pc').forEach(t => revealAround(t.x, t.y, 3));
+  logStory('scene', 'DM', `— ${state.scene.title} —`);
+}
+
 export function setScene({ mapId, title, mood }) {
   if (mapId && !MAPS[mapId]) return { error: `Unknown map "${mapId}". Choose: ${Object.keys(MAPS).join(', ')}.` };
   if (mapId && mapId !== state.scene.mapId) {
-    state.scene.mapId = mapId;
-    state.revealed = [];
-    if (!title) state.scene.title = MAPS[mapId].name;
+    // The prompt said "do not switch maps with set_scene" and the DM did it
+    // anyway: walked the party into the glade, changed the map, and never called
+    // advance_quest — so the beat was never cleared and the player crossed the
+    // whole glade for nothing. Maps belong to beats. Only advance_quest moves
+    // the party between them, because that is the call that pays.
+    const beat = currentBeat();
+    return {
+      error: `set_scene cannot change the map. The board is on "${state.scene.mapId}" because the current ` +
+             `beat ("${beat?.title}") is set there. If the party has done what that beat asked, call ` +
+             `advance_quest — it changes the map for you AND pays the milestone. If they have not, they ` +
+             `are not leaving yet. Use set_scene for the title and mood only.`,
+      useInstead: 'advance_quest', currentMap: state.scene.mapId, beat: beat?.title,
+    };
   }
   if (title) state.scene.title = title;
   if (mood) state.scene.mood = mood;
@@ -351,7 +375,11 @@ export function startCombat({ order } = {}) {
   const first = findToken(ids[0]);
   logStory('combat', 'DM', `⚔ Combat begins! Round 1 — ${first.name} acts first.`);
   emit('combat');
-  return { ok: true, order: ids.map(id => findToken(id)?.name), current: first.name };
+  // If a monster won initiative it does not wait to be introduced.
+  const acted = runMonsterTurns();
+  const cur = findToken(state.combat.order[state.combat.turnIndex]);
+  return { ok: true, order: ids.map(id => findToken(id)?.name), current: cur?.name || first.name,
+           ...(acted.length ? { monstersActed: acted, note: 'Monsters that won initiative already acted. Narrate it, then hand the turn to the player.' } : {}) };
 }
 
 /** Where to stand to swing at this target: nearest open cell within reach. */
@@ -432,6 +460,11 @@ export function attack({ attackerId, targetId, kind = 'melee', damage, reason = 
   const roll = rollDice({ formula: 'd20', reason: reason || `${a.name} attacks ${t.name}` });
   const ac = t.ac ?? 12;
   const hit = roll.nat20 || (!roll.nat1 && roll.total >= ac);
+  // A swing should be visible on the board, not only readable in the log — an
+  // arc from the attacker through the target, so you can see who went at whom.
+  // Set before the hit check, because a miss is a swing too.
+  if (melee) state.swingFx = { from: { x: a.x, y: a.y }, to: { x: t.x, y: t.y }, crit: !!roll.nat20, hit, t: Date.now() };
+
   if (!hit) {
     logStory('combat', a.name, `swings at ${t.name} and misses.`);
     emit('combat');
@@ -486,7 +519,56 @@ export function advanceTurn() {
   if (!t) { c.order.splice(c.turnIndex, 1); return advanceTurn(); }
   logStory('combat', 'DM', `Round ${c.round} — ${t.name}'s turn.`);
   emit('combat');
-  return { ok: true, round: c.round, current: t.name, tokenId: t.id };
+  // If that is a monster, it acts now. The turn does not come back to the DM
+  // until a hero is up — see runMonsterTurns.
+  const acted = runMonsterTurns();
+  const cur = findToken(c.order[c.turnIndex]);
+  return { ok: true, round: c.round, current: cur?.name, tokenId: cur?.id,
+           ...(acted.length ? { monstersActed: acted, note: 'The monsters above already took their turns. Narrate what they did, then it is the player\'s move.' } : {}) };
+}
+
+// ── monsters act on their own turn ───────────────────────────────────────────
+// A goblin standing in the doorway waited, politely, for the player to type
+// "I attack it" — and then for the DM to remember to swing it back. "Having to
+// say one line to engage the monster was silly." So a monster's turn is not
+// the DM's to spend: when initiative lands on one it closes and swings at the
+// nearest hero itself, and the turn keeps moving until a hero is up.
+function nearestHero(from) {
+  return state.tokens.filter(t => t.kind === 'pc' && t.hp > 0)
+    .sort((a, b) => gridDistance(from, a) - gridDistance(from, b))[0] || null;
+}
+
+export function runMonsterTurns() {
+  const c = state.combat;
+  const acted = [];
+  if (!c.active) return acted;
+  for (let guard = 0; guard < c.order.length + 1 && c.active; guard++) {
+    if (state.downed) break;                          // time has stopped
+    const m = findToken(c.order[c.turnIndex]);
+    if (!m || m.kind !== 'monster' || m.hp <= 0) break;   // a hero is up — stop here
+    const hero = nearestHero(m);
+    if (!hero) break;
+    const d = gridDistance(m, hero);
+    const kind = (m.range || 0) > 0 && d > (m.reach ?? 1) && d <= m.range ? 'ranged' : 'melee';
+    const r = attack({ attackerId: m.id, targetId: hero.id, kind, reason: `${m.name} attacks ${hero.name}` });
+    if (r.error) {
+      // Could not reach and could not shoot: it holds. Say so, so the DM can
+      // narrate it prowling rather than pretending it hit something.
+      logStory('combat', m.name, `cannot reach anyone this turn and holds its ground.`);
+      acted.push({ monster: m.name, held: true, distance: d });
+    } else {
+      acted.push({ monster: m.name, target: hero.name, kind, hit: r.hit, damage: r.damage,
+                   closed: r.closed ? r.closed.squares : 0, targetHp: r.targetHp, targetDown: r.targetDown });
+    }
+    if (!c.active || state.downed) break;             // the fight ended, or someone fell
+    // Next combatant. Round rolls over the same way advanceTurn does.
+    c.turnIndex++;
+    if (c.turnIndex >= c.order.length) { c.turnIndex = 0; c.round++; }
+    const nxt = findToken(c.order[c.turnIndex]);
+    if (nxt) logStory('combat', 'DM', `Round ${c.round} — ${nxt.name}'s turn.`);
+  }
+  if (acted.length) emit('combat');
+  return acted;
 }
 
 export function updateHp({ tokenId, delta }) {
@@ -498,12 +580,42 @@ export function updateHp({ tokenId, delta }) {
   logStory('combat', t.name, `${verb} (${t.hp}/${t.maxHp}).`);
   if (t.hp === 0) {
     if (t.kind === 'pc') { goDown(t); }
-    else logStory('combat', 'DM', `${t.name} is defeated!`);
+    else fallToken(t);
   }
   // Healing a downed hero back above zero puts them on their feet.
   if (t.hp > 0 && state.downed?.tokenId === t.id) return { ...standUp(`${t.name} is pulled back from the edge.`), hp: t.hp };
   emit();
   return { ok: true, token: t.id, hp: t.hp, maxHp: t.maxHp, down: t.hp === 0, timeStopped: !!state.downed };
+}
+
+// ── a monster that dies leaves the board ─────────────────────────────────────
+// It used to only get a line in the log. The token stayed exactly where it fell:
+// still drawn, still blocking its square, still a legal target, and still taking
+// its turn in the initiative order. Players killed the first goblin and it stood
+// there for the rest of the fight.
+function fallToken(t) {
+  logStory('combat', 'DM', `${t.name} is defeated!`);
+  state.deathFx = { x: t.x, y: t.y, art: t.art, name: t.name, t: Date.now() };
+  state.tokens = state.tokens.filter(x => x.id !== t.id);
+  dropFromOrder(t.id);
+  // Nothing left to fight — do not make the player call end_combat on an empty
+  // room, and do not leave the combat-only tools registered.
+  if (state.combat.active && !state.tokens.some(x => x.kind === 'monster' && x.hp > 0)) {
+    logStory('combat', 'DM', 'Nothing else is standing.');
+    endCombat();
+  }
+}
+
+/** Take a token out of initiative without skipping whoever is up next. */
+function dropFromOrder(id) {
+  const c = state.combat;
+  const i = c.order.indexOf(id);
+  if (i === -1) return;
+  c.order.splice(i, 1);
+  // Everything after the hole shifts down one, so the index has to follow it or
+  // the turn silently jumps a combatant.
+  if (i < c.turnIndex) c.turnIndex--;
+  if (c.turnIndex >= c.order.length) { c.turnIndex = 0; c.round++; }
 }
 
 // ── going down · time stops ─────────────────────────────────────────────────
@@ -607,14 +719,59 @@ export function notePlayerTurn() {
   state.quest.turnsOnBeat = (state.quest.turnsOnBeat || 0) + 1;
 }
 
-/** An offer was made — reps, hold or Oath. Restarts the clock. */
+/** An offer was made — reps, hold or Oath. Restarts both clocks. */
 function noteOffer() {
   state.fitness.turnsSinceOffer = 0;
+  state.fitness.rollsSinceOffer = 0;
+  state.fitness.rollGateWaived = false;
   state.fitness.offersMade = (state.fitness.offersMade || 0) + 1;
+}
+
+// ── the roll gate ────────────────────────────────────────────────────────────
+// Asking the model to offer effort more often has now failed three ways: in the
+// system prompt, in a counter handed to it every turn, and in a nudge injected
+// into the message stream. It complies for a while and drifts back. So the last
+// version of this is not a request at all — the dice themselves stop.
+//
+// Two rolls without anything staked and roll_dice refuses ONCE, naming the
+// bargain it wants made first. It never refuses twice in a row: the refusal
+// spends a waiver, so if the DM ignores it and rolls again that roll goes
+// through and the run continues. A pacing rule that can deadlock a game is
+// worse than the drift it was fixing.
+export const ROLLS_PER_OFFER = 2;
+
+export function rollGateRefusal() {
+  const f = state.fitness;
+  // Something is already staked, or the board is frozen — nothing to ask for.
+  if (state.challenge || state.tasks || state.oath || state.warmup || state.downed) return null;
+  if ((f.rollsSinceOffer || 0) < ROLLS_PER_OFFER) return null;
+  if (f.rollGateWaived) return null;              // already refused once; let it through
+
+  f.rollGateWaived = true;
+  f.rollsGated = (f.rollsGated || 0) + 1;
+  const pref = effortPref();
+  const how = pref === 'oaths'
+    ? 'Call propose_oath — this player takes nothing physical.'
+    : pref === 'holds'
+      ? 'Call propose_challenge with mode "hold".'
+      : pref === 'reps'
+        ? 'Call propose_challenge with mode "reps".'
+        : 'Call propose_challenge (reps or a hold) or propose_oath — whichever suits the moment.';
+  return {
+    error: `${f.rollsSinceOffer} rolls since anything was staked. This table trades effort for dice, ` +
+           `and a roll nobody paid for is the one thing it is not for. Offer a Heroic Effort for THIS ` +
+           `roll first, then roll. ${how} Scale it to the moment — five reps or twenty seconds for +2 ` +
+           `on a small check is plenty. Then call roll_dice again; if the player declines, roll straight away.`,
+    mustOfferFirst: true,
+    rollsSinceOffer: f.rollsSinceOffer,
+    // Said plainly so the DM does not get stuck in a loop trying to satisfy it.
+    note: 'This refusal will not repeat on your next roll_dice — but it returns two rolls later.',
+  };
 }
 
 export function proposeChallenge({ exercise, reps, reward, reason = '', mode = 'reps', seconds }) {
   if (state.challenge) return { error: 'A challenge is already in progress — resolve it first.' };
+  if (state.tasks) return { error: 'A task list is on the table — let the player finish it first.' };
   if (state.oath) return { error: 'The player is away keeping an Oath. Wait for them.' };
   mode = mode === 'hold' ? 'hold' : 'reps';
   const gate = effortGate(mode);
@@ -739,6 +896,141 @@ export function declineChallenge() {
   return res;
 }
 
+// ── a task list: pick your own price ─────────────────────────────────────────
+// One offer, take it or leave it, is a yes/no question — and a player who does
+// not fancy push-ups right now just says no and the table gets nothing. A list
+// is a different question: three small things on screen, each worth its own
+// points, tick off whatever you actually did. Do one for +2, do all three for
+// +6. Nobody has to be talked into the whole set to get some of it.
+//
+// Every item is priced off the same EFFORT_SCALE the single challenge uses, so
+// this is not a cheaper door to the same rewards — it is the same rates, split
+// into pieces. Additive bonuses only: "advantage" and "natural 20" do not sum,
+// and pretending they do would make the list the best deal at the table.
+let taskSeq = 0;
+const taskWaiters = new Map();
+
+const BONUS_OF = { 'bonus+2': 2, 'bonus+3': 3, 'bonus+5': 5, 'bonus+8': 8 };
+
+/** What one item of this size is worth, in flat bonus points. */
+export function taskBonus(amount, mode = 'reps') {
+  const kind = mode === 'oath' ? 'oath' : mode === 'hold' ? 'hold' : 'reps';
+  return BONUS_OF[rewardFor(amount, kind)] ?? 8;   // the ladder tops out at +8 per item
+}
+
+export function proposeTaskList({ items, reason = '' }) {
+  if (state.tasks) return { error: 'A task list is already on the table — resolve it first.' };
+  if (state.challenge) return { error: 'A challenge is already in progress — resolve it first.' };
+  if (state.oath) return { error: 'The player is away keeping an Oath. Wait for them.' };
+  if (!Array.isArray(items) || !items.length) {
+    return { error: 'Give 2-3 items, e.g. [{"exercise":"push-ups","mode":"reps","amount":5},{"exercise":"plank","mode":"hold","amount":20}].' };
+  }
+  if (items.length > 4) return { error: 'Four is already too many to read on a card. Offer 2 or 3.' };
+
+  const built = [];
+  for (const raw of items) {
+    const mode = raw.mode === 'hold' ? 'hold' : raw.mode === 'oath' ? 'oath' : 'reps';
+    const gate = effortGate(mode);
+    if (gate) return gate;                     // the standing preference decides, as everywhere else
+    const amount = Math.max(1, Math.min(300, Math.round(Number(raw.amount) || (mode === 'hold' ? 20 : 5))));
+
+    let label, exercise = String(raw.exercise || '').toLowerCase();
+    if (mode === 'oath') {
+      label = String(raw.exercise || raw.label || '').trim().slice(0, 60);
+      if (!label) return { error: 'An oath item needs to say what it is, e.g. "clear the sink".' };
+      label = `${label} · ${amount} min`;
+    } else {
+      const known = mode === 'hold' ? HOLDS : EXERCISES;
+      const allowed = allowedFor(mode);
+      if (!known.includes(exercise)) {
+        return { error: `"${exercise}" is not a ${mode === 'hold' ? 'hold' : 'rep exercise'}. For mode "${mode}" choose: ${allowed.join(', ')}.` };
+      }
+      if (!allowed.includes(exercise)) {
+        return { error: `This player has not enabled "${exercise}". Offer one of: ${allowed.join(', ')}.` };
+      }
+      label = mode === 'hold' ? `${amount}s ${exercise}` : `${amount} ${exercise}`;
+    }
+    built.push({ label, exercise, mode, amount, bonus: taskBonus(amount, mode), done: false });
+  }
+
+  const id = `tasks-${++taskSeq}-${Date.now().toString(36)}`;
+  state.tasks = { id, items: built, reason, status: 'offered' };
+  noteOffer();
+  const most = built.reduce((s, i) => s + i.bonus, 0);
+  logStory('challenge', 'DM',
+    `📋 TASK LIST: ${built.map(i => `${i.label} (+${i.bonus})`).join(' · ')} — all of it is +${most}. ${reason}`);
+  emit('tasks');
+
+  return new Promise(resolve => {
+    taskWaiters.set(id, resolve);
+    setTimeout(() => {
+      if (taskWaiters.has(id)) {
+        taskWaiters.delete(id);
+        resolve({ status: 'pending', taskListId: id, note: 'The player is still working through it. Call get_fitness_log to check back.' });
+      }
+    }, 90_000);
+  });
+}
+
+export function taskTotal() {
+  return (state.tasks?.items || []).filter(i => i.done).reduce((s, i) => s + i.bonus, 0);
+}
+
+export function toggleTask(index) {
+  const t = state.tasks;
+  if (!t) return { error: 'No task list on the table.' };
+  const item = t.items[index];
+  if (!item) return { error: `No item ${index}.` };
+  item.done = !item.done;
+  t.status = 'active';
+  emit('tasks');
+  return { ok: true, index, done: item.done, runningTotal: taskTotal() };
+}
+
+/** Take what was actually ticked. Nothing ticked is the same as walking away. */
+export function claimTasks() {
+  const t = state.tasks;
+  if (!t) return { error: 'No task list on the table.' };
+  const done = t.items.filter(i => i.done);
+  const total = taskTotal();
+
+  done.forEach(i => {
+    if (i.mode === 'reps') {
+      state.fitness.totalReps += i.amount;
+      state.fitness.byExercise[i.exercise] = (state.fitness.byExercise[i.exercise] || 0) + i.amount;
+    } else if (i.mode === 'hold') {
+      state.fitness.holdSeconds += i.amount;
+    } else {
+      state.fitness.oathsKept++;
+      state.fitness.oathMinutes += i.amount;
+    }
+  });
+  if (total > 0) {
+    state.boosts.bonus += total;
+    state.fitness.challengesDone++;
+    logStory('challenge', 'Player',
+      `✅ ${done.length} of ${t.items.length} done — ${done.map(i => i.label).join(', ')}. +${total} on the next roll.`);
+  } else {
+    logStory('challenge', 'Player', 'left the task list untouched — rolling fate as it lies.');
+  }
+
+  const res = {
+    status: total > 0 ? 'completed' : 'declined',
+    taskListId: t.id,
+    completed: done.map(i => i.label),
+    ofItems: t.items.length,
+    bonusGranted: total,
+    note: total > 0
+      ? `Player earned +${total} on their next roll. Say so, then make the roll.`
+      : 'Player took none of it — proceed with a normal roll, and do not nag.',
+  };
+  const w = taskWaiters.get(t.id);
+  if (w) { taskWaiters.delete(t.id); w(res); }
+  state.tasks = null;
+  emit('tasks');
+  return res;
+}
+
 // ── Oaths: effort the app cannot see ─────────────────────────────────────────
 // Not everyone can drop and do push-ups, and not every session should be about
 // sweat. An Oath stakes something real in the room — the dishes, twenty pages,
@@ -751,6 +1043,7 @@ const oathWaiters = new Map();
 export function proposeOath({ label, kind = 'chores', minutes, reward, reason = '' }) {
   if (state.oath) return { error: 'An Oath is already being kept. Wait for the player to come back.' };
   if (state.challenge) return { error: 'A challenge is already in progress — resolve it first.' };
+  if (state.tasks) return { error: 'A task list is on the table — let the player finish it first.' };
   const gate = effortGate('oath');
   if (gate) return gate;
   label = String(label || '').trim().slice(0, 90);
@@ -841,9 +1134,34 @@ export function oathActive() { return !!state.oath && state.oath.status === 'act
 // runs underneath. The player's only job is to follow along.
 let warmTimer = null;
 
-export function startWarmup({ plan = '90s' } = {}) {
+// Asked for in prose, the warm-up died in the chat: the DM said "ninety seconds
+// or three minutes?", the player typed an answer, and by then the moment had
+// passed. It is a choice with two buttons — so it is a card, like every other
+// thing this table asks for. Called with no plan, start_warmup OFFERS.
+export function offerWarmup({ reason = '' } = {}) {
+  if (state.warmup) return { error: 'A warm-up is already running.' };
+  if (state.warmupOffer) return { error: 'The warm-up card is already on screen.' };
+  state.warmupOffer = { reason, plans: ['90s', '3min', '5min'], t: Date.now() };
+  logStory('challenge', 'DM', '🤸 Warm-up offered — 90 seconds, 3 minutes, or straight in.');
+  emit('warmup');
+  return { ok: true, offered: true,
+           note: 'The card is on screen with the plan buttons. Say one line inviting them to stretch, then WAIT — do not call start_warmup yourself, the player picks.' };
+}
+
+export function dismissWarmupOffer() {
+  if (!state.warmupOffer) return { error: 'No warm-up offered.' };
+  state.warmupOffer = null;
+  logStory('challenge', 'Player', 'skipped the warm-up — straight into the keep.');
+  emit('warmup');
+  return { ok: true, declined: true };
+}
+
+export function startWarmup({ plan } = {}) {
+  // No plan named means "ask them", which is what the DM should almost always do.
+  if (plan === undefined || plan === null || plan === '') return offerWarmup({});
   if (!WARMUP_PLANS[plan]) return { error: `Unknown plan "${plan}". Choose: ${Object.keys(WARMUP_PLANS).join(', ')}.` };
   if (state.warmup) return { error: 'A warm-up is already running.' };
+  state.warmupOffer = null;
   const p = WARMUP_PLANS[plan];
   // seq is the list of stretch indices this plan runs — it spans the body, so
   // index is a position in seq, never a position in STRETCHES.
@@ -1029,7 +1347,7 @@ export function advanceQuest({ summary = '' } = {}) {
   // The beat owns its map. A live run had the DM set_scene back to the dungeon
   // while the party stood in the glade, so the board and the rail disagreed
   // about where everyone was.
-  if (next.mapId !== state.scene.mapId) setScene({ mapId: next.mapId });
+  if (next.mapId !== state.scene.mapId) travelTo(next.mapId);
   logStory('quest', 'DM', `✦ Next: ${next.title} — ${next.objective}`);
   // A beat can name the thing that bars it, so the DM does not have to invent a
   // token for the set-piece — and cannot reach for the knight art, which is
@@ -1137,6 +1455,10 @@ export function getFitnessLog() {
     activeChallenge: state.challenge
       ? { mode: state.challenge.mode, exercise: state.challenge.exercise, reps: state.challenge.reps, seconds: state.challenge.seconds, progress: state.challenge.progress, status: state.challenge.status }
       : null,
+    activeTaskList: state.tasks
+      ? { items: state.tasks.items.map(i => ({ label: i.label, bonus: i.bonus, done: i.done })),
+          runningTotal: taskTotal(), status: state.tasks.status }
+      : null,
     activeOath: state.oath
       ? { label: state.oath.label, minutes: state.oath.minutes, status: state.oath.status, secondsLeft: Math.ceil(oathRemaining() / 1000) }
       : null,
@@ -1147,6 +1469,8 @@ export function getFitnessLog() {
     effortScale: EFFORT_SCALE,
     turnsSinceLastOffer: state.fitness.turnsSinceOffer || 0,
     offerOverdue: (state.fitness.turnsSinceOffer || 0) >= 2,
+    rollsSinceLastOffer: state.fitness.rollsSinceOffer || 0,
+    rollsLeftBeforeDiceStop: Math.max(0, ROLLS_PER_OFFER - (state.fitness.rollsSinceOffer || 0)),
     oathKinds: OATH_KINDS,
     effortPreference: {
       setting: effortPref(),
@@ -1161,10 +1485,11 @@ export function getFitnessLog() {
     },
     coachNote: [
       'PRICE LIST: effortScale maps how much you ask for to what it is worth — 5 reps or 20s for +2, 10 or 30s for +5, 15 or 45s for +8, 25 or 90s for a natural 20. Ask bigger, pay bigger. Omit the reward and the size of the ask picks one.',
-      'PACING: stake something real about every SECOND exchange. If offerOverdue is true you are already late — offer on this turn unless a hero is down or the player is mid-challenge.',
+      'PACING IS ENFORCED BY THE DICE: stake something real at least every SECOND roll. rollsLeftBeforeDiceStop counts down, and at zero roll_dice refuses once and tells you to make an offer first. Do not play chicken with it — offer before it fires and the game never stops.',
       'Three ways to stake effort, and they are equals — never treat the Oath as the lesser option.',
       'reps: countable, tapped or counted out loud. hold: a timed hold, the ring counts itself down.',
       'oath: something real in the room the app cannot see. It locks the table for the minutes agreed.',
+      'task list (propose_task_list): 2-3 small items at once, each worth its own flat bonus, and the player ticks off whatever they actually did — 5 push-ups, a 20s plank and 5 squats is +2 +2 +2, so the whole card is +6. Reach for it INSTEAD of a single challenge when you want to ask properly: a player who would decline one big ask will often take two of three small ones. Additive bonuses only, so it never pays advantage or a natural 20 — those stay with propose_challenge.',
       'READ effortPreference FIRST and offer only what mayAsk lists — the tools refuse the rest.',
       'Offer ONLY from availableExercises for mode "reps", and ONLY from availableHolds for mode "hold" — the player chose them.',
       'Vary muscle groups; scale down if they are slowing. Everything here is always optional.',

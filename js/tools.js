@@ -109,9 +109,11 @@ export const BASE_TOOLS = [
   },
   {
     name: 'roll_dice',
-    description: 'Roll dice on the table, visibly, with animation. Formula like "d20", "2d6+3". Any earned Heroic Effort boosts (bonus, advantage, or a set die) apply automatically to a single d20 and are consumed. Rolls are public — no fudging.',
+    description: 'Roll dice on the table, visibly, with animation. Formula like "d20", "2d6+3". Any earned Heroic Effort boosts (bonus, advantage, or a set die) apply automatically to a single d20 and are consumed. Rolls are public — no fudging. PACED: after two rolls with nothing staked this refuses once and asks you to offer a Heroic Effort or an Oath for the roll first — so stake something roughly every other roll and you will never see it.',
     inputSchema: obj({ formula: str('Dice formula, e.g. "d20" or "2d6+3"'), reason: str('What the roll is for, e.g. "Brannok attacks the goblin"') }, ['formula']),
-    handler: a => A.rollDice(a),
+    // The gate lives on the TOOL, not on rollDice itself: the attack tool and
+    // death saves roll internally and must never be blocked mid-resolution.
+    handler: a => A.rollGateRefusal() || A.rollDice(a),
   },
   {
     name: 'narrate',
@@ -121,7 +123,7 @@ export const BASE_TOOLS = [
   },
   {
     name: 'set_scene',
-    description: 'Retitle the scene and set its mood line. You may also switch the map ("dungeon" = Sunken Keep, "forest" = Whispering Glade, "crypt" = Ember Crypt) — but DO NOT: each quest beat owns its map and advance_quest switches it for you. Setting a different one puts the board somewhere the quest is not. Use this for title and mood; switching maps resets fog of war around the party.',
+    description: 'Retitle the scene and set its mood line. It CANNOT change the map: each quest beat owns its map and only advance_quest moves the party between them — because that is the call that pays the milestone. Passing a different mapId is refused and points you at advance_quest.',
     inputSchema: obj({ mapId: { type: 'string', enum: ['dungeon', 'forest', 'crypt'], description: 'Which battle map' }, title: str('Scene title'), mood: str('One-line mood, shown under the title') }),
     handler: a => A.setScene(a),
   },
@@ -184,7 +186,7 @@ export const BASE_TOOLS = [
   },
   {
     name: 'start_combat',
-    description: 'Begin combat. Rolls initiative automatically (or pass an explicit order of token ids/names). While combat runs, the combat tools advance_turn, update_hp and apply_condition become available.',
+    description: 'Begin initiative. Registers the combat tools. Every combatant comes out of the fog. MONSTERS ACT ON THEIR OWN TURN: if a monster wins initiative it closes and attacks the nearest hero immediately, and the result comes back in monstersActed — narrate it, then hand the turn to the player. You never need to make a monster swing; the turn order does it.',
     inputSchema: obj({ order: { type: 'array', items: { type: 'string' }, description: 'Optional initiative order (token ids or names)' } }),
     handler: a => A.startCombat(a),
   },
@@ -216,6 +218,21 @@ export const BASE_TOOLS = [
     handler: a => A.proposeChallenge(a),
   },
   {
+    name: 'propose_task_list',
+    description: 'A TASK LIST instead of a single ask: put 2-3 small pieces of effort on the table at once, each worth its own flat bonus, and let the player tick off whatever they actually do. Five push-ups (+2), a twenty-second plank (+2) and five squats (+2) means the whole card is +6 — but two out of three is +4 and that is a real result. Reach for this when you want the best odds of getting SOMETHING: a player who would decline one big ask will usually take part of a list. Bonuses add up, so this never pays advantage or a natural 20 — use propose_challenge for those. Modes per item: "reps", "hold", or "oath" (a real-world task, amount in minutes).',
+    inputSchema: obj({
+      items: { type: 'array', minItems: 2, maxItems: 4,
+        description: '2-3 items. Each: {exercise, mode, amount}. For mode "oath", put the task itself in "exercise", e.g. {"exercise":"clear the sink","mode":"oath","amount":10}.',
+        items: obj({
+          exercise: str('Exercise name for reps/hold, or the task itself for an oath'),
+          mode: { type: 'string', enum: ['reps', 'hold', 'oath'], description: 'reps · hold (seconds) · oath (minutes)' },
+          amount: { type: 'number', description: 'Reps, or seconds for a hold, or minutes for an oath' },
+        }, ['exercise']) },
+      reason: str('Why, in character — what is at stake on this roll'),
+    }, ['items']),
+    handler: a => A.proposeTaskList(a),
+  },
+  {
     name: 'propose_oath',
     description: 'OATH — the other way to pay. Stake something real in the room that this app cannot see: clearing the sink, twenty minutes of study, ten pages of reading, practising an instrument, one dreaded email. The table LOCKS for the minutes agreed — the board freezes, you wait, and the player confirms on their honour when they return. It pays exactly the same dice rewards as a Heroic Effort, and you must treat it as an equal, never a consolation prize. Reach for it when a player cannot or would rather not exercise, when they mention something they are avoiding, or simply to vary what the table asks of them. Keep the minutes honest: 5-25 for most things.',
     inputSchema: obj({
@@ -229,8 +246,8 @@ export const BASE_TOOLS = [
   },
   {
     name: 'start_warmup',
-    description: 'Run the guided warm-up: standing stretches, head to ankle, each with a spoken cue and a timer that advances itself. Offer this ONCE at the very start of a run, before the first real beat — "before we begin, stand up" — and never interrupt a fight with it. AT THE START, OFFER ONLY TWO: "90s" (6 stretches) or "3min" (12) — either is a real warm-up and neither costs a player their patience. "5min" (20) and "10min" (20 at a slower hold) exist for a player who asks for them, and should not be volunteered. Finishing it grants +2 on the next roll. It needs no equipment and no floor.',
-    inputSchema: obj({ plan: { type: 'string', enum: ['90s', '3min', '5min', '10min'], description: 'How long the player has' } }),
+    description: 'Offer the guided warm-up: twenty standing stretches, head to ankle, each with a cue and a self-advancing timer. CALL IT WITH NO PLAN and a card appears asking the player to pick 90 seconds, 3 minutes, 5 minutes, or skip — that is what you want almost every time, at the very top of a run. Say one warm line inviting them to stand up, then WAIT for them to choose; do not pick for them. Pass a plan only if the player has already named one out loud. Finishing grants +2 on the first roll.',
+    inputSchema: obj({ plan: { type: 'string', enum: ['90s', '3min', '5min', '10min'], description: 'Omit this to show the choice card, which is the normal use' } }),
     handler: a => A.startWarmup(a),
   },
 ];
@@ -238,7 +255,7 @@ export const BASE_TOOLS = [
 export const COMBAT_TOOLS = [
   {
     name: 'advance_turn',
-    description: 'Advance to the next combatant in initiative order. Announces whose turn it is.',
+    description: 'Move to the next combatant. Every monster whose turn comes up acts by itself — closes, swings or shoots at the nearest hero — and the turn keeps advancing until a hero is up. What they did comes back in monstersActed: narrate it in one or two lines, then ask the player what THEY do. Call this after the player\'s action each round; do not call it for the monsters, they have already gone.',
     inputSchema: obj({}),
     handler: () => A.advanceTurn(),
   },
@@ -278,7 +295,7 @@ const registered = new Map();   // name → AbortController
 
 // The only writes allowed while a hero is down: say something, roll the save,
 // offer the reps, or heal them. Everything else waits.
-const FROZEN_OK = new Set(['death_save', 'propose_challenge', 'propose_oath', 'narrate', 'update_hp']);
+const FROZEN_OK = new Set(['death_save', 'propose_challenge', 'propose_task_list', 'propose_oath', 'narrate', 'update_hp']);
 // An Oath locks the table just as hard: the player is out of the room.
 const OATH_OK = new Set(['narrate']);
 
@@ -409,6 +426,11 @@ export async function initTools() {
     // preference, it is a suggestion. The player sets it, the tools enforce it.
     effortPref: () => A.effortPref(),
     setEffortPref: (p) => A.setEffortPref(p),
+    // Ticking a task list is a player gesture, like clicking the map.
+    toggleTask: (i) => A.toggleTask(i),
+    claimTasks: () => A.claimTasks(),
+    offerWarmup: () => A.offerWarmup({}),
+    dismissWarmupOffer: () => A.dismissWarmupOffer(),
   };
   window.__st = state;                 // tests reach in to fast-forward clocks
   emit('agent');

@@ -100,13 +100,41 @@ ck('a warden drawing exists', await page.evaluate(async () =>
   !!(await import('/js/art.js')).TOKEN_ART.warden));
 
 console.log('— no timer is a trap —');
-// A judge trying the table for five minutes must always be able to leave.
+// A judge trying the table for five minutes must always be able to leave. Every
+// screen that can hold someone gets checked here, and "visible" is not enough —
+// a disabled button is a wall with a picture of a door on it.
+const escapable = async (sel, label) => {
+  ck(`${label} — the way out is on screen`, await page.isVisible(sel));
+  ck(`${label} — and it is actually clickable`, await page.isEnabled(sel));
+};
+
+// Every state that can appear, not just the two that used to be checked.
+await page.evaluate(async () => (await import('/js/actions.js'))
+  .proposeChallenge({ mode: 'reps', exercise: 'push-ups', reps: 10, reward: 'nat20', reason: 'x' }));
+await page.waitForSelector('#challenge-modal:not([hidden])');
+await escapable('#chal-decline', 'a challenge being offered');
+await page.evaluate(async () => (await import('/js/actions.js')).declineChallenge());
+await page.waitForTimeout(200);
+
+await page.evaluate(async () => {
+  const A = await import('/js/actions.js');
+  A.proposeChallenge({ mode: 'reps', exercise: 'push-ups', reps: 10, reward: 'nat20', reason: 'x' });
+  A.acceptChallenge();
+});
+await page.waitForTimeout(200);
+await escapable('#chal-skip', 'a rep challenge underway');
+await page.click('#chal-skip');
+await page.waitForTimeout(250);
+ck('skipping reps ends it and pays nothing', await page.evaluate(() =>
+  window.__st.challenge === null && window.__st.boosts.setRoll === null));
+
 await page.evaluate(async () => {
   const A = await import('/js/actions.js');
   A.proposeChallenge({ mode: 'hold', exercise: 'plank', seconds: 120, reward: 'set10', reason: 'x' });
   A.acceptChallenge();
 });
 await page.waitForSelector('#challenge-modal:not([hidden])');
+await escapable('#chal-skip', 'a 120-second hold');
 ck('a running hold offers a way out', await page.isVisible('#chal-skip'));
 await page.click('#chal-skip');
 await page.waitForTimeout(250);
@@ -120,7 +148,19 @@ await page.evaluate(async () => {
   A.acceptOath();
 });
 await page.waitForSelector('#oath:not([hidden])');
+await escapable('#oath-quit', 'a 25-minute Oath');
 ck('a 25-minute Oath can still be abandoned', await page.isVisible('#oath-quit'));
+// The Oath locks the whole board, so the exit must announce itself rather than
+// be found at minute twenty — and must say what it costs, which is the reward
+// and nothing more.
+// textContent keeps the source line wrapping, so flatten it before matching —
+// otherwise the assertion fails on where the HTML happens to break a line.
+const oathCopy = (await page.evaluate(() => document.getElementById('oath-active')?.textContent || ''))
+  .replace(/\s+/g, ' ');
+ck('and the card says the exit is live immediately', /from the first second/i.test(oathCopy));
+ck('and that it costs only the reward', /lose the reward, nothing else/i.test(oathCopy));
+ck('the claim button is still gated on the clock, which is the actual mechanic',
+   !(await page.isEnabled('#oath-keep')));
 await page.click('#oath-quit');
 await page.waitForTimeout(250);
 ck('and that releases the table', await page.evaluate(() => window.__st.oath === null));
@@ -131,6 +171,8 @@ const warm = await page.evaluate(async () => {
   return true;
 });
 await page.waitForSelector('#warmup:not([hidden])');
+await escapable('#warm-done', 'a warm-up');
+await escapable('#warm-skip', 'a single stretch');
 ck('a ten-minute warm-up can be ended at any point', await page.isVisible('#warm-done'));
 await page.click('#warm-done');
 await page.waitForTimeout(250);
