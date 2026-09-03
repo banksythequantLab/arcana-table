@@ -73,7 +73,7 @@ v = VOS
 # title card and the warm-up card appearing, and Derek comes in after it has
 # had the floor. Before this the DM only ever spoke under the narration, ducked,
 # and nobody got to hear what the product actually sounds like.
-SOLO = 12.0
+SOLO = 14.0
 SOLO2 = 10.0
 CUT = [
     ('card',  'open',   2.0,                                   None),
@@ -170,7 +170,9 @@ SKIP_DM = {'dm/03.mp3'}
 # the DM's turn is still running tools. Pin it to the shot of the card closing
 # instead — that is the picture its words describe.
 solo2_video = sum(l for (k, s, l, st) in CUT[:10])          # video time of CUT[10]
-PIN_DM = {'dm/04.mp3': solo2_video + 0.9}
+# The opening line starts on the title card, not three seconds into the shot —
+# five seconds of silence at the top of a demo is five seconds of a judge leaving.
+PIN_DM = {'dm/00.mp3': 0.5, 'dm/04.mp3': solo2_video + 0.9}
 placed = []
 for c in dmclips:
     if c['file'] in SKIP_DM: continue

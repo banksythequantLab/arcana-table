@@ -1,7 +1,7 @@
 # Arcana Table — demo video voice-over
 
 **This is the shooting script as actually spoken in the submitted video.**
-Runtime **2:37** (second cut, `media/arcana-table-demo-v2.mp4`). Devpost caps at 3:00.
+Runtime **2:39** (second cut, `media/arcana-table-demo-v2.mp4`). Devpost caps at 3:00.
 
 **Second cut, Sep 3.** Same narration audio, new picture and mix: the DM's own
 TTS voice is now in the video at the seconds its lines appeared on screen, the
