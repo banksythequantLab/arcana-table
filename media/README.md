@@ -1,6 +1,6 @@
 # Demo video assets
 
-- **`arcana-table-demo-v2.mp4`** — **the submitted cut, 2:29.** Real gameplay
+- **`arcana-table-demo-v2.mp4`** — **the submitted cut, 2:30.** Real gameplay
   against the live DM with the DM's own OpenAI TTS voice in the mix, ducked under
   Derek's narration; narration runs under every title card; every footage offset
   comes from event marks stamped during the recording (`test/record2.mjs` →

@@ -1,7 +1,7 @@
 # Arcana Table — demo video voice-over
 
 **This is the shooting script as actually spoken in the submitted video.**
-Runtime **2:29** (second cut, `media/arcana-table-demo-v2.mp4`). Devpost caps at 3:00.
+Runtime **2:30** (second cut, `media/arcana-table-demo-v2.mp4`). Devpost caps at 3:00.
 
 **Second cut, Sep 3.** Same narration audio, new picture and mix: the DM's own
 TTS voice is now in the video at the seconds its lines appeared on screen, the
@@ -11,7 +11,9 @@ offset is derived from event marks recorded with the bed (`test/record2.mjs`,
 speaks one clause alone — "The Ember Crown is burning the marshes from the crypt
 beneath the Sunken Keep" — as the warm-up card appears, and gets one longer solo
 where it is narrating the game: "the dishes are cleared, and the oath answers,"
-over the Oath clock hitting zero and the gold twenty. **VO-09 (micro-bursts) is cut**, and VO-05 is
+over the Oath clock hitting zero and the gold twenty. **Two voices never speak at
+once**: the DM is heard only in holes left in the narration, each clip cut at a
+sentence end before the narration resumes — measured, not eyeballed. **VO-09 (micro-bursts) is cut**, and VO-05 is
 trimmed at the pause after the tool names: the last third of the narration was
 the wordiest, and it rambled. The "twenty one tools" line is now accurate again by
 coincidence: 21 is the number registered at rest (25 in total).

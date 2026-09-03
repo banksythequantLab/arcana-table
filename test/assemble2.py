@@ -74,7 +74,7 @@ v = VOS
 # had the floor. Before this the DM only ever spoke under the narration, ducked,
 # and nobody got to hear what the product actually sounds like.
 TASTE = 4.4        # the DM's first clause, alone, after Derek introduces it
-SOLO2 = 10.0       # the Oath answered, in the DM's voice — it is narrating the game
+SOLO2 = 10.4       # the Oath answered, in the DM's voice — one sentence, then Derek resumes
 CUT = [
     ('card',  'open',   2.0,                                   None),
     ('shot',  None,     v['vo01_problem'] + v['vo02_whatitis'] - 2.0, at('table', 31.4, 0.3)),
@@ -165,15 +165,20 @@ run(['ffmpeg','-y','-loglevel','error','-f','concat','-safe','0','-i',str(alist)
 # ── the DM's voice, at the seconds its words appeared on screen ──────────────
 # Lines that would play under the wrong picture. 03 is the DM narrating a miss,
 # and it begins a tenth of a second before the cut into the Oath card.
-SKIP_DM = {'dm/03.mp3', 'dm/00.mp3'}     # 00 is heard as the four-second taste instead
+SKIP_DM = {'dm/00.mp3', 'dm/01.mp3', 'dm/02.mp3', 'dm/03.mp3', 'dm/04.mp3', 'dm/05.mp3'}   # nothing plays under the narration
 # The Oath-answered line is spoken a few seconds after the card closes, while
 # the DM's turn is still running tools. Pin it to the shot of the card closing
 # instead — that is the picture its words describe.
 taste_video = sum(l for (k, s, l, st) in CUT[:2])           # video time of CUT[2]
 solo2_video = sum(l for (k, s, l, st) in CUT[:11])          # video time of CUT[11]
-PIN_DM = {'dm/04.mp3': solo2_video + 0.9}
+PIN_DM = {}
 # Derek introduces the DM; then it speaks — one clause, four seconds, alone.
-EXTRA_DM = [(taste_video + 0.15, BED / 'dm/00_taste.mp3', 'The Ember Crown is burning the marshes… (taste)')]
+# Two voices never speak at once. The DM is heard ONLY in the holes left in the
+# narration, and each clip is cut at a sentence end before the narration resumes.
+EXTRA_DM = [
+    (taste_video + 0.15, BED / 'dm/00_taste.mp3', 'The Ember Crown is burning the marshes… (taste)'),
+    (solo2_video + 0.8,  BED / 'dm/04_solo.mp3',  'The dishes are cleared, and the oath answers… (one sentence)'),
+]
 placed = list(EXTRA_DM)
 for c in dmclips:
     if c['file'] in SKIP_DM: continue
