@@ -440,6 +440,70 @@ export function startCombat({ order } = {}) {
            ...(acted.length ? { monstersActed: acted, note: 'Monsters that won initiative already acted. Narrate it, then hand the turn to the player.' } : {}) };
 }
 
+// ── a click during a fight ───────────────────────────────────────────────────
+// "While engaging in a fight there is a window where I click and the people
+// move when they shouldn't." Every one of those windows is closed here, in one
+// place the board and the tests both call, instead of in the click handler:
+//   · on a monster's turn nobody moves;
+//   · while the dice are still in the air (an attack resolving) nobody moves;
+//   · while the DM is mid-round (tools in flight) nobody moves;
+//   · a hero gets ONE step a turn, and none once they have swung — the turn is
+//     spent, and the next click does nothing until the round comes back round.
+export const STEPS_PER_TURN = 1;
+const DICE_IN_AIR_MS = 2400;                 // tumble + landing, see ui.renderDice
+export let dmResolving = false;              // set by the DM loop around a turn
+export function setDmResolving(v) { dmResolving = !!v; }
+export function diceInAir() { return !!state.dice?.t && Date.now() - state.dice.t < DICE_IN_AIR_MS; }
+
+/** The current combatant's spent budget; a fresh record whenever the turn changes. */
+function turnRecord() {
+  const c = state.combat;
+  const id = c.order[c.turnIndex];
+  if (!c.turn || c.turn.id !== id || c.turn.round !== c.round) c.turn = { id, round: c.round, steps: 0, attacked: false };
+  return c.turn;
+}
+
+/** Why a click cannot move anyone right now, or null if it may. */
+export function stepRefusal() {
+  const c = state.combat;
+  if (!c.active) return null;
+  const actor = findToken(c.order[c.turnIndex]);
+  if (!actor || actor.kind !== 'pc') return { error: `It is ${actor ? actor.name + "'s" : 'not your'} turn.`, whose: actor?.name || null };
+  if (diceInAir()) return { error: 'The dice are still in the air.', actor: actor.name, wait: true };
+  if (dmResolving) return { error: 'The DM is resolving the round.', actor: actor.name, wait: true };
+  const rec = turnRecord();
+  if (rec.attacked) return { error: `${actor.name} has already swung this turn — the turn is spent.`, actor: actor.name, spent: true };
+  if (rec.steps >= STEPS_PER_TURN) return { error: `${actor.name} has already stepped this turn — attack, or let the round move on.`, actor: actor.name, spent: true };
+  return null;
+}
+
+/** One square from `from` toward `to` — diagonal if open, else the nearer straight. */
+export function oneStepToward(from, to) {
+  const dx = Math.sign(to.x - from.x), dy = Math.sign(to.y - from.y);
+  if (!dx && !dy) return null;
+  const free = (x, y) => isWalkable(x, y) && !state.tokens.some(t => t.x === x && t.y === y && t.hp > 0);
+  const tries = [{ x: from.x + dx, y: from.y + dy }];
+  if (dx && dy) tries.push({ x: from.x + dx, y: from.y }, { x: from.x, y: from.y + dy });
+  else if (dx)  tries.push({ x: from.x + dx, y: from.y + 1 }, { x: from.x + dx, y: from.y - 1 });
+  else          tries.push({ x: from.x + 1, y: from.y + dy }, { x: from.x - 1, y: from.y + dy });
+  return tries.find(p => free(p.x, p.y)) || null;
+}
+
+/** A click on (x,y) during a fight: the current hero takes one step that way, if the rules allow. */
+export function combatStep({ x, y }) {
+  if (!state.combat.active) return { error: 'No combat is running — use move_party.' };
+  const no = stepRefusal();
+  if (no) return no;
+  const actor = findToken(state.combat.order[state.combat.turnIndex]);
+  const step = oneStepToward(actor, { x, y });
+  if (!step) return { error: 'No open square that way.', actor: actor.name };
+  const from = { x: actor.x, y: actor.y };
+  const r = moveParty({ x: step.x, y: step.y, who: actor.id });
+  if (r?.error) return r;
+  turnRecord().steps++;
+  return { ...r, step: true, actor: actor.name, from, to: step, toward: { x, y }, stepsLeft: STEPS_PER_TURN - turnRecord().steps };
+}
+
 /** Where to stand to swing at this target: nearest open cell within reach. */
 function stepIntoReach(attacker, target, reach) {
   const taken = new Set(state.tokens.filter(t => t.id !== attacker.id).map(t => `${t.x},${t.y}`));
@@ -508,6 +572,8 @@ export function attack({ attackerId, targetId, kind = 'melee', damage, reason = 
 
   // In reach: you can see what you are hitting.
   revealAround(t.x, t.y, 2);
+  // A hero's swing spends their turn: no stepping away afterwards on a click.
+  if (a.kind === 'pc' && state.combat.active && state.combat.order[state.combat.turnIndex] === a.id) turnRecord().attacked = true;
 
   // A spell cast at distance is a FIREBALL: it bursts, and everything hostile
   // standing next to what you aimed at catches the edge of it. That is the

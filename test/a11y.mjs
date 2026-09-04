@@ -5,7 +5,7 @@ import { extname, join } from 'path';
 const root = join(process.cwd(), '..');
 const MIME = { '.html':'text/html','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml' };
 const server = createServer(async (req,res)=>{ const p=req.url==='/'?'/index.html':req.url.split('?')[0];
-  try{ res.writeHead(200,{'content-type':MIME[extname(p)]||'application/octet-stream'}); res.end(await readFile(join(root,p))); }catch{res.writeHead(404);res.end();} });
+  try{ const body=await readFile(join(root,p)); res.writeHead(200,{'content-type':MIME[extname(p)]||'application/octet-stream'}); res.end(body); }catch{res.writeHead(404);res.end();} });
 await new Promise(r=>server.listen(0,r));
 const port = server.address().port;
 const b = await chromium.launch({ executablePath: process.env.CHROMIUM });

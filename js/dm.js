@@ -291,6 +291,7 @@ async function ask(messages, tools) {
 export async function sendToDM(playerText, { silent = false } = {}) {
   if (chat.busy) return;
   chat.busy = true; chat.error = null;
+  A.setDmResolving(true);        // a click cannot move a hero while the round is being resolved
   if (playerText && !silent) {
     chat.messages.push({ role: 'user', text: playerText, t: Date.now() });
     A.notePlayerTurn();          // drives offerOverdue in get_fitness_log
@@ -405,6 +406,7 @@ export async function sendToDM(playerText, { silent = false } = {}) {
     chat.messages.push({ role: 'system', text: humanError(chat.error), t: Date.now() });
   } finally {
     chat.busy = false;
+    A.setDmResolving(false);
     emit('chat');
   }
 }

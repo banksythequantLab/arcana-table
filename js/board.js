@@ -3,7 +3,7 @@
 // drag-to-move — and effects, so the board reacts instead of just updating.
 
 import { state, GRID_W, GRID_H, currentMap, isRevealed, isWalkable, findToken } from './state.js';
-import { moveToken, moveParty, onChange, emit } from './actions.js';
+import { moveToken, moveParty, combatStep, stepRefusal, onChange, emit } from './actions.js';
 import { TOKEN_ART, TILE_COLORS } from './art.js';
 import { fx, step, draw as drawFx, damageNumber, burst, ring, kick, flash, slash } from './fx.js';
 
@@ -197,7 +197,7 @@ function onMove(e) {
   const onToken = c && state.tokens.some(t => t.x === c.x && t.y === c.y);
   canvas.style.cursor = !c ? 'default'
     : onToken ? 'grab'
-    : (isWalkable(c.x, c.y) && !state.downed && !state.challenge && !state.oath && !state.warmup) ? 'pointer'
+    : (isWalkable(c.x, c.y) && !state.downed && !state.challenge && !state.oath && !state.warmup && !stepRefusal()) ? 'pointer'
     : 'not-allowed';
 }
 function onUp(e) {
@@ -206,6 +206,19 @@ function onUp(e) {
     const t = drag.token;
     drag = null;
     if (c && (c.x !== t.x || c.y !== t.y) && isWalkable(c.x, c.y)) {
+      // Dragging was the one way left to move a hero across the room mid-fight
+      // — no turn check, no step limit, no pause for the dice. A drag now
+      // answers to the same rules as a click: out of a fight it is a move; in
+      // one, it is a step for whoever's turn it is, toward where you dropped.
+      if (state.downed || state.challenge || state.oath || state.warmup) { ring(c.x, c.y, '#D9534F'); return; }
+      if (state.combat.active && t.kind === 'pc') {
+        const cur = state.combat.order[state.combat.turnIndex];
+        const r = cur === t.id ? combatStep({ x: c.x, y: c.y }) : { error: 'not your turn' };
+        if (r?.error) { ring(c.x, c.y, '#D9534F'); return; }
+        lastPos.set(t.id, r.to); ring(r.to.x, r.to.y, '#F2C14E'); emit('player-move');
+        return;
+      }
+      if (state.combat.active) { ring(c.x, c.y, '#D9534F'); return; }   // monsters move themselves
       lastPos.set(t.id, c);
       moveToken({ tokenId: t.id, x: c.x, y: c.y });
       ring(c.x, c.y, '#F2C14E');
@@ -242,31 +255,16 @@ export function walkTo(c) {
     emit('player-move');               // the DM reacts to it like any other move
     return r;
   }
-  const actor = state.tokens.find(t => t.id === state.combat.order[state.combat.turnIndex]);
-  if (!actor || actor.kind !== 'pc') {
-    ring(c.x, c.y, '#D9534F');
-    return { error: `It is ${actor ? actor.name + "'s" : 'not your'} turn.` };
-  }
-  const step = oneStepToward(actor, c);
-  if (!step) { ring(c.x, c.y, '#D9534F'); return { error: 'No open square that way.' }; }
-  const r = moveParty({ x: step.x, y: step.y, who: actor.id });
+  // The rules for a click in a fight live in actions.combatStep — one step a
+  // turn, none once you have swung, none while the dice are in the air or the
+  // DM is mid-round, none on a monster's turn — so the board and the tests
+  // share them. Here we only paint the answer.
+  const r = combatStep({ x: c.x, y: c.y });
   if (r?.error) { ring(c.x, c.y, '#D9534F'); return r; }
-  ring(step.x, step.y, '#F2C14E');
-  if (step.x !== c.x || step.y !== c.y) ring(c.x, c.y, '#F2C14E55');   // where you pointed, faintly
+  ring(r.to.x, r.to.y, '#F2C14E');
+  if (r.to.x !== c.x || r.to.y !== c.y) ring(c.x, c.y, '#F2C14E55');   // where you pointed, faintly
   emit('player-move');
-  return { ...r, step: true, from: { x: actor.x, y: actor.y }, toward: { x: c.x, y: c.y } };
-}
-
-/** One square from `from` toward `to` — diagonal if open, else the nearer straight. */
-function oneStepToward(from, to) {
-  const dx = Math.sign(to.x - from.x), dy = Math.sign(to.y - from.y);
-  if (!dx && !dy) return null;
-  const free = (x, y) => isWalkable(x, y) && !state.tokens.some(t => t.x === x && t.y === y && t.hp > 0);
-  const tries = [{ x: from.x + dx, y: from.y + dy }];
-  if (dx && dy) tries.push({ x: from.x + dx, y: from.y }, { x: from.x, y: from.y + dy });
-  else if (dx)  tries.push({ x: from.x + dx, y: from.y + 1 }, { x: from.x + dx, y: from.y - 1 });
-  else          tries.push({ x: from.x + 1, y: from.y + dy }, { x: from.x - 1, y: from.y + dy });
-  return tries.find(p => free(p.x, p.y)) || null;
+  return r;
 }
 
 // ── render loop ──────────────────────────────────────────────────────────────

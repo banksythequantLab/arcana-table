@@ -93,9 +93,56 @@ ck('a click seven squares away moves the active hero ONE square', bAfter.x === 6
 ck('and reports it as a step toward the click', farClick.step === true && farClick.toward?.x === 12);
 const mAfter = await page.evaluate(() => { const m = window.__st.tokens.find(t => t.name === 'Mira'); return { x: m.x, y: m.y }; });
 ck('the rest of the party did not come along', mAfter.x === 4 && mAfter.y === 6, JSON.stringify(mAfter));
+// "While engaging in a fight there is a window where I click and the people
+// move when they shouldn't." One step is one step A TURN, not one per click.
+const again = await page.evaluate(() => window.arcana.walkTo(12, 6));
+const bAgain = await page.evaluate(() => { const b = window.__st.tokens.find(t => t.name === 'Brannok'); return { x: b.x, y: b.y }; });
+ck('a second click in the same turn moves nobody', !!again.error && bAgain.x === 6 && bAgain.y === 6, again.error || JSON.stringify(bAgain));
+ck('and says the step is spent', /already stepped/i.test(again.error || ''), again.error || '');
+ck('the cursor says so too', (await page.evaluate(() => window.arcana.stepRefusal()))?.spent === true);
+// Next round: the step is back.
+await page.evaluate(() => { window.__st.combat.round++; });
 const diag = await page.evaluate(() => window.arcana.walkTo(9, 9));
 const bDiag = await page.evaluate(() => { const b = window.__st.tokens.find(t => t.name === 'Brannok'); return { x: b.x, y: b.y }; });
-ck('a diagonal click steps diagonally', bDiag.x === 7 && bDiag.y === 7, JSON.stringify(bDiag));
+ck('next round, a diagonal click steps diagonally', bDiag.x === 7 && bDiag.y === 7, JSON.stringify(bDiag));
+// The windows: dice still in the air, and the DM mid-round.
+await page.evaluate(async () => { window.__st.combat.round++; (await import('/js/actions.js')).rollDice({ formula: 'd20', reason: 'test' }); });
+const inAir = await page.evaluate(() => window.arcana.walkTo(12, 6));
+ck('while the dice are in the air a click moves nobody', !!inAir.error && /dice/i.test(inAir.error), inAir.error || 'moved');
+await page.evaluate(() => { window.__st.dice.t -= 10000; });                 // the roll landed a while ago
+await page.evaluate(() => window.arcana.setDmResolving(true));
+const midRound = await page.evaluate(() => window.arcana.walkTo(12, 6));
+ck('while the DM is resolving the round a click moves nobody', !!midRound.error && /resolving/i.test(midRound.error), midRound.error || 'moved');
+await page.evaluate(() => window.arcana.setDmResolving(false));
+// A swing spends the turn: no stepping away afterwards.
+await page.evaluate(async () => {
+  const A = await import('/js/actions.js');
+  const b = window.__st.tokens.find(t => t.name === 'Brannok');
+  const g = A.addToken({ name: 'Nearby', kind: 'monster', art: 'goblin', x: b.x + 1, y: b.y, hp: 500 }).token;
+  A.attack({ attackerId: b.id, targetId: g.id, kind: 'melee' });
+  window.__st.dice.t -= 10000;
+});
+const afterSwing = await page.evaluate(() => window.arcana.walkTo(3, 3));
+ck('after a swing the turn is spent — a click moves nobody', !!afterSwing.error && /swung/i.test(afterSwing.error), afterSwing.error || 'moved');
+await page.evaluate(() => { window.__st.tokens = window.__st.tokens.filter(t => t.name !== 'Nearby'); window.__st.combat.order = window.__st.combat.order.filter(id => window.__st.tokens.some(t => t.id === id)); window.__st.combat.turnIndex = 0; });
+// Dragging in a fight answers to the same rules: one step, on your turn.
+await page.evaluate(() => { window.__st.combat.round++; });
+// The earlier clicks nudged the (aborted) DM; let that settle so the only rule in play is the drag's.
+await page.waitForTimeout(900);                                   // the 700ms nudge fires…
+await page.waitForFunction(() => !window.arcana.stepRefusal(), null, { timeout: 5000 }).catch(() => {});   // …and the aborted call settles
+const bNow = await page.evaluate(() => { const b = window.__st.tokens.find(t => t.name === 'Brannok'); return { x: b.x, y: b.y }; });
+const dropCell = await page.evaluate(async (b) => {          // an open floor cell well to the right of him
+  const S = await import('/js/state.js');
+  for (let dx = 5; dx >= 3; dx--) for (const dy of [0, -1, 1]) if (S.isWalkable(b.x + dx, b.y + dy)) return { x: b.x + dx, y: b.y + dy };
+  return null;
+}, bNow);
+const dFrom = await cellPoint(bNow.x, bNow.y), dTo = await cellPoint(dropCell.x, dropCell.y);
+await page.mouse.move(dFrom.x, dFrom.y); await page.mouse.down();
+await page.mouse.move(dTo.x, dTo.y, { steps: 8 }); await page.mouse.up();
+await page.waitForTimeout(300);
+const bDragged = await page.evaluate(() => { const b = window.__st.tokens.find(t => t.name === 'Brannok'); return { x: b.x, y: b.y }; });
+const dragDist = Math.max(Math.abs(bDragged.x - bNow.x), Math.abs(bDragged.y - bNow.y));
+ck('dragging a hero five squares mid-fight moves him ONE', dragDist === 1 && bDragged.x === bNow.x + 1, `${JSON.stringify(bNow)} → ${JSON.stringify(bDragged)} (dropped at ${JSON.stringify(dropCell)})`);
 // A monster's turn: the click does nothing to anyone.
 await page.evaluate(() => { const o = window.__st.combat.order; window.__st.combat.turnIndex = o.findIndex(id => window.__st.tokens.find(t => t.id === id)?.kind === 'monster'); });
 const pcsBefore = await page.evaluate(() => window.__st.tokens.filter(t => t.kind === "pc").map(t => `${t.x},${t.y}`).join("|"));

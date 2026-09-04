@@ -30,7 +30,7 @@ There are 25 tools on `document.modelContext`. 21 are always there. Three more (
 
 The DM loop is about 180 lines. It calls `getTools()`, turns the result into OpenAI function specs, sends the conversation to the Worker, runs whatever tool calls come back through `executeTool()`, feeds the results back in, and repeats up to seven times before it has to say something. There's no other path for it to change the game. The DM Panel tab in the app shows you the same registry live, every tool with a form built from its JSON schema, and running one goes through the same `executeTool()` and shows up in the same log.
 
-There's a Playwright test suite, 493 assertions in eleven files, that drives everything through the real `document.modelContext` in headless Chromium. It checks the registry growing and shrinking with combat, both approval paths, all the effort modes, a full five-beat run, and it samples pixels off the canvas. That last part exists because I once shipped a scope bug that made every monster disappear from the board and all 196 tests at the time still passed.
+There's a Playwright test suite, 500 assertions in eleven files, that drives everything through the real `document.modelContext` in headless Chromium. It checks the registry growing and shrinking with combat, both approval paths, all the effort modes, a full five-beat run, and it samples pixels off the canvas. That last part exists because I once shipped a scope bug that made every monster disappear from the board and all 196 tests at the time still passed.
 
 I used Claude (in Cowork) as a pair programmer for most of the build. A lot of the test suite and the refactoring described below came out of that.
 

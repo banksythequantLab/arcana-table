@@ -417,6 +417,9 @@ export async function initTools() {
     resetQuest: () => A.resetQuest(),
     // Clicking the map is a player gesture, not a tool — tests drive it here.
     walkTo: (x, y) => import('./board.js').then(b => b.walkTo({ x, y })),
+    stepRefusal: () => A.stepRefusal(),
+    setDmResolving: (v) => A.setDmResolving(v),
+    stepsPerTurn: A.STEPS_PER_TURN,
     // The warm-up runs on a wall clock, so tests need to step it by hand.
     currentStretch: () => A.currentStretch(),
     skipStretch: () => A.skipStretch(),
