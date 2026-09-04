@@ -205,6 +205,28 @@ ck('the prose version was never spoken to the player', !newLines.some(l => /woul
 ck('the corrected line was', newLines.some(l => /edge is yours/.test(l)));
 ck('and the story log says what happened', bounce.logged);
 
+console.log('— the drowned guard is in the hall from the start, and walking up to it starts the fight —');
+// "No skeleton on start." The first beat's guard is on the board before the DM
+// says a word, and the party reaching it is what begins combat — not the DM
+// remembering to call start_combat.
+await page.evaluate(() => localStorage.clear());
+await page.reload(); await page.waitForFunction(() => window.arcana);
+await page.click('#intro-type');
+await page.waitForSelector('#warm-offer:not([hidden])', { timeout: 3000 }).catch(() => {});
+if (await page.isVisible('#warm-offer-no').catch(() => false)) { await page.click('#warm-offer-no'); await page.waitForTimeout(150); }
+const guard = await page.evaluate(() => window.__st.tokens.find(t => t.name === 'Drowned Guard'));
+ck('a fresh table has the Drowned Guard on the board', !!guard && guard.kind === 'monster' && guard.art === 'skeleton', JSON.stringify(guard || {}).slice(0, 80));
+ck('it is the first beat\'s own monster', await page.evaluate(async () => (await import('/js/state.js')).QUEST.beats[0].spawn?.name === 'Drowned Guard'));
+ck('and the party starts out of its reach, so the warm-up is not an ambush', await page.evaluate(() => !window.__st.combat.active));
+const call = (n, a = {}) => page.evaluate(([n, a]) => window.arcana.call(n, a), [n, a]);
+const stillNo = await call('advance_quest', { summary: 'we tiptoe past' });
+ck('the first beat will not clear while it stands', !!stillNo.error && stillNo.mustDefeat === 'Drowned Guard', (stillNo.error || '').slice(0, 60));
+const walk = await call('move_party', { x: 6, y: 6 });
+ck('walking the party up to it starts the fight by itself', walk.combatStarted === true && (walk.ambush || []).includes('Drowned Guard'), JSON.stringify(walk).slice(0, 120));
+ck('with the party first in the order, so the player gets the opening move', await page.evaluate(() => {
+  const o = window.__st.combat.order.map(id => window.__st.tokens.find(t => t.id === id)?.kind); return window.__st.combat.active && o[0] === 'pc'; }));
+ck('and the guard is in that order', await page.evaluate(() => window.__st.combat.order.includes(window.__st.tokens.find(t => t.name === 'Drowned Guard').id)));
+
 console.log('— the opening is pre-recorded: the DM is talking before the model is even asked —');
 // Reload to a fresh table with the DM endpoint BLOCKED. The opening line, the
 // warm-up card and the audio request must all happen anyway, from the file.

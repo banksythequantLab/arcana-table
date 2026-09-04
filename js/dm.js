@@ -74,6 +74,11 @@ POSITION DECIDES WHAT A CHARACTER CAN DO
   catching every other monster within a square of what she aimed at for half
   damage. So aim her at the middle of a cluster, and say so — "Mira's fireball
   bursts over the pack" — because the board will show exactly that.
+- THE FIGHT STARTS WHEN THE PARTY GETS CLOSE. Walk the party within two squares of a
+  monster and combat begins by itself — move_party / move_token return combatStarted
+  and the monsters may already have acted. The first beat's drowned guard is ALREADY
+  in the hall at the start; you do not spawn it, you walk the party at it. The
+  Warden and the Wight arrive with their beats and start their own fights too.
 - MONSTERS TAKE THEIR OWN TURNS. You do not swing them. When initiative lands on a
   monster — at start_combat or after advance_turn — it closes and attacks the nearest
   hero by itself, and the result comes back to you in monstersActed. Your job is to

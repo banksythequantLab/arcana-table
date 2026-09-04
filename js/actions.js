@@ -189,7 +189,8 @@ export function moveToken({ tokenId, x, y }) {
   if (t.kind === 'pc') revealPath(from, { x, y }, 3);
   logStory('action', t.name, `moved to (${x}, ${y})`);
   emit();
-  return { ok: true, token: t.id, x, y };
+  const ambush = t.kind === 'pc' ? checkAmbush() : null;
+  return { ok: true, token: t.id, x, y, ...(ambush ? { combatStarted: true, ambush: ambush.ambush, current: ambush.current } : {}) };
 }
 
 /** The nearest open cell to (x,y) that nothing is standing on. */
@@ -211,6 +212,25 @@ function nearestFree(x, y, taken) {
 // routine travel is exactly the bookkeeping a model skips. One call moves the
 // whole party, keeps the companions at the leader's shoulder, and lifts the fog
 // at the far end, so "we head through the door" is a single, reliable act.
+// A monster you walk up to does not wait for the DM to remember start_combat.
+// Come within two squares of something hostile with no fight running and the
+// fight starts — it and everything near it in the order, the party first, so
+// the player still gets the opening move. Not during a warm-up or an Oath (the
+// table is locked), and never while a hero is down.
+export function checkAmbush() {
+  if (state.combat.active || state.downed || state.warmup || state.oath || state.challenge || state.tasks) return null;
+  const pcs = state.tokens.filter(t => t.kind === 'pc' && t.hp > 0);
+  const near = state.tokens.filter(m => m.kind === 'monster' && m.hp > 0 &&
+    pcs.some(p => gridDistance(p, m) <= 2));
+  if (!near.length) return null;
+  const others = state.tokens.filter(m => m.kind === 'monster' && m.hp > 0 && !near.includes(m) &&
+    pcs.some(p => gridDistance(p, m) <= 6));
+  const order = [...pcs.map(t => t.id), ...near.map(t => t.id), ...others.map(t => t.id)];
+  logStory('combat', 'DM', `${near.map(m => m.name).join(' and ')} ${near.length > 1 ? 'turn' : 'turns'} on the party.`);
+  const r = startCombat({ order });
+  return r?.ok ? { ambush: near.map(m => m.name), ...r } : null;
+}
+
 export function moveParty({ x, y, who = 'all' }) {
   const pcs = state.tokens.filter(t => t.kind === 'pc' && (who === 'all' || t.id === who || t.name === who));
   if (!pcs.length) return { error: who === 'all' ? 'No party on the board.' : `No party member matches "${who}".` };
@@ -242,8 +262,11 @@ export function moveParty({ x, y, who = 'all' }) {
   if (!moved.length) return { error: `Nowhere to stand near (${x},${y}) — every cell is occupied.` };
   logStory('action', 'Party', `moves to (${x}, ${y}).`);
   emit();
+  const ambush = checkAmbush();
   return { ok: true, moved, left: pcs.length - moved.length,
-           ...(nudged ? { note: `(${nudged.asked.x},${nudged.asked.y}) is wall; the party stopped at (${x},${y}).` } : {}) };
+           ...(nudged ? { note: `(${nudged.asked.x},${nudged.asked.y}) is wall; the party stopped at (${x},${y}).` } : {}),
+           ...(ambush ? { combatStarted: true, ambush: ambush.ambush, current: ambush.current, monstersActed: ambush.monstersActed,
+                          note: `${ambush.ambush.join(' and ')} turned on the party — the fight has started. Narrate it; the player is up.` } : {}) };
 }
 
 export function addToken({ name, kind = 'monster', art, x, y, hp = 10, maxHp, scale }) {
@@ -378,7 +401,21 @@ export function narrate({ text, speaker = 'DM' }) {
 
 // ── combat ───────────────────────────────────────────────────────────────────
 export function startCombat({ order } = {}) {
-  if (state.combat.active) return { error: 'Combat is already running.' };
+  if (state.combat.active) {
+    // Fights start by themselves now — a monster the party walks up to, a beat's
+    // own spawn — so the DM calling start_combat mid-fight is not a mistake to
+    // punish; it is asking for the fight it is already in. Bring in any monster
+    // that is not yet in the order, light everyone up, and report the round.
+    const missing = state.tokens.filter(t => t.kind === 'monster' && t.hp > 0 && !state.combat.order.includes(t.id));
+    missing.forEach(t => state.combat.order.push(t.id));
+    state.combat.order.forEach(id => { const t = findToken(id); if (t) revealAround(t.x, t.y, 2); });
+    const cur = findToken(state.combat.order[state.combat.turnIndex]);
+    emit('combat');
+    return { ok: true, alreadyRunning: true, round: state.combat.round,
+             order: state.combat.order.map(id => findToken(id)?.name), current: cur?.name,
+             ...(missing.length ? { joined: missing.map(t => t.name) } : {}),
+             note: 'Combat was already running (it starts by itself when the party closes with a monster). This is the current round — narrate, and it is the player\'s move.' };
+  }
   let ids;
   if (Array.isArray(order) && order.length) {
     ids = order.map(o => findToken(o)?.id).filter(Boolean);

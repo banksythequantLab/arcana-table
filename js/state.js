@@ -82,10 +82,13 @@ export const QUEST = {
   beats: [
     {
       id: 'breach', mapId: 'dungeon', title: 'Breach the flooded hall',
-      objective: 'Get the party through the flooded entry hall of the Sunken Keep. Something drowned guards it — fight or outwit it.',
+      objective: 'Get the party through the flooded entry hall of the Sunken Keep. A drowned guard stands in the water — put it down.',
       reward: { items: ['Rusted Keep Key'], gold: 40 },
       boon: 'bonus+3',
       honorific: 'Keep-Breakers',
+      // On the board from the first second: "no skeleton on start" was a run
+      // where the DM never spawned one and the hall was empty.
+      spawn: { name: 'Drowned Guard', art: 'skeleton', hp: 14, x: 7, y: 7 },
     },
     {
       id: 'vault', mapId: 'dungeon', title: 'Open the drowned vault',
@@ -240,6 +243,8 @@ function freshState() {
       { id: 'pc-brannok', name: 'Brannok', kind: 'pc', art: 'knight', x: 2, y: 2, hp: 24, maxHp: 24, ac: 17, str: 16, dex: 10, con: 14, int: 8, wis: 12, cha: 13, reach: 1, range: 0, conditions: [], inventory: ['Longsword', 'Shield', 'Torch ×3'] },
       { id: 'pc-mira', name: 'Mira', kind: 'pc', art: 'wizard', x: 3, y: 3, hp: 14, maxHp: 14, ac: 12, str: 8, dex: 14, con: 12, int: 17, wis: 13, cha: 10, reach: 1, range: 8, spells: ['Fireball', 'Frostbite', 'Mage Hand'], conditions: [], inventory: ['Spellbook', 'Dagger', 'Component pouch'] },
       { id: 'npc-chest', name: 'Old Chest', kind: 'object', art: 'chest', x: 18, y: 11, hp: 10, maxHp: 10, reach: 0, range: 0, conditions: [], inventory: [] },
+      // The first beat's guard, present before the DM says a word (see QUEST.beats[0].spawn).
+      { id: 'mon-drowned-guard', name: 'Drowned Guard', kind: 'monster', art: 'skeleton', x: 7, y: 7, hp: 14, maxHp: 14, ac: 12, reach: 1, range: 0, conditions: [], inventory: [] },
     ],
     revealed: [],                 // ['x,y', …] cells cleared of fog
     combat: { active: false, order: [], turnIndex: 0, round: 1 },

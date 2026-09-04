@@ -56,6 +56,9 @@ async function enterTable(page, { muted = true } = {}) {
   // The table opens with the warm-up card already up (pre-recorded opening); clear it like a player would.
   await page.waitForSelector('#warm-offer:not([hidden])', { timeout: 3000 }).catch(() => {});
   if (await page.isVisible('#warm-offer-no').catch(() => false)) { await page.click('#warm-offer-no'); await page.waitForTimeout(150); }
+  // This suite exercises the tool surface, not the story: the first beat's guard
+  // (covered in fixes.mjs) would start a fight the moment the board ops walk near it.
+  await page.evaluate(() => { window.__st.tokens = window.__st.tokens.filter(t => t.id !== 'mon-drowned-guard'); });
 }
 
 const BASE_N = 21, COMBAT_N = 24, DOWNED_N = 22;   // base · +combat · +death_save
@@ -275,6 +278,10 @@ check('current beat carries an objective for the DM', typeof q0.current?.objecti
 check('quest rides along in get_board_state', (await call('get_board_state')).quest?.current?.id === q0.current.id);
 
 const goldBefore = (await call('get_board_state')).party.gold;
+// Beats clear over the body now, and a fight may have started by itself when a
+// board op walked past Snaggle — finish it before asking to advance.
+await page.evaluate(() => { window.__st.tokens.filter(t => t.kind === 'monster').forEach(t => { t.hp = 0; }); });
+await call('end_combat');
 const adv1 = await call('advance_quest', { summary: 'Cut the drowned thing down in the shallows.' });
 check('advance_quest moves to beat 2', adv1.ok && adv1.beatNumber === 2, JSON.stringify(adv1).slice(0, 120));
 check('clearing a beat pays a milestone', (await call('get_board_state')).party.gold > goldBefore);

@@ -80,6 +80,7 @@ await page.evaluate(async () => {
   const A = await import('/js/actions.js');
   const b = window.__st.tokens.find(t => t.name === 'Brannok'), m = window.__st.tokens.find(t => t.name === 'Mira');
   b.x = 5; b.y = 6; m.x = 4; m.y = 6;
+  window.__st.tokens = window.__st.tokens.filter(t => t.id !== 'mon-drowned-guard');   // (7,7) is on the diagonal we step along
   A.addToken({ name: 'Blocker', kind: 'monster', art: 'goblin', x: 14, y: 6, hp: 500 });
   A.startCombat({});
   // Force Brannok to the top of the order for a deterministic check.

@@ -368,7 +368,8 @@ const stolen = await page.evaluate(async () => {
   const r = A.attack({ attackerId: g.id, targetId: b.id, kind: 'melee' });   // the goblin swings first
   return { goblinGotNat20: r.critical === true && r.roll === 20, stillBanked: window.__st.boosts.setRoll === 20 };
 });
-ck('a monster\'s swing does not spend the player\'s natural 20', !stolen.goblinGotNat20 && stolen.stillBanked, JSON.stringify(stolen));
+// (A goblin can roll a real 20 on its own die one time in twenty — the claim is only that the BANKED one is untouched.)
+ck('a monster\'s swing does not spend the player\'s natural 20', stolen.stillBanked, JSON.stringify(stolen));
 ck('the hero\'s next swing does', await page.evaluate(async () => {
   const A = await import('/js/actions.js');
   const b = window.__st.tokens.find(t => t.name === 'Brannok');

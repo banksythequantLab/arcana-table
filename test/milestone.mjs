@@ -34,6 +34,8 @@ const call = (n, a = {}) => page.evaluate(([n, a]) => window.arcana.call(n, a), 
 console.log('— clearing a beat pays, and pays visibly —');
 // Bloody the party first, so the short rest is something you can see.
 await page.evaluate(() => window.__st.tokens.filter(t => t.kind === 'pc').forEach(t => { t.hp = 3; }));
+// The first beat owns its guard now: it has to be down before the beat clears.
+await page.evaluate(() => { const g = window.__st.tokens.find(t => t.name === 'Drowned Guard'); if (g) g.hp = 0; });
 const r1 = await call('advance_quest', { summary: 'Cut the drowned guard down.' });
 ck('the beat advanced', !r1.error && r1.beatNumber === 2, JSON.stringify(r1).slice(0, 70));
 ck('it names what was cleared and what it paid', !!r1.cleared && !!r1.paid, JSON.stringify(r1.paid));
